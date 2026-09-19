@@ -9,6 +9,7 @@ COMMANDS = {
     "cards":     ("fetch Scryfall's bulk card file", "cards"),
     "upscale":   ("4x-upscale card art through a local ComfyUI", "upscale"),
     "fonts":     ("report which frame fonts are present", "fonts"),
+    "impose":    ("lay rendered PNGs out 3x3 on a printable PDF", "impose"),
     "print":     ("send a PDF to the printer at true 100%", "printing"),
 }
 

@@ -74,7 +74,18 @@ A set is a JSON file (see `sets/bls1.json`):
 | `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
 | `mint fonts` | report which frame fonts are present |
+| `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
+
+End to end, on this machine:
+
+```sh
+mint upscale --set sets/bls1.json
+mint render  --set sets/bls1.json --out proofs
+mint impose  --out proofs/bls1.pdf proofs/0*.png
+mint print   --test proofs/bls1.pdf        # one page on plain paper first
+mint print   -p matte proofs/bls1.pdf
+```
 
 ## Fonts
 
@@ -116,7 +127,6 @@ queue a workflow, fetch outputs) that any other ComfyUI workflow can reuse.
   whatever the set's identity is — with the style prompt living in the set
   file next to `art_filter`. Needs a diffusion checkpoint in ComfyUI's
   `models/`; none is bundled.
-- an imposer (PNGs → 3×3 letter-size PDF with cut marks) to feed `mint print`
 - layouts beyond `normal`: split, MDFC, planeswalker, saga
 - picking art from a specific printing (`mint cards --kind default_cards`
   fetches the data; the render still uses the oracle default)
