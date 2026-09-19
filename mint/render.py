@@ -96,8 +96,23 @@ def load_card(name):
             if c["layout"] == "art_series":  # same name, no rules text or art id
                 continue
             if c["name"].lower() == want or c["name"].lower().startswith(want + " //"):
-                return c
+                return front_face(c)
     sys.exit(f"not in {CARDS.name}: {name}")
+
+
+def front_face(card):
+    """Double-faced cards (transform, modal_dfc) keep art, text, cost and type per
+    face; present the front face's fields at the top level so the frame renders
+    it as a normal card. The back face is not rendered yet."""
+    faces = card.get("card_faces")
+    if faces and "image_uris" not in card:
+        card = {**card, **{k: v for k, v in faces[0].items() if k != "object"}, "full_name": card["name"]}
+    return card
+
+
+def overrides(cards, card):
+    """The set file's entry for a card, keyed by either its face name or its full 'A // B' name."""
+    return cards.get(card["name"]) or cards.get(card.get("full_name", ""), {})
 
 
 def symbols():
@@ -296,7 +311,7 @@ def main(argv=None):
         b, page = browser(p, a.dpi)
         for i, name in enumerate(names, 1):
             card = load_card(name)
-            ov = cards.get(card["name"], {})
+            ov = overrides(cards, card)
             number = ov.get("number", i)
             art_filter = None
             if a.styled:

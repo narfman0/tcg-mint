@@ -147,7 +147,7 @@ def main(argv=None):
         s = {**style, "seed": style["seed"] * 1000 + i}
         # a per-card `subject` pins what the picture is of ("a gaunt long-haired man in black
         # armour at a workbench") so the style prompt can't drift it into something else
-        subject = cards.get(card["name"], {}).get("subject")
+        subject = render.overrides(cards, card).get("subject")
         if subject:
             s["prompt"] = f"{subject}, {s['prompt']}"
         try:
