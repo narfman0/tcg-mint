@@ -215,8 +215,13 @@ def esc(s):
 def render_text(card, table, flavor=None):
     def syms(s):
         return re.sub(r"\{[^}]+\}", lambda m: f'<img class="sym" src="{symbol_data_uri(m.group(0), table)}">', esc(s))
+    text = card.get("oracle_text") or ""
+    # a basic land shows one big mana symbol instead of its "({T}: Add {G}.)" line
+    m = re.fullmatch(r"\(\{T\}: Add (\{[WUBRGC]\})\.\)", text.strip())
+    if card["type_line"].startswith("Basic") and m:
+        return f'<p class="big-sym"><img src="{symbol_data_uri(m.group(1), table)}"></p>'
     paras = []
-    for p in (card.get("oracle_text") or "").split("\n"):
+    for p in text.split("\n"):
         p = syms(p)
         p = re.sub(r"\(([^)]*)\)", r'<span class="reminder">(\1)</span>', p)
         # a run of symbols plus any trailing punctuation wraps as one unit
@@ -224,7 +229,9 @@ def render_text(card, table, flavor=None):
         paras.append(f"<p>{p}</p>")
     flavor = card.get("flavor_text") if flavor is None else flavor
     if flavor:
-        paras.append(f'<p class="flavor">{esc(flavor)}</p>')
+        # Scryfall marks the non-italic spans of flavor text (card names, emphasis) with *...*
+        f = re.sub(r"\*([^*]+)\*", r'<span class="upright">\1</span>', esc(flavor))
+        paras.append(f'<p class="flavor">{f}</p>')
     return "\n".join(paras)
 
 
