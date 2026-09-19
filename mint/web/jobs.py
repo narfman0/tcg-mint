@@ -19,6 +19,7 @@ class Job:
     params: dict
     state: str = "queued"      # queued | running | done | failed | cancelled
     log: list = field(default_factory=list)
+    items: list = field(default_factory=list)   # what the job made, one entry per unit (job.made)
     done: int = 0
     total: int = 0
     result: object = None
@@ -32,7 +33,7 @@ class Job:
 
     def to_dict(self):
         return {"id": self.id, "kind": self.kind, "title": self.title, "params": self.params, "state": self.state,
-                "log": self.log[-200:], "done": self.done, "total": self.total, "result": self.result,
+                "log": self.log[-200:], "items": self.items[-500:], "done": self.done, "total": self.total, "result": self.result,
                 "error": self.error, "created": self.created, "started": self.started, "finished": self.finished}
 
     # --- for the job function -------------------------------------------------
@@ -42,7 +43,10 @@ class Job:
 
     def made(self, **what):
         """One unit of the job's output is on disk -- a card's variant, a render -- and the page can
-        show it now rather than when the whole batch ends. `what` names it (set, name, ...)."""
+        show it now rather than when the whole batch ends, and link to it from the job afterwards.
+        `what` names it: set and name (the card), and what was made -- kind, key (the column on the
+        card page: a variant hash, render-plain / render-styled), path (the file), label / file."""
+        self.items.append(dict(what))
         self._jobs.emit("item", {"id": self.id, **what})
 
     def step(self, done, total=None):

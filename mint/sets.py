@@ -93,8 +93,9 @@ class Style:
     repose_end: float = 0.3
     # inspire only: how much the reference image weighs against the words, for what fraction of
     # the steps, and how -- standard: all of it; prompt first: the words settle the composition
-    # before the image comes in; style: the image's look without its layout
-    inspire_weight: float = 0.7
+    # before the image comes in; style: the image's look without its layout. Base-SDXL checkpoints
+    # (Juggernaut) take 0.6-0.8; Pony burns to flat neon above ~0.5, so 0.35-0.5 there
+    inspire_weight: float = 0.5
     inspire_end: float = 0.8
     inspire_type: str = "standard"
     # keys the file spelled out, so saving keeps them even at their default value

@@ -472,15 +472,12 @@ def create_app(ws):
         kind = body.get("kind")
         st = S.find_set(body["set"]) if body.get("set") else None
         names = body.get("names") or (st.names() if st else [])
-        if kind == "render":
-            return submit_render(S, st, names, body).to_dict()
-        if kind == "enhance":
-            return submit_enhance(S, st, names, body).to_dict()
-        if kind == "restyle":
-            return submit_restyle(S, st, names, body).to_dict()
-        if kind == "themes":
-            return submit_themes(S, st, names, body).to_dict()
-        raise HTTPException(400, f"unknown job kind {kind!r}")
+        submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes}.get(kind)
+        if not submit:
+            raise HTTPException(400, f"unknown job kind {kind!r}")
+        job = submit(S, st, names, body)
+        job.params["origin"] = body.get("origin")  # where on the page it was asked for, for the jobs list
+        return job.to_dict()
 
     @app.get("/api/events")
     def events(request: Request):
@@ -631,6 +628,8 @@ def submit_render(S, st, names, body):
         raise HTTPException(400, "bad sub directory")
     out_dir = str(S.out_dir(st) / sub if sub else S.out_dir(st))
     title = f"render {st.code} {'styled ' if styled else ''}{len(names)} card(s) @ {dpi}"
+    what = (f"composes {len(names)} card(s) of {st.code} -- frame, text and their {'styled' if styled else 'plain'} art -- "
+            f"at {dpi} dpi; the art must already exist, none is made")
 
     def run(job):
         job.step(0, len(names))
@@ -640,12 +639,14 @@ def submit_render(S, st, names, body):
             done.append(r.out)
             job.say(f"{os.path.basename(r.out)}" + (f"  text {r.sizes['text']}px" if r.shrunk else "") +
                     "".join(f"  warning: {w}" for w in r.warnings))
-            job.made(set=st.code, name=r.name)
+            job.made(set=st.code, name=r.name, kind="render", key=f"render-{'styled' if styled else 'plain'}",
+                     file=os.path.basename(r.out), path=r.out)
             job.step(len(done))
         render.render_cards(S.ws, names, set_path=st.path, styled=styled, dpi=dpi, out_dir=out_dir,
                             on_rendered=on_rendered)
         return {"files": done, "out_dir": out_dir}
-    return S.jobs.submit("render", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi}, run)
+    return S.jobs.submit("render", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi,
+                                           "what": what, "dest": out_dir}, run)
 
 
 def submit_themes(S, st, names, body):
@@ -659,12 +660,13 @@ def submit_themes(S, st, names, body):
         def on_rendered(r):
             done.append(r.out)
             job.say(f"{r.theme}: {os.path.basename(r.out)}")
-            job.made(set=st.code, name=name)
+            job.made(set=st.code, name=name, kind="theme", file=os.path.basename(r.out), path=r.out)
             job.step(len(done))
         render.render_cards(S.ws, [name], set_path=st.path, themes=list(frame.THEMES), dpi=int(body.get("dpi") or 300),
                             out_dir=out_dir, compare=True, on_rendered=on_rendered)
         return {"files": done}
-    return S.jobs.submit("themes", f"themes for {name}", {"set": st.code, "names": [name]}, run)
+    return S.jobs.submit("themes", f"themes for {name}", {"set": st.code, "names": [name], "dest": out_dir,
+                                                          "what": f"renders {name} once in every frame theme, side by side"}, run)
 
 
 def submit_enhance(S, st, names, body):
@@ -683,11 +685,13 @@ def submit_enhance(S, st, names, body):
             job.say(f"{'enhanced' if did else 'cached'} {name} -> {v.label}-{v.hash}")
             made.append(v.hash)
             if st:
-                job.made(set=st.code, name=name)
+                job.made(set=st.code, name=name, kind=v.kind, key=v.hash, label=v.label, path=str(v.path))
             job.step(i + 1)
         return {"variants": made}
     title = f"enhance {len(names)} card(s) from {base}"
-    return S.jobs.submit("enhance", title, {"set": st.code if st else None, "names": names, "base": base, "model": model}, run)
+    what = f"an ESRGAN pass ({model}) over the {'crop' if base == 'crop' else 'variant ' + base} of {len(names)} card(s); a new enhance variant each"
+    return S.jobs.submit("enhance", title, {"set": st.code if st else None, "names": names, "base": base, "model": model,
+                                            "what": what, "dest": str(S.art.dir)}, run)
 
 
 def submit_restyle(S, st, names, body):
@@ -728,10 +732,14 @@ def submit_restyle(S, st, names, body):
                 take = f"  (take {t + 1}, seed {sd})" if takes > 1 else ""
                 job.say(f"{'restyled' if did else 'cached'} {name} -> {v.label}-{v.hash}{take}")
                 made.append(v.hash)
-                job.made(set=st.code, name=name)
+                job.made(set=st.code, name=name, kind=v.kind, key=v.hash, label=v.label, path=str(v.path))
                 job.step(i * takes + t + 1)
         return {"variants": made}
     title = f"restyle {len(names)} card(s) as {sty.name}" + (f" x {takes} takes" if takes > 1 else "")
     title += (" (lab)" if overrides else "") + ("" if up else ", drafts: enhance the keeper")
-    params = {"set": st.code, "names": names, "style": overrides, "template": template, "label": sty.name, "takes": takes}
+    what = (f"makes art for {len(names)} card(s) of {st.code} in the look {sty.name} (mode {sty.remix}; a card's own mode, "
+            f"base, subject and seed win), {takes} take(s) each, {'with' if up else 'without'} the ESRGAN pass; "
+            f"{'the template taken whole' if template else 'the lab knobs over the set style' if overrides else 'the set style'}")
+    params = {"set": st.code, "names": names, "style": overrides, "template": template, "label": sty.name, "takes": takes,
+              "what": what, "dest": str(S.art.dir)}
     return S.jobs.submit("restyle", title, params, run)

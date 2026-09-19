@@ -43,8 +43,8 @@ function toast(msg, bad = false) {
   const d = document.createElement('div'); d.textContent = msg; if (bad) d.className = 'bad';
   $('#toast').appendChild(d); setTimeout(() => d.remove(), bad ? 8000 : 3500);
 }
-async function submit(job) {
-  try { const j = await api('/api/jobs', {method: 'POST', body: job}); state.jobs[j.id] = j; toast(`queued: ${j.title}`); renderJobstrip(); return j; }
+async function submit(job, origin) {
+  try { const j = await api('/api/jobs', {method: 'POST', body: {...job, origin}}); state.jobs[j.id] = j; toast(`queued: ${j.title}`); renderJobstrip(); return j; }
   catch (e) { toast(e.message, true); }
 }
 
@@ -156,7 +156,7 @@ function connect() {
     if (route().view === 'jobs') jobs();
   });
   es.addEventListener('progress', e => { const d = JSON.parse(e.data); const j = state.jobs[d.id]; if (j) { j.done = d.done; j.total = d.total; renderJobstrip(); } });
-  es.addEventListener('item', e => arrived(JSON.parse(e.data)));
+  es.addEventListener('item', e => { const d = JSON.parse(e.data); const j = state.jobs[d.id]; if (j) { (j.items || (j.items = [])).push(d); if (route().view === 'jobs') jobs(); } arrived(d); });
   es.addEventListener('log', e => { const d = JSON.parse(e.data); const j = state.jobs[d.id]; if (j) { j.log.push(d.msg); if (route().view === 'jobs') jobs(); } });
   es.onerror = () => setTimeout(() => { es.close(); connect(); }, 3000);
 }
@@ -376,7 +376,8 @@ function board() {
         'enhance': {kind: 'enhance', set: s, names: list, base: 'crop'},
         'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
       };
-      if (jobs[job]) submit(jobs[job]);
+      const origin = `${all ? 'all-sets board' : code + ' board'}: ${n ? `${n} selected` : 'all cards'}${state.missing ? ', only what\'s missing' : ''}${all ? ` (${s})` : ''}`;
+      if (jobs[job]) submit(jobs[job], origin);
     });
   });
 }
@@ -765,13 +766,14 @@ async function card(r) {
     e.stopPropagation(); const key = b.closest('.col').dataset.key;
     ab[b.dataset.ab] = ab[b.dataset.ab] === key ? null : key; card(r);
   });
-  const render = styled => submit({kind: 'render', set: code, names: [c.name], styled, dpi: state.dpi});
+  const origin = `card page: ${c.name}`;
+  const render = styled => submit({kind: 'render', set: code, names: [c.name], styled, dpi: state.dpi}, origin);
   document.querySelectorAll('[data-cjob]').forEach(b => b.onclick = () => {
     const j = b.dataset.cjob, names = [c.name];
     if (j === 'restyle') submit({kind: 'restyle', set: code, names, template: lookTemplate(st.style), takes: state.takes,
                                  upscale: state.takes > 1 ? state.upscale : undefined,
-                                 seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined});
-    else if (j === 'enhance-styled') submit({kind: 'enhance', set: code, names, base: styledV.hash});
+                                 seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined}, origin + ' (generate)');
+    else if (j === 'enhance-styled') submit({kind: 'enhance', set: code, names, base: styledV.hash}, origin);
     else if (j === 'render-plain') render(false);
     else if (j === 'render-styled') render(true);
   });
@@ -781,7 +783,7 @@ async function card(r) {
     const act = b.dataset.act, arg = b.dataset.arg, names = [c.name];
     if (act === 'keep') put({pick: arg});
     else if (act === 'unpick') put({pick: null});
-    else if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg});
+    else if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg}, origin);
     else if (act === 'base') put({base: arg === 'crop' ? null : arg});
     else if (act === 'pose') put({pose: arg});
     else if (act === 'pin') put({seed: +arg});
@@ -892,7 +894,7 @@ function lab() {
   $('#run').onclick = () => {
     const over = {}; for (const f of fields) if (f.name !== 'name' && changed(f)) over[f.name] = L.values[f.name];
     if (!st.style) over.prompt = L.values.prompt || '';
-    submit({kind: 'restyle', set: code, names: L.probes, style: over, label: L.label || undefined, upscale: $('#upscale').checked});
+    submit({kind: 'restyle', set: code, names: L.probes, style: over, label: L.label || undefined, upscale: $('#upscale').checked}, `${code} recipe lab`);
   };
   $('#save').onclick = () => {
     const body = {}; for (const f of fields) if (f.name !== 'name' && changed(f) || ['prompt'].includes(f.name)) body[f.name] = L.values[f.name];
@@ -950,8 +952,8 @@ function frame() {
   $('#fcard').onchange = e => { F.name = e.target.value; frame(); };
   const saveCss = () => api(`/api/sets/${code}/css`, {method: 'PUT', body: {css: $('#css').value}}).then(() => { F.css = $('#css').value; st.css = F.css; toast('css saved'); });
   $('#savecss').onclick = () => saveCss().catch(e => toast(e.message, true));
-  $('#proof').onclick = () => saveCss().then(() => submit({kind: 'render', set: code, names: [F.name], styled: false, dpi: 300, sub: 'proof'})).catch(e => toast(e.message, true));
-  $('#themes').onclick = () => submit({kind: 'themes', set: code, names: [F.name]});
+  $('#proof').onclick = () => saveCss().then(() => submit({kind: 'render', set: code, names: [F.name], styled: false, dpi: 300, sub: 'proof'}, `${code} frame page`)).catch(e => toast(e.message, true));
+  $('#themes').onclick = () => submit({kind: 'themes', set: code, names: [F.name]}, `${code} frame page`);
   $('#getscan').onclick = () => api(`/api/sets/${code}/cards/${encodeURIComponent(F.name)}/scan`, {method: 'POST'}).then(d => { F.scan = d.path; frame(); }).catch(e => toast(e.message, true));
   $('#op').oninput = e => { F.opacity = +e.target.value; const o = $('#ours'); if (o) o.style.opacity = 1 - F.opacity / 100; };
   document.querySelectorAll('[data-open]').forEach(p => p.onclick = () => window.open(file(p.dataset.open), '_blank'));
@@ -970,7 +972,7 @@ const FIELD_HELP = {
   refine: 'a second pass at refine_scale x the size with this denoise; 0 = off', refine_scale: '1-3',
   clip_skip: '1 = the checkpoint\'s CLIP; 2 for Pony-family checkpoints', remix: 'restyle: redraw the base; repose: a new picture holding only the pose image\'s skeleton; new: from the prompt alone; inspire: a new picture with the base as an IP-Adapter reference',
   repose_strength: 'repose only: how hard the OpenPose skeleton is held (0-1)', repose_end: 'repose only: the fraction of the steps the skeleton is held for',
-  inspire_weight: 'inspire only: the reference image\'s weight against the words (0-2; 0.7 is a start)', inspire_end: 'inspire only: the fraction of the steps the image is read for',
+  inspire_weight: 'inspire only: the reference image\'s weight against the words (0-2; 0.6-0.8 on base-SDXL checkpoints, 0.35-0.5 on Pony, which burns above that)', inspire_end: 'inspire only: the fraction of the steps the image is read for',
   inspire_type: 'inspire only: standard; prompt first (the words settle the composition before the image weighs in); style (its look, not its subject)',
 };
 function fieldInput(f, v) {
@@ -1292,9 +1294,24 @@ async function jobs() {
         <span class="muted" style="margin-left:auto">${new Date(j.created * 1000).toLocaleTimeString()}${j.finished ? ` · ${Math.round(j.finished - (j.started || j.created))}s` : ''}</span></div>
       ${j.state === 'running' ? `<div class="bar"><i style="width:${j.total ? 100 * j.done / j.total : 0}%"></i></div>` : ''}
       ${j.error ? `<div class="bad">${esc(j.error)}</div>` : ''}
-      ${j.log.length ? `<pre>${esc(j.log.slice(-40).join('\n'))}</pre>` : ''}
+      <div class="desc">${j.params?.what ? `<div>${esc(j.params.what)}</div>` : ''}
+        <div class="muted">${j.params?.origin ? `from <b>${esc(j.params.origin)}</b>` : 'from the API'}${j.params?.dest ? ` · to <span class="mono">${esc(j.params.dest)}</span>` : ''}</div></div>
+      ${j.items?.length ? `<div class="items">${j.items.map(itemHtml).join('')}</div>` : ''}
+      ${j.log.length ? `<details class="log"><summary class="muted">log</summary><pre>${esc(j.log.slice(-40).join('\n'))}</pre></details>` : ''}
     </div>`).join('') || '<div class="empty">no jobs yet</div>');
   document.querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => api(`/api/jobs/${b.dataset.cancel}/cancel`, {method: 'POST'}).then(jobs));
+  // the preview loads on the first hover, not with the page
+  document.querySelectorAll('.it[data-src]').forEach(a => a.addEventListener('mouseenter', () => {
+    const im = a.querySelector('img'); if (im && !im.src) im.src = a.dataset.src;
+  }, {once: true}));
+}
+
+/* One thing a job made: a link to that image on the card page, the picture itself on hover. */
+function itemHtml(it) {
+  const href = it.key ? colHash(it.set, it.name, it.key) : `#/set/${esc(it.set)}/card/${encodeURIComponent(it.name)}`;
+  const what = it.label ? `${it.label}-${it.key}` : it.file || it.kind || '';
+  return `<a class="it ${it.kind === 'render' || it.kind === 'theme' ? 'card' : ''}" href="${href}" ${it.path ? `data-src="${img(it.path, 320)}"` : ''}>
+      ${esc(it.name)} <span class="mono muted">${esc(what)}</span>${it.path ? '<span class="peek"><img alt=""></span>' : ''}</a>`;
 }
 
 /* --- boot ------------------------------------------------------------------------------- */

@@ -51,7 +51,9 @@ the old ones stay for comparison.
              (the subject line: who, the pose, the scene) decide the rest.
              inspire_type "prompt first" lets the words settle the composition
              before the image weighs in; "style" takes the look and not the
-             subject. Needs the ComfyUI_IPAdapter_plus nodes, the SDXL
+             subject. The weight is the knob that matters: base-SDXL
+             checkpoints take 0.6-0.8, Pony burns to flat neon above ~0.5 and
+             wants 0.35-0.5. Needs the ComfyUI_IPAdapter_plus nodes, the SDXL
              ip-adapter-plus vit-h weights and the CLIP ViT-H image encoder.
 
 Output is 2x the generation size (a 4x ESRGAN pass halved), ~1130 DPI on the
@@ -89,7 +91,9 @@ def preprocessor(control, src):
     raise SetError(f"unknown control {control!r}")
 
 
-INSPIRE_TYPE = {"standard": "standard", "prompt first": "prompt is more important", "style": "style transfer"}
+# the IPAdapterAdvanced weight types behind the plain names: linear = the image all the way through;
+# ease out = strong early, fading, so the words settle the composition; style transfer = the look alone
+INSPIRE_TYPE = {"standard": "linear", "prompt first": "ease out", "style": "style transfer"}
 
 
 def workflow(image_name, s, prefix, upscale=True):
@@ -114,13 +118,16 @@ def workflow(image_name, s, prefix, upscale=True):
     if s.get("clip_skip", 1) > 1:
         w["5"] = {"class_type": "CLIPSetLastLayer", "inputs": {"clip": clip, "stop_at_clip_layer": -s["clip_skip"]}}
         clip = ["5", 0]
+    bare = model  # the refine pass samples without the image prompt: the picture is composed by then
     if remix == "inspire":
         # the base as an image prompt: the unified loader finds the SDXL plus adapter and the ViT-H
-        # encoder by name; the patched model goes to every sampler (the refine pass too)
+        # encoder by name. "K+V w/ C penalty" keeps the image from burning the colours out, which
+        # it does on checkpoints far from base SDXL (Pony) with the plain scaling
         w["30"] = {"class_type": "IPAdapterUnifiedLoader", "inputs": {"model": model, "preset": "PLUS (high strength)"}}
-        w["31"] = {"class_type": "IPAdapter", "inputs": {
+        w["31"] = {"class_type": "IPAdapterAdvanced", "inputs": {
             "model": ["30", 0], "ipadapter": ["30", 1], "image": ["2", 0], "weight": s["inspire_weight"],
-            "start_at": 0.0, "end_at": s["inspire_end"], "weight_type": INSPIRE_TYPE[s["inspire_type"]]}}
+            "weight_type": INSPIRE_TYPE[s["inspire_type"]], "combine_embeds": "concat",
+            "start_at": 0.0, "end_at": s["inspire_end"], "embeds_scaling": "K+V w/ C penalty"}}
         model = ["31", 0]
     w.update({
         "7": {"class_type": "CLIPTextEncode", "inputs": {"clip": clip, "text": s["prompt"]}},
@@ -160,7 +167,7 @@ def workflow(image_name, s, prefix, upscale=True):
                    "inputs": {"image": final, "upscale_method": "lanczos", "scale_by": s["refine_scale"]}}
         w["21"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["20", 0], "vae": ["4", 2]}}
         w["22"] = {"class_type": "KSampler", "inputs": {
-            "model": model, "positive": ["7", 0], "negative": ["8", 0], "latent_image": ["21", 0],
+            "model": bare, "positive": ["7", 0], "negative": ["8", 0], "latent_image": ["21", 0],
             "seed": s["seed"] + 1, "steps": s["steps"], "cfg": s["cfg"], "sampler_name": s["sampler"],
             "scheduler": s["scheduler"], "denoise": s["refine"]}}
         w["23"] = {"class_type": "VAEDecode", "inputs": {"samples": ["22", 0], "vae": ["4", 2]}}
