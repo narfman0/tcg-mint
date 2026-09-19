@@ -263,7 +263,7 @@ def build_html(card, theme, table, number, set_code, set_size, override, art_fil
         text=render_text(card, table, override.get("flavor")), pt=pt, text_class="has-pt" if pt else "",
         number=f"{number:03d}", set_size=set_size, rarity=card["rarity"][0].upper(),
         artist=esc(card["artist"]), maker_code=MAKER_CODE, maker=MAKER,
-        date=dt.date.today().strftime("%Y-%m"),
+        date=dt.date.today().strftime("%Y"),
         orig_set=card["set"].upper(), orig_number=card["collector_number"],
     )
 
