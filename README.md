@@ -135,15 +135,16 @@ A local page over the workspace, for comparing and deciding:
 - **Viewer** (click a card) — the tile's image large: ← → or a swipe steps
   through the board in its current order, wheel / pinch / drag zoom and pan,
   `s` `p` `a` switch styled / plain / art, `c` opens compare, `f` fullscreen.
-- **Card** (`c`, or click a tile) — three parts. *Card*: type, printing,
-  subject, and the styled art — the variant the styled render uses — with
-  the renders and their buttons. *Generate*: one mode (restyle, repose, new)
+- **Card** (`c`, or click a tile) — type, printing and subject up top, then
+  three parts in pipeline order. *Generate*: one mode (restyle, repose, new)
   and only that mode's inputs — the look, what the picture starts from or
   takes its pose from, the seed, how many takes — all of them this card's
   own overrides, with a reset back to the set's. *Images*: the Scryfall crop,
   every variant the cache holds grouped by look with the knobs that differ
   from the set's recipe, each enhance beside the image it was made from.
   Mark two images A and B for a wipe with zoom and pan, or a blind A/B.
+  *Card*, at the bottom: the styled art — the variant the styled render
+  uses — with the renders and their buttons.
   A restyled variant offers *keep* — it becomes the card's styled art (the
   entry's `pick`), whatever the recipe says — and *enhance*; a menu on every
   image holds *restyle from this*, *repose from this*, *pin its seed*,
