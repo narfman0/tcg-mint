@@ -128,14 +128,20 @@ A local page over the workspace, for comparing and deciding:
 - **Sets** — every card as a tile (styled render, plain render, or just the
   art), with badges from the render manifest: no restyle for the current
   recipe, not rendered, rules text shrunk, Universes Beyond art, own art.
+  In styled mode a picker shows any restyle label the art cache holds, not
+  just the set's own recipe; a search box matches name, type and artist.
   Shift-click to select cards; render, enhance or restyle the selection.
-- **Compare** (click a card) — the Scryfall crop, every variant the cache
+  *all* in the nav puts every set on one board.
+- **Viewer** (click a card) — the tile's image large: ← → or a swipe steps
+  through the board in its current order, wheel / pinch / drag zoom and pan,
+  `s` `p` `a` switch styled / plain / art, `c` opens compare, `f` fullscreen.
+- **Compare** (`c`, or *compare* in the viewer) — the Scryfall crop, every variant the cache
   holds with the knobs that differ from the set's recipe, and the renders,
   side by side. Mark two images A and B for a wipe with zoom and pan, or a
   blind A/B. Each image offers *enhance* (an ESRGAN pass, from any image),
-  *restyle from this* and *use as base* (which image the next restyle starts
-  from), and a restyled variant offers *use recipe for set*. The card's
-  printing, subject and seed are set here too.
+  *restyle from this*, *use as base* (which image the next restyle starts
+  from) and *delete*; a restyled variant offers *use recipe for set*. The
+  card's printing, subject, seed and the set-wide restyle base are set here.
 - **Recipe lab** — a form for every knob in the style block, a few probe
   cards, and a run button; results land as variants in a probe-by-recipe
   grid as they finish. New knobs are one field in `sets.Style` and one node
@@ -233,6 +239,16 @@ Each card's seed comes from the set's seed and its illustration id
 (`"seed_rule": "stable"`), so cards differ, reruns don't, and adding a card
 never changes another's; sets migrated from before this carry
 `"seed_rule": "position"` so their existing images stay current.
+
+`"remix"` in the style block (or per card) is what a restyle keeps of the
+picture it starts with — three modes: **`restyle`** redraws it in the style
+(img2img + ControlNet, the default); **`repose`** is a fresh picture laid out
+by the original's structure, the ControlNet letting go at `control_end`, so
+the figure is free to move; **`new`** is a new scene from the prompt alone,
+with the card's `subject` line (else its name and type line) as the only
+thread back to the original. `"refine": 0.4` adds a second sampling pass at
+1.5× the size for detail, and `"clip_skip": 2` is what Pony-family
+checkpoints want.
 
 Per card, `"base": "<variant hash>"` starts the restyle from an enhanced or
 earlier restyled image instead of the crop, and `"seed": 123` pins a seed you
