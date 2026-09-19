@@ -493,7 +493,8 @@ async function card(r) {
           <span>restyle base</span><span><span class="badge">${esc(c.entry.base || state.set.base || 'crop')}</span>${!c.entry.base && state.set.base ? ' <span class="muted">(set-wide)</span>' : ''} ${c.entry.base ? '<button class="small" id="basecrop">use set default</button>' : ''}
             <select id="setbase" title="set-wide base: every card starts its restyle from this"><option value="">set-wide: crop</option>${styleLabels(state.set.cards_detail).filter(([l]) => l !== state.set.style?.name).map(([l, k]) => `<option value="${esc(l)}" ${state.set.base === l ? 'selected' : ''}>set-wide: ${esc(l)} (${k})</option>`).join('')}</select></span>
           <span>subject</span><span><input type="text" id="subject" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene"></span>
-          <span>seed</span><span><input type="number" id="seed" value="${c.entry.seed ?? ''}" placeholder="derived: ${c.recipe?.seed ?? '-'}" style="width:9em"> ${c.entry.seed != null ? '<button class="small" id="unpin">unpin</button>' : ''}</span>
+          <span>seed</span><span><input type="number" id="seed" value="${c.entry.seed ?? ''}" placeholder="derived: ${c.recipe?.seed ?? '-'}" style="width:9em" title="the number the picture is generated from; same seed + same recipe = same picture. Empty = a fixed value derived from the set, so it is reproducible. Pin a number (or roll one) to explore other takes.">
+            <button class="small" id="roll" title="put a random seed here (then generate)">🎲</button>${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to the derived, reproducible seed">unpin</button>' : ''}</span>
           <span>remix</span><span><select id="remix" title="what the next restyle keeps of the base image">
             <option value="">style's (${state.set.style?.remix || 'restyle'})</option>
             ${Object.entries(REMIX).map(([m, d]) => `<option value="${m}" ${c.entry.remix === m ? 'selected' : ''}>${m} · ${d}</option>`).join('')}</select></span>
@@ -505,8 +506,8 @@ async function card(r) {
     </div>
     <div class="toolbar" title="jobs for this card; a restyle starts from the base shown above">
       <span class="muted">this card:</span>
-      <button data-cjob="restyle" ${state.set.style ? '' : 'disabled'} title="run the recipe above: this card's base, remix mode and subject with the set's style">${esc(c.entry.remix || state.set.style?.remix || 'restyle')}</button>
-      <button data-cjob="restyle-force" ${state.set.style ? '' : 'disabled'} title="a fresh run of the same recipe even though its variant exists">again</button>
+      <button data-cjob="restyle" ${state.set.style ? '' : 'disabled'} title="generate: the base, subject and remix mode above, in the set's style">${esc(c.entry.remix || state.set.style?.remix || 'restyle')}</button>
+      <button data-cjob="another" ${state.set.style ? '' : 'disabled'} title="the same, but with a fresh random seed — a different take you can compare, then pin or promote if you like it">another take</button>
       <span class="sep"></span>
       <button data-cjob="enhance">enhance</button>
       <button data-cjob="render-plain">render plain</button>
@@ -547,6 +548,7 @@ async function card(r) {
   $('#seed').onchange = e => put({seed: e.target.value === '' ? null : +e.target.value});
   $('#remix').onchange = e => put({remix: e.target.value || null});
   if ($('#unpin')) $('#unpin').onclick = () => put({seed: null});
+  $('#roll').onclick = () => put({seed: 1 + Math.floor(Math.random() * 2 ** 31)});
   if ($('#basecrop')) $('#basecrop').onclick = () => put({base: null});
   $('#setbase').onchange = e => api(`/api/sets/${code}/base`, {method: 'PUT', body: {base: e.target.value || null}}).then(() => { toast(e.target.value ? `every ${code} restyle now starts from its ${e.target.value}` : 'restyles start from the crop'); refresh(); }).catch(e => toast(e.message, true));
   document.querySelectorAll('[data-ab]').forEach(b => b.onclick = e => {
@@ -556,7 +558,7 @@ async function card(r) {
   document.querySelectorAll('[data-cjob]').forEach(b => b.onclick = () => {
     const j = b.dataset.cjob, names = [c.name];
     if (j === 'restyle') submit({kind: 'restyle', set: code, names});
-    else if (j === 'restyle-force') submit({kind: 'restyle', set: code, names, force: true});
+    else if (j === 'another') { const seed = 1 + Math.floor(Math.random() * 2 ** 31); put({seed}).then(() => submit({kind: 'restyle', set: code, names})); }
     else if (j === 'enhance') submit({kind: 'enhance', set: code, names, base: c.entry.base || state.set.base || 'crop'});
     else if (j === 'render-plain') submit({kind: 'render', set: code, names, styled: false, dpi: 1200});
     else if (j === 'render-styled') submit({kind: 'render', set: code, names, styled: true, dpi: 1200});
