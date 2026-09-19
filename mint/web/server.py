@@ -9,7 +9,7 @@ import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from .. import PKG, comfy, frame, render, restyle, sets, upscale
+from .. import PKG, comfy, frame, newset, render, restyle, sets, style, upscale
 from ..art import Art
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
@@ -53,6 +53,16 @@ class State:
             if st.code.lower() == code.lower():
                 return st
         raise HTTPException(404, f"no set with code {code}")
+
+    def codes(self):
+        """Every set code in the workspace, lowercased."""
+        out = set()
+        for p in self.set_paths():
+            try:
+                out.add(sets.load(p).code.lower())
+            except MintError:
+                continue
+        return out
 
     def out_dir(self, st):
         return self.ws.home / "out" / st.code.lower()
@@ -140,6 +150,116 @@ def create_app(ws):
         st = S.find_set(code)
         return set_detail(S, st)
 
+    @app.post("/api/sets")
+    def post_set(body: dict):
+        """A new set: code, name, the cards (a decklist text or a list of names), an optional style
+        template and tier. An existing code is refused; `mint newset` is the way to append to one."""
+        code = (body.get("code") or "").strip().upper()
+        if not code.isalnum():
+            raise HTTPException(400, "a set code is letters and digits, like SAT")
+        if code.lower() in S.codes():
+            raise HTTPException(400, f"there is already a set {code}")
+        names = card_names(body)
+        with S.lock:
+            path, st, _ = newset.create(ws, code, body.get("name") or code, names, style_name=body.get("style") or None,
+                                        private=bool(body.get("private")))
+        return set_detail(S, st)
+
+    @app.patch("/api/sets/{code}")
+    def patch_set(code: str, body: dict):
+        """The set's own fields: name, code, size, note, art_filter, base (null clears one)."""
+        st = S.find_set(code)
+        allowed = ("name", "code", "size", "note", "art_filter", "base")
+        bad = set(body) - set(allowed)
+        if bad:
+            raise HTTPException(400, f"not a set field: {', '.join(sorted(bad))}; the editor takes {', '.join(allowed)}")
+        with S.lock:
+            d = st.to_dict()
+            for k, v in body.items():
+                if v is None or v == "":
+                    d.pop(k, None)
+                else:
+                    d[k] = v
+            if "code" in body:
+                d["code"] = str(body.get("code") or "").strip().upper()
+                if not d["code"].isalnum():
+                    raise HTTPException(400, "a set code is letters and digits, like SAT")
+                if d["code"].lower() != st.code.lower() and d["code"].lower() in S.codes():
+                    raise HTTPException(400, f"there is already a set {d['code']}")
+            new = sets.from_dict(d, str(st.path))
+            new.path, new.css = st.path, st.css
+            sets.save(st.path, new)
+        return set_detail(S, new)
+
+    @app.delete("/api/sets/{code}")
+    def delete_set(code: str):
+        """Remove the set file and its css. Renders under out/ and the art cache stay."""
+        st = S.find_set(code)
+        with S.lock:
+            st.path.unlink()
+            css = st.path.with_suffix(".css")
+            if css.exists():
+                css.unlink()
+        return {"deleted": str(st.path)}
+
+    @app.post("/api/sets/{code}/cards")
+    def post_cards(code: str, body: dict):
+        """Append cards (a decklist text or a list of names) after the set's last number.
+        Names the card file does not know are refused, all of them at once, unless `force`."""
+        st = S.find_set(code)
+        names = newset.dedupe(card_names(body))
+        unknown = [n for n in names if not S.cards().printings(n)]
+        if unknown and not body.get("force"):
+            raise HTTPException(400, f"not in the card file: {', '.join(unknown)}")
+        with S.lock:
+            added = newset.add_cards(st, names)
+            sets.save(st.path, st)
+        d = set_detail(S, st)
+        d["added"] = added
+        return d
+
+    @app.put("/api/sets/{code}/cards")
+    def put_cards(code: str, body: dict):
+        """The card list in a new order (`order`: every name, once), optionally renumbered 1..n."""
+        st = S.find_set(code)
+        order = body.get("order") or st.names()
+        if sorted(order) != sorted(st.names()):
+            raise HTTPException(400, "order must list every card of the set exactly once")
+        with S.lock:
+            st.cards = {n: st.cards[n] for n in order}
+            if body.get("renumber"):
+                for i, e in enumerate(st.cards.values(), 1):
+                    e.number = i
+            sets.save(st.path, st)
+        return set_detail(S, st)
+
+    @app.delete("/api/sets/{code}/cards/{name}")
+    def delete_card(code: str, name: str):
+        st = S.find_set(code)
+        with S.lock:
+            if name not in st.cards:
+                raise HTTPException(404, f"{name} is not in {st.code}")
+            del st.cards[name]
+            st.size = len(st.cards)
+            sets.save(st.path, st)
+        return set_detail(S, st)
+
+    @app.post("/api/sets/{code}/cards/{name}/rename")
+    def rename_card(code: str, name: str, body: dict):
+        """Change which card an entry names (a typo, a different face), keeping its place and edits."""
+        st = S.find_set(code)
+        new = (body.get("name") or "").strip()
+        if not new:
+            raise HTTPException(400, "a name is needed")
+        with S.lock:
+            if name not in st.cards:
+                raise HTTPException(404, f"{name} is not in {st.code}")
+            if new != name and new in st.cards:
+                raise HTTPException(400, f"{new} is already in {st.code}")
+            st.cards = {(new if n == name else n): e for n, e in st.cards.items()}
+            sets.save(st.path, st)
+        return set_detail(S, st)
+
     @app.put("/api/sets/{code}/style")
     def put_style(code: str, body: dict):
         st = S.find_set(code)
@@ -147,6 +267,60 @@ def create_app(ws):
             st.style = sets.from_dict({"code": "x", "style": body}).style if body else None
             sets.save(st.path, st)
         return set_detail(S, st)
+
+    @app.post("/api/sets/{code}/style/template")
+    def style_from_template(code: str, body: dict):
+        """Replace the set's style block with a template's (or a built-in's); its css too when
+        `css` is true or the set has none."""
+        st = S.find_set(code)
+        new_style, css = style.load(ws, body.get("template") or "")
+        with S.lock:
+            st.style = new_style
+            sets.save(st.path, st)
+            css_fn = st.path.with_suffix(".css")
+            if css and (body.get("css") or not st.css):
+                css_fn.write_text(css)
+                st.css = css
+        return set_detail(S, st)
+
+    # --- style templates ---------------------------------------------------------------------
+    @app.get("/api/styles")
+    def styles_list():
+        return [template_dict(S, name, p, private) for name, p, private in style.templates(ws)]
+
+    @app.get("/api/styles/{name}")
+    def get_style(name: str):
+        for n, p, private in style.templates(ws):
+            if n == name:
+                return template_dict(S, n, p, private)
+        raise HTTPException(404, f"no style template {name}")
+
+    @app.put("/api/styles/{name}")
+    def put_style_template(name: str, body: dict):
+        """Create or replace a template: `style` is the block as the file would hold it (every key
+        given is spelled out), `css` its frame rules, `private` the tier. A built-in's name makes
+        a file that shadows it."""
+        block = dict(body.get("style") or {})
+        block["name"] = name
+        new_style = sets.from_dict({"code": "x", "style": block}, f"styles/{name}.json").style
+        with S.lock:
+            p = style.write(ws, name, new_style, body.get("css") or "", private=bool(body.get("private")))
+        return template_dict(S, name, p, ws.is_private(p))
+
+    @app.post("/api/styles")
+    def post_style_from_set(body: dict):
+        """Save a set's style block as a template, as `mint style save` does (name, private, force)."""
+        st = S.find_set(body.get("set") or "")
+        with S.lock:
+            p = style.save(ws, st, body.get("name") or None, private=bool(body.get("private")),
+                           force=bool(body.get("force")))
+        return template_dict(S, p.stem, p, ws.is_private(p))
+
+    @app.delete("/api/styles/{name}")
+    def delete_style_template(name: str):
+        with S.lock:
+            p = style.delete(ws, name)
+        return {"deleted": str(p)}
 
     @app.put("/api/sets/{code}/cards/{name}")
     def put_card(code: str, name: str, body: dict):
@@ -314,6 +488,35 @@ def create_app(ws):
 
 
 # --- detail builders ------------------------------------------------------------------------
+def card_names(body):
+    """The card names a request carries: `names` (a list) or `decklist` (text, counts optional)."""
+    names = list(body.get("names") or [])
+    if body.get("decklist"):
+        names += newset.parse_decklist(body["decklist"], plain=True)
+    names = [n.strip() for n in names if isinstance(n, str) and n.strip()]
+    if not names:
+        raise HTTPException(400, "no card names given")
+    return names
+
+
+def template_dict(S, name, path, private):
+    """A style template for the page: the block as its file spells it, its css, and which sets
+    carry a style of that name."""
+    st, css = style.load(S.ws, name)
+    block = sets._slim(dataclasses.asdict(st), sets.Style, st.explicit)
+    used = []
+    for p in S.set_paths():
+        try:
+            s = sets.load(p)
+        except MintError:
+            continue
+        if s.style and s.style.name == name:
+            used.append(s.code)
+    shadowed = path is not None and style.find(S.ws, name) != path
+    return {"name": name, "path": str(path) if path else None, "private": private, "builtin": path is None,
+            "shadowed": shadowed, "style": block, "css": css, "sets": used}
+
+
 def style_fields():
     """The Style schema for the recipe form: name, type, default."""
     out = []
@@ -470,6 +673,7 @@ def submit_restyle(S, st, names, body):
             base["name"] = body["label"]
         style = sets.from_dict({"code": "x", "style": base}).style
     force, up = bool(body.get("force")), body.get("upscale", True)
+    seed = body.get("seed")
 
     def run(job):
         server = S.comfy()
@@ -479,7 +683,7 @@ def submit_restyle(S, st, names, body):
         made = []
         for i, name in enumerate(names):
             card = cards.find(name, st.card({"name": name}).printing)
-            v, did = restyle.restyle(server, S.art, card, st, style=style, force=force, upscale=up)
+            v, did = restyle.restyle(server, S.art, card, st, style=style, force=force, upscale=up, seed=seed)
             job.say(f"{'restyled' if did else 'cached'} {name} -> {v.label}-{v.hash}")
             made.append(v.hash)
             job.step(i + 1)

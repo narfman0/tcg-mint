@@ -195,3 +195,14 @@ def test_remix_modes_change_the_workflow_and_the_hash():
     assert len({sets.recipe_hash(x) for x in (r1, r2, r3)}) == 3
     with pytest.raises(SetError, match="remix"):
         sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "remix": "wilder"}})
+
+
+def test_one_off_seed_overrides_without_pinning():
+    st = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "seed": 7}})
+    alpha = {"name": "Alpha", "illustration_id": "a"}
+    assert st.recipe(alpha, seed=999)["seed"] == 999      # the roll a "generate" passes
+    assert st.cards["Alpha"].seed is None                  # the file is untouched
+    st.cards["Alpha"].seed = 55
+    assert st.recipe(alpha)["seed"] == 55                  # a pinned seed is used when no override
+    assert st.recipe(alpha, seed=999)["seed"] == 999       # an override still wins for its one run
+    assert sets.recipe_hash(st.recipe(alpha, seed=1)) != sets.recipe_hash(st.recipe(alpha, seed=2))

@@ -148,9 +148,10 @@ class SetFile:
             return style.seed * 1000 + self.position(name)
         return style.seed * 1000 + zlib.crc32(illustration_id.encode()) % 1000
 
-    def recipe(self, record, style=None, art=None):
+    def recipe(self, record, style=None, art=None, seed=None):
         """The effective restyle recipe for one card, as a plain dict, or None without a style.
-        With the art cache, a base named by label becomes that card's newest variant's hash."""
+        With the art cache, a base named by label becomes that card's newest variant's hash.
+        `seed` overrides for a one-off run (an unpinned "generate" rolls one) without touching the file."""
         style = style or self.style
         if style is None:
             return None
@@ -172,7 +173,7 @@ class SetFile:
         subject = entry.subject or (f"{record['name']}, {record.get('type_line', '')}".rstrip(", ") if remix == "new" else None)
         if subject:
             r["prompt"] = f"{subject}, {r['prompt']}"
-        r["seed"] = self.card_seed(record["name"], record.get("illustration_id", ""), style)
+        r["seed"] = seed if seed is not None else self.card_seed(record["name"], record.get("illustration_id", ""), style)
         base = entry.base or self.base or "crop"
         if art is not None and is_label(base):
             v = art.latest(record, base)
