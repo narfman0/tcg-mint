@@ -30,7 +30,13 @@ def enhance_recipe(model=DEFAULT_MODEL, base="crop"):
 
 
 def enhance(server, art, card, model=DEFAULT_MODEL, base="crop", force=False):
-    """Make (or find) the enhance variant of `base` for this card. Returns (Variant, made)."""
+    """Make (or find) the enhance variant of `base` for this card. Returns (Variant, made).
+    A base given by label ("spore") means this card's newest such variant."""
+    if sets.is_label(base):
+        v = art.latest(card, base)
+        if not v:
+            raise MintError(f"{card['name']}: no {base!r} variant yet to enhance")
+        base = v.hash
     recipe = enhance_recipe(model, base)
     h = sets.recipe_hash(recipe)
     if not force:

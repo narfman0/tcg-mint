@@ -14,6 +14,9 @@ block, so a set's look is reproducible:
       "control_strength": 0.8,
       "denoise": 0.85, "steps": 28, "cfg": 6, "seed": 7,
       "checkpoint": "juggernautXL_v9.safetensors",
+      "clip_skip": 2,                       Pony-family checkpoints want 2; default 1
+      "remix": "restyle",                   restyle | repose | new (below); a card entry can override
+      "refine": 0.4, "refine_scale": 1.5,   second pass at 1.5x size, denoise 0.4: detail; default off
       "loras": [{"name": "x.safetensors", "strength": 0.7}],
       "width": 1248, "height": 912          generation size (art window is 1.42:1)
     }
@@ -21,9 +24,21 @@ block, so a set's look is reproducible:
 A card entry may add `"subject": "..."` -- what the picture is of -- which is
 prepended to the prompt so the style can't drift a character into someone else,
 and `"base": "<variant hash>"` to start from an enhanced or earlier restyled
-image instead of Scryfall's crop. The effective recipe (sets.SetFile.recipe)
+image instead of Scryfall's crop. The set's own `"base": "spore"` does that
+for every card at once, by label: each card starts from its newest spore
+variant, so one style can be remixed through another. The effective recipe (sets.SetFile.recipe)
 is hashed into the output name, so every change to it is a new variant and
 the old ones stay for comparison.
+
+`remix` is what the result keeps of the picture it starts from -- three modes:
+
+    restyle  img2img from the base with the ControlNet: same picture, redrawn
+    repose   an empty latent, the ControlNet from the base until control_end,
+             the prompt from there on: same layout, a new picture (freer
+             pose the lower control_end and control_strength are)
+    new      an empty latent and the prompt alone -- no base image at all.
+             The card's subject line is the only thread back to the original;
+             without one the card's name and type line stand in for it.
 
 Output is 2x the generation size (a 4x ESRGAN pass halved), ~1130 DPI on the
 card. `mint render --styled` picks these up automatically.
@@ -55,13 +70,15 @@ def preprocessor(control, src):
 
 
 def workflow(image_name, s, prefix, upscale=True):
-    w = {
-        "1": {"class_type": "LoadImage", "inputs": {"image": image_name}},
-        "2": {"class_type": "ImageScale", "inputs": {"image": ["1", 0], "upscale_method": "lanczos",
-                                                     "width": s["width"], "height": s["height"], "crop": "center"}},
-        "3": preprocessor(s["control"], ["2", 0]),
-        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": s["checkpoint"]}},
-    }
+    remix = s.get("remix", "restyle")
+    w = {"4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": s["checkpoint"]}}}
+    if remix != "new":
+        w.update({
+            "1": {"class_type": "LoadImage", "inputs": {"image": image_name}},
+            "2": {"class_type": "ImageScale", "inputs": {"image": ["1", 0], "upscale_method": "lanczos",
+                                                         "width": s["width"], "height": s["height"], "crop": "center"}},
+            "3": preprocessor(s["control"], ["2", 0]),
+        })
     model, clip = ["4", 0], ["4", 1]
     for i, lora in enumerate(s["loras"]):
         nid = f"lora{i}"
@@ -69,22 +86,49 @@ def workflow(image_name, s, prefix, upscale=True):
                                                           "strength_model": lora.get("strength", 0.7),
                                                           "strength_clip": lora.get("strength", 0.7)}}
         model, clip = [nid, 0], [nid, 1]
+    if s.get("clip_skip", 1) > 1:
+        w["5"] = {"class_type": "CLIPSetLastLayer", "inputs": {"clip": clip, "stop_at_clip_layer": -s["clip_skip"]}}
+        clip = ["5", 0]
     w.update({
         "7": {"class_type": "CLIPTextEncode", "inputs": {"clip": clip, "text": s["prompt"]}},
         "8": {"class_type": "CLIPTextEncode", "inputs": {"clip": clip, "text": s["negative"]}},
-        "9": {"class_type": "ControlNetLoader", "inputs": {"control_net_name": s["controlnet"]}},
-        "10": {"class_type": "SetUnionControlNetType", "inputs": {"control_net": ["9", 0], "type": UNION_TYPE[s["control"]]}},
-        "11": {"class_type": "ControlNetApplyAdvanced", "inputs": {
-            "positive": ["7", 0], "negative": ["8", 0], "control_net": ["10", 0], "image": ["3", 0],
-            "strength": s["control_strength"], "start_percent": 0.0, "end_percent": s["control_end"], "vae": ["4", 2]}},
-        "12": {"class_type": "VAEEncode", "inputs": {"pixels": ["2", 0], "vae": ["4", 2]}},
+    })
+    positive, negative = ["7", 0], ["8", 0]
+    if remix != "new":
+        w.update({
+            "9": {"class_type": "ControlNetLoader", "inputs": {"control_net_name": s["controlnet"]}},
+            "10": {"class_type": "SetUnionControlNetType", "inputs": {"control_net": ["9", 0], "type": UNION_TYPE[s["control"]]}},
+            "11": {"class_type": "ControlNetApplyAdvanced", "inputs": {
+                "positive": ["7", 0], "negative": ["8", 0], "control_net": ["10", 0], "image": ["3", 0],
+                "strength": s["control_strength"], "start_percent": 0.0, "end_percent": s["control_end"], "vae": ["4", 2]}},
+        })
+        positive, negative = ["11", 0], ["11", 1]
+    if remix == "restyle":
+        w["12"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["2", 0], "vae": ["4", 2]}}
+        denoise = s["denoise"]
+    else:  # a fresh picture: nothing of the base's pixels survives, only (repose) its structure
+        w["12"] = {"class_type": "EmptyLatentImage", "inputs": {"width": s["width"], "height": s["height"], "batch_size": 1}}
+        denoise = 1.0
+    w.update({
         "13": {"class_type": "KSampler", "inputs": {
-            "model": model, "positive": ["11", 0], "negative": ["11", 1], "latent_image": ["12", 0],
+            "model": model, "positive": positive, "negative": negative, "latent_image": ["12", 0],
             "seed": s["seed"], "steps": s["steps"], "cfg": s["cfg"], "sampler_name": s["sampler"],
-            "scheduler": s["scheduler"], "denoise": s["denoise"]}},
+            "scheduler": s["scheduler"], "denoise": denoise}},
         "14": {"class_type": "VAEDecode", "inputs": {"samples": ["13", 0], "vae": ["4", 2]}},
     })
     final = ["14", 0]
+    if s.get("refine"):
+        # hires pass: the first result, scaled up, sampled again lightly with the bare prompt (no
+        # control -- the picture is already composed; this pass only draws it in finer)
+        w["20"] = {"class_type": "ImageScaleBy",
+                   "inputs": {"image": final, "upscale_method": "lanczos", "scale_by": s["refine_scale"]}}
+        w["21"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["20", 0], "vae": ["4", 2]}}
+        w["22"] = {"class_type": "KSampler", "inputs": {
+            "model": model, "positive": ["7", 0], "negative": ["8", 0], "latent_image": ["21", 0],
+            "seed": s["seed"] + 1, "steps": s["steps"], "cfg": s["cfg"], "sampler_name": s["sampler"],
+            "scheduler": s["scheduler"], "denoise": s["refine"]}}
+        w["23"] = {"class_type": "VAEDecode", "inputs": {"samples": ["22", 0], "vae": ["4", 2]}}
+        final = ["23", 0]
     if upscale:
         w["15"] = {"class_type": "UpscaleModelLoader", "inputs": {"model_name": s["upscaler"]}}
         w["16"] = {"class_type": "ImageUpscaleWithModel", "inputs": {"upscale_model": ["15", 0], "image": final}}
@@ -96,6 +140,9 @@ def workflow(image_name, s, prefix, upscale=True):
 
 def restyle_file(server, src, dest, recipe, prefix="tcg-mint/restyle", upscale=True):
     """Run the style workflow with an effective recipe (sets.SetFile.recipe) on any image file into dest."""
+    if recipe.get("remix") == "new":  # nothing to read: the prompt is the whole input
+        os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+        return server.run_to_file(workflow(None, recipe, prefix, upscale), str(dest), timeout=900)
     src = str(src)
     if recipe.get("grayscale_source"):
         # monochrome styles: the starting latent keeps (1 - denoise) of the source,
@@ -115,14 +162,15 @@ def restyle(server, art, card, st, style=None, force=False, upscale=True):
     style = style or st.style
     if style is None:
         raise SetError(f"{st.path or st.code} has no `style` block")
-    recipe = st.recipe(card, style)
+    recipe = st.recipe(card, style, art)
     h = sets.recipe_hash(recipe)
     if not force:
         v = art.variant(card, h)
         if v:
             return v, False
     v = art.new_variant(card, style.name, "restyle", recipe, recipe["base"], h)
-    restyle_file(server, art.base_path(card, recipe["base"]), v.path, recipe,
+    src = None if recipe["base"] == "none" else art.base_path(card, recipe["base"])
+    restyle_file(server, src, v.path, recipe,
                  "tcg-mint/" + card["illustration_id"] + "." + style.name, upscale)
     return art.record(v), True
 

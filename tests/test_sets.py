@@ -105,3 +105,93 @@ def test_card_lookup_by_face_or_full_name():
     st = sets.from_dict({"code": "T", "cards": {"Front // Back": {"number": 3}}})
     assert st.card({"name": "Front", "full_name": "Front // Back"}).number == 3
     assert st.card({"name": "Other"}).number is None
+
+
+def test_clip_skip_is_a_knob_only_when_set():
+    from mint import restyle
+    st = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p"}})
+    alpha = {"name": "Alpha", "illustration_id": "a"}
+    assert "clip_skip" not in st.recipe(alpha)  # default 1: hashes of existing variants stay put
+    h = sets.recipe_hash(st.recipe(alpha))
+    assert "CLIPSetLastLayer" not in {n["class_type"] for n in restyle.workflow("x.png", st.recipe(alpha), "p").values()}
+    st.style.clip_skip = 2
+    r = st.recipe(alpha)
+    assert r["clip_skip"] == 2 and sets.recipe_hash(r) != h
+    w = restyle.workflow("x.png", r, "p")
+    assert w["5"] == {"class_type": "CLIPSetLastLayer", "inputs": {"clip": ["4", 1], "stop_at_clip_layer": -2}}
+    assert w["7"]["inputs"]["clip"] == ["5", 0] and w["8"]["inputs"]["clip"] == ["5", 0]
+    with pytest.raises(SetError, match="clip_skip"):
+        sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "clip_skip": 0}})
+
+
+def test_base_by_label_resolves_through_the_art_cache(tmp_path):
+    from mint.art import Art
+    art = Art(tmp_path)
+    alpha = {"name": "Alpha", "illustration_id": "a"}
+    st = sets.from_dict({**BASE, "base": "spore"})
+    assert sets.is_label("spore") and not sets.is_label("deadbeef") and not sets.is_label("crop")
+    assert st.recipe(alpha)["base"] == "spore"  # no cache to look in: the label stands
+    assert st.recipe(alpha, art=art)["base"] == "spore"  # nothing made yet: still the label, so check/UI can say so
+    old = art.record(art.new_variant(alpha, "spore", "restyle", {"x": 1}, "crop", "11111111"))
+    old.path.write_bytes(b"png")
+    old.created = "2026-01-01T00:00:00+00:00"
+    art.record(old)
+    new = art.record(art.new_variant(alpha, "spore", "restyle", {"x": 2}, "crop", "22222222"))
+    new.path.write_bytes(b"png")
+    assert art.latest(alpha, "spore").hash == "22222222"
+    assert st.recipe(alpha, art=art)["base"] == "22222222"
+    st.cards["Alpha"].base = "11111111"  # a card's own base wins over the set's
+    assert st.recipe(alpha, art=art)["base"] == "11111111"
+    assert sets.from_dict(st.to_dict()).base == "spore"  # round-trips
+    art.delete(new)
+    assert not new.path.exists() and not new.sidecar.exists() and art.latest(alpha, "spore").hash == "11111111"
+
+
+def test_refine_is_a_knob_only_when_on():
+    from mint import restyle
+    alpha = {"name": "Alpha", "illustration_id": "a"}
+    st = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p"}})
+    r = st.recipe(alpha)
+    assert "refine" not in r and "refine_scale" not in r
+    assert "22" not in restyle.workflow("x.png", r, "p")
+    st.style.refine, st.style.refine_scale = 0.4, 1.5
+    r = st.recipe(alpha)
+    assert r["refine"] == 0.4 and r["refine_scale"] == 1.5
+    w = restyle.workflow("x.png", r, "p")
+    assert w["20"]["inputs"]["scale_by"] == 1.5 and w["22"]["inputs"]["denoise"] == 0.4
+    assert w["22"]["inputs"]["positive"] == ["7", 0] and w["22"]["inputs"]["seed"] == r["seed"] + 1
+    assert w["16"]["inputs"]["image"] == ["23", 0]  # the ESRGAN pass takes the refined image
+    with pytest.raises(SetError, match="refine_scale"):
+        sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "refine": 0.4, "refine_scale": 5}})
+
+
+def test_remix_modes_change_the_workflow_and_the_hash():
+    from mint import restyle
+    alpha = {"name": "Alpha", "illustration_id": "a", "type_line": "Creature — Test"}
+    st = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p"}})
+    r1 = st.recipe(alpha)
+    assert "remix" not in r1 and r1["base"] == "crop"  # level 1 is the old recipe, hash unchanged
+    w1 = restyle.workflow("x.png", r1, "p")
+    assert w1["12"]["class_type"] == "VAEEncode" and w1["13"]["inputs"]["positive"] == ["11", 0]
+
+    st.style.remix = "repose"
+    r2 = st.recipe(alpha)
+    assert r2["remix"] == "repose" and r2["base"] == "crop" and r2["prompt"] == "a dog, p"
+    w2 = restyle.workflow("x.png", r2, "p")
+    assert w2["12"]["class_type"] == "EmptyLatentImage" and w2["13"]["inputs"]["denoise"] == 1.0
+    assert w2["13"]["inputs"]["positive"] == ["11", 0] and "1" in w2  # still guided by the base
+
+    st.style.remix = "new"
+    r3 = st.recipe(alpha)
+    assert r3["remix"] == "new" and r3["base"] == "none" and r3["prompt"] == "a dog, p"  # the subject is the thread
+    w3 = restyle.workflow(None, r3, "p")
+    assert "1" not in w3 and "11" not in w3 and w3["13"]["inputs"]["positive"] == ["7", 0]
+    beta = {"name": "Beta", "illustration_id": "b", "type_line": "Creature — Test"}
+    assert st.recipe(beta)["prompt"] == "Beta, Creature — Test, p"  # no subject: the card itself stands in
+
+    st.style.remix = "restyle"
+    st.cards["Alpha"].remix = "repose"  # a card's own mode wins
+    assert st.recipe(alpha)["remix"] == "repose"
+    assert len({sets.recipe_hash(x) for x in (r1, r2, r3)}) == 3
+    with pytest.raises(SetError, match="remix"):
+        sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "remix": "wilder"}})

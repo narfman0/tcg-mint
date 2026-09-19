@@ -33,9 +33,12 @@ def check_set(ws, cards, art, st):
             else None
         notes.append(f"plain: {plain.describe() if plain else 'crop not fetched'}")
         if st.style:
-            h = sets.recipe_hash(st.recipe(card))
+            recipe = st.recipe(card, art=art)
+            h = sets.recipe_hash(recipe)
             v = art.variant(card, h)
             notes.append(f"styled: {v.label}-{v.hash}" if v else f"styled: missing ({h})")
+            if sets.is_label(recipe["base"]):
+                notes.append(f"base {recipe['base']}: none yet")
         others = [v for v in art.variants(card)]
         if others:
             notes.append(f"{len(others)} variant(s)")

@@ -4,6 +4,8 @@
       "code": "BLS1", "name": "...", "size": 18,
       "art_filter": "saturate(1.4)",       CSS filter for --styled when no restyle exists
       "style": {...},                      the restyle recipe (Style below; restyle.py explains the knobs)
+      "base": "spore",                     what every restyle starts from: a restyle label (that card's newest
+                                           variant with it) or a variant hash; default the crop
       "cards": {
         "Card Name": {"number": 1, "flavor": "...", "art": "path.png", "art_filter": "...",
                       "subject": "what the picture is of", "printing": "rvr:40",
@@ -18,12 +20,15 @@ recipe should never pass silently -- and `mint check` reports them.
 The *effective recipe* for a card (`SetFile.recipe`) is the style with the
 card's subject ahead of the prompt, its own seed, and the image it starts
 from; its hash names the restyle output (see art.py), so changing any knob
-gives a new variant instead of overwriting the old one.
+gives a new variant instead of overwriting the old one. A base given as a
+label ("spore") is resolved to that card's newest such variant when the art
+cache is passed in, so the hash follows the actual input image.
 """
 import dataclasses
 import hashlib
 import json
 import os
+import re
 import zlib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -32,6 +37,11 @@ from .errors import SetError
 
 CONTROLS = ("canny", "lineart", "depth")
 SEED_RULES = ("stable", "position")
+# what a restyle keeps of the picture it starts from (restyle.py) -- three modes, not a scale:
+#   restyle: the base's pixels and structure, redrawn in the style
+#   repose:  a fresh picture laid out by the base's structure (control only, until control_end)
+#   new:     a fresh picture from the prompt alone -- the subject line is all that links it to the card
+REMIX = ("restyle", "repose", "new")
 
 
 @dataclass
@@ -58,6 +68,13 @@ class Style:
     width: int = 1248
     height: int = 912
     grayscale_source: bool = False
+    # a second sampling pass over the first result at refine_scale x the size, with this
+    # denoise (0.3-0.5 adds detail without changing the picture); 0 = off
+    refine: float = 0.0
+    refine_scale: float = 1.5
+    # 1 = the checkpoint's own CLIP; 2 = CLIP skip 2, which Pony-family checkpoints are trained for
+    clip_skip: int = 1
+    remix: str = "restyle"  # REMIX above; a card entry can override it
     # keys the file spelled out, so saving keeps them even at their default value
     explicit: set = field(default_factory=set, compare=False, repr=False)
 
@@ -70,6 +87,14 @@ class Style:
             v = getattr(self, k)
             if not 0 <= v <= 1:
                 raise SetError(f"{where}: {k} must be between 0 and 1, not {v}")
+        if not 0 <= self.refine <= 1:
+            raise SetError(f"{where}: refine must be between 0 and 1, not {self.refine}")
+        if not 1 <= self.refine_scale <= 3:
+            raise SetError(f"{where}: refine_scale must be between 1 and 3, not {self.refine_scale}")
+        if self.remix not in REMIX:
+            raise SetError(f"{where}: remix must be one of {', '.join(REMIX)}, not {self.remix!r}")
+        if not 1 <= self.clip_skip <= 12:
+            raise SetError(f"{where}: clip_skip must be between 1 and 12, not {self.clip_skip}")
         for lora in self.loras:
             if not isinstance(lora, dict) or "name" not in lora:
                 raise SetError(f"{where}: each lora needs a name")
@@ -83,8 +108,9 @@ class CardEntry:
     art_filter: str | None = None    # per-card CSS filter for --styled
     subject: str | None = None       # what the picture is of; prepended to the style prompt
     printing: str | None = None      # "set:number" to render a specific printing
-    base: str | None = None          # the image a restyle starts from: a variant hash, else the crop
+    base: str | None = None          # the image a restyle starts from: a variant hash or label, else the set's
     seed: int | None = None          # this card's seed, instead of the derived one
+    remix: str | None = None         # this card's remix mode (REMIX), instead of the style's
 
 
 @dataclass
@@ -95,6 +121,7 @@ class SetFile:
     note: str | None = None
     art_filter: str | None = None
     style: Style | None = None
+    base: str | None = None                    # every card's restyle base unless its entry says: hash or label
     cards: dict = field(default_factory=dict)  # name -> CardEntry, in collector order
     # not part of the file
     path: Path | None = field(default=None, compare=False)
@@ -121,17 +148,36 @@ class SetFile:
             return style.seed * 1000 + self.position(name)
         return style.seed * 1000 + zlib.crc32(illustration_id.encode()) % 1000
 
-    def recipe(self, record, style=None):
-        """The effective restyle recipe for one card, as a plain dict, or None without a style."""
+    def recipe(self, record, style=None, art=None):
+        """The effective restyle recipe for one card, as a plain dict, or None without a style.
+        With the art cache, a base named by label becomes that card's newest variant's hash."""
         style = style or self.style
         if style is None:
             return None
         entry = self.card(record)
         r = {k: v for k, v in dataclasses.asdict(style).items() if k not in ("name", "seed_rule", "explicit")}
-        if entry.subject:
-            r["prompt"] = f"{entry.subject}, {r['prompt']}"
+        # no-op knobs stay out of the hash, so older variants keep their names
+        if r["clip_skip"] == 1:
+            del r["clip_skip"]
+        if not r["refine"]:
+            del r["refine"], r["refine_scale"]
+        remix = entry.remix or style.remix
+        if remix not in REMIX:
+            raise SetError(f"{record['name']}: remix must be one of {', '.join(REMIX)}, not {remix!r}")
+        if remix == "restyle":
+            del r["remix"]
+        else:
+            r["remix"] = remix
+        # a new picture has nothing but words to tie it to the card: the subject, else the card itself
+        subject = entry.subject or (f"{record['name']}, {record.get('type_line', '')}".rstrip(", ") if remix == "new" else None)
+        if subject:
+            r["prompt"] = f"{subject}, {r['prompt']}"
         r["seed"] = self.card_seed(record["name"], record.get("illustration_id", ""), style)
-        r["base"] = entry.base or "crop"
+        base = entry.base or self.base or "crop"
+        if art is not None and is_label(base):
+            v = art.latest(record, base)
+            base = v.hash if v else base
+        r["base"] = "none" if remix == "new" else base  # `new` reads no image, so none names its variant
         return r
 
     def promote(self, recipe, record):
@@ -151,13 +197,18 @@ class SetFile:
     # --- (de)serialisation --------------------------------------------------
     def to_dict(self):
         d = {"code": self.code, "name": self.name}
-        for k in ("size", "note", "art_filter"):
+        for k in ("size", "note", "art_filter", "base"):
             if getattr(self, k) is not None:
                 d[k] = getattr(self, k)
         if self.style:
             d["style"] = _slim(dataclasses.asdict(self.style), Style, self.style.explicit)
         d["cards"] = {n: {k: v for k, v in dataclasses.asdict(e).items() if v is not None} for n, e in self.cards.items()}
         return d
+
+
+def is_label(base):
+    """A base that names a restyle label rather than the crop or a variant hash."""
+    return bool(base) and base != "crop" and not re.fullmatch(r"[0-9a-f]{8}", base)
 
 
 def recipe_hash(recipe):

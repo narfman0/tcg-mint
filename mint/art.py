@@ -123,6 +123,16 @@ class Art:
                 return v
         return None
 
+    def latest(self, card, label):
+        """This card's newest restyle variant with a label, or None."""
+        return next((v for v in self.variants(card) if v.kind == "restyle" and v.label == label), None)
+
+    def delete(self, variant):
+        """Remove a variant's image and sidecar; other variants made from it keep their files."""
+        for p in (variant.path, variant.sidecar):
+            if p.exists():
+                p.unlink()
+
     def new_variant(self, card, label, kind, recipe, base, hash):
         """A Variant record for an image about to be made; write the file to .path, then record()."""
         return Variant(label, hash, kind, self.variant_path(card, label, hash), base, recipe,
@@ -143,8 +153,9 @@ class Art:
             return self.crop(card)
         v = self.variant(card, base)
         if not v:
-            raise MintError(f"{card['name']}: no variant {base!r} to start from "
-                            f"(have {', '.join(x.hash for x in self.variants(card)) or 'none'})")
+            have = ", ".join(f"{x.label}-{x.hash}" for x in self.variants(card)) or "none"
+            what = f"no {base!r} variant yet -- restyle that first" if not HASH.match(base) else f"no variant {base!r}"
+            raise MintError(f"{card['name']}: {what} to start from (have {have})")
         return v.path
 
     # --- the decision ---------------------------------------------------------
