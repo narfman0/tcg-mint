@@ -70,6 +70,7 @@ A set is a JSON file (see `sets/bls1.json`):
 | command | what |
 |---|---|
 | `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet |
+| `mint upscale` | 4× ESRGAN the art through a local ComfyUI; renders pick the result up automatically |
 | `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
 | `mint fonts` | report which frame fonts are present |
@@ -82,12 +83,43 @@ ours to redistribute; `fonts/README.md` says where each is published and how
 to repair the community copies that Chromium's font sanitizer rejects.
 Without them the closest open faces are substituted automatically.
 
+## Art: upscaling and ComfyUI
+
+Scryfall's art crops are ~626×457 — about 300 DPI on the card, visibly soft
+next to a vector frame. `mint upscale` sends them through a local
+[ComfyUI](https://github.com/comfyanonymous/ComfyUI) server and caches the
+4× result (`art/<illustration_id>.x4.png`, ~1130 DPI); `mint render` uses it
+whenever it exists.
+
+```sh
+# in your ComfyUI checkout, once: an upscale model in models/upscale_models/
+curl -L -o models/upscale_models/4x-UltraSharp.pth \
+  https://huggingface.co/Kim2091/UltraSharp/resolve/main/4x-UltraSharp.pth
+python main.py --listen 127.0.0.1 --port 8188      # leave it running
+
+# in your workspace
+mint upscale --set sets/bls1.json                  # ~2 s a card on an RTX 5070 Ti
+mint upscale --model RealESRGAN_x4plus.pth "Cyclonic Rift"
+```
+
+4x-UltraSharp is the default: on painted card art it keeps canvas grain and
+brushwork where Real-ESRGAN x4plus goes smooth and plasticky. `COMFY_URL`
+points at a server elsewhere. `mint/comfy.py` is a ~60-line client (upload,
+queue a workflow, fetch outputs) that any other ComfyUI workflow can reuse.
+
 ## What's not here yet
 
-- art upscaling (Scryfall's crops are ~300 DPI; a 4× Real-ESRGAN pass is the plan)
+- **alternate art styles per set** — the `--styled` variant is only a CSS
+  filter today. The real version is a ComfyUI img2img workflow through the
+  same client: a checkpoint plus ControlNet (canny/depth) to keep the
+  original composition while restyling it per set — woodcut, ukiyo-e, neon,
+  whatever the set's identity is — with the style prompt living in the set
+  file next to `art_filter`. Needs a diffusion checkpoint in ComfyUI's
+  `models/`; none is bundled.
 - an imposer (PNGs → 3×3 letter-size PDF with cut marks) to feed `mint print`
 - layouts beyond `normal`: split, MDFC, planeswalker, saga
-- picking art from a specific printing (`default_cards` is fetched; the render still uses the oracle default)
+- picking art from a specific printing (`mint cards --kind default_cards`
+  fetches the data; the render still uses the oracle default)
 
 ## Legal
 

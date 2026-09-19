@@ -7,6 +7,7 @@ COMMANDS = {
     "render":    ("render cards from a set file or by name", "render"),
     "calibrate": ("compare our text placement against Scryfall scans", "calibrate"),
     "cards":     ("fetch Scryfall's bulk card file", "cards"),
+    "upscale":   ("4x-upscale card art through a local ComfyUI", "upscale"),
     "fonts":     ("report which frame fonts are present", "fonts"),
     "print":     ("send a PDF to the printer at true 100%", "printing"),
 }

@@ -115,10 +115,15 @@ def symbol_data_uri(sym, table):
     return "data:image/svg+xml;base64," + base64.b64encode(fn.read_bytes()).decode()
 
 
-def art_path(card, override=None):
+def art_path(card, override=None, upscaled=True):
+    """file:// URL of the art: an override image, else the 4x upscale if
+    `mint upscale` has made one, else Scryfall's art crop (fetched on demand)."""
     if override:
         return "file://" + os.path.abspath(override)
     ART.mkdir(parents=True, exist_ok=True)
+    big = ART / (card["illustration_id"] + ".x4.png")
+    if upscaled and big.exists():
+        return "file://" + str(big)
     fn = ART / (card["illustration_id"] + ".jpg")
     if not fn.exists():
         urllib.request.urlretrieve(card["image_uris"]["art_crop"], fn)
