@@ -96,6 +96,11 @@ def load_card(name):
             if c["layout"] == "art_series":  # same name, no rules text or art id
                 continue
             if c["name"].lower() == want or c["name"].lower().startswith(want + " //"):
+                if c.get("security_stamp") == "triangle":
+                    # Universes Beyond: crossover art is never wanted, and this
+                    # printing is the only one in oracle_cards -- say so, loudly
+                    print(f"warning: {c['name']}: art source is a Universes Beyond printing ({c['set'].upper()})",
+                          file=sys.stderr)
                 return front_face(c)
     sys.exit(f"not in {CARDS.name}: {name}")
 

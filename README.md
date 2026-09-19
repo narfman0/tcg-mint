@@ -217,9 +217,20 @@ in the footer either way: the composition is still theirs.
 - **Dark manga / Berserk-style** — the hardest without a LoRA; base models
   give "generic dark manga." Worth it with a good dark-fantasy-manga LoRA.
 
+## Universes Beyond
+
+Crossover printings (Marvel, TMNT, Lord of the Rings, …) are never wanted as
+an art source here. Scryfall stamps every one of them `security_stamp:
+"triangle"`, and the renderer warns whenever the printing it is about to use
+carries it. Today the oracle-cards file gives one printing per card, so the
+warning is all it can do; picking a non-crossover printing automatically is
+part of the `default_cards` work below. Cards that only exist in a crossover
+set (The One Ring) will always warn — that's a deck decision, not a render one.
+
 ## What's not here yet
 
 - IP-Adapter style anchoring for set-wide consistency
+- prefer a non-Universes-Beyond printing for art (needs `default_cards`)
 - layouts beyond `normal`: split, MDFC, planeswalker, saga
 - picking art from a specific printing (`mint cards --kind default_cards`
   fetches the data; the render still uses the oracle default)

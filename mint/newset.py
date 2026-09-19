@@ -27,14 +27,17 @@ STYLES = {
         "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel, nude, nsfw",
         "control": "canny", "control_strength": 0.75, "denoise": 0.85, "steps": 28, "cfg": 6, "seed": 7,
     },
+    # pen-and-ink: the prompt has to say "drawing" loudly or a photoreal checkpoint
+    # just paints in grey; the source is desaturated so no colour survives the latent
     "ink": {
         "name": "ink",
-        "prompt": "dark fantasy manga illustration, black ink on white paper, heavy cross-hatching, dense screentone, "
-                  "black-ink dominant with deep shadows, confident brush-pen linework, grotesque detail, "
-                  "monochrome, no colour",
-        "negative": "colour, color, blurry, low quality, text, watermark, signature, frame, border, soft shading, "
-                    "painterly, photographic, nude, nsfw",
-        "control": "lineart", "control_strength": 0.9, "denoise": 0.9, "steps": 30, "cfg": 6.5, "seed": 11,
+        "prompt": "manga page, pen and ink drawing, pure black ink on white paper, bold confident brush-pen linework, "
+                  "dense cross-hatching for shadow, screentone, high contrast, no gray wash, dark fantasy, "
+                  "grotesque detail",
+        "negative": "grayscale painting, soft gradients, photograph, photorealistic, blurry, low quality, text, "
+                    "watermark, signature, frame, border, colour, color, nude, nsfw",
+        "control": "lineart", "control_strength": 0.8, "control_end": 0.8,
+        "denoise": 0.95, "steps": 30, "cfg": 7.5, "seed": 11, "grayscale_source": True,
     },
     "glass": {
         "name": "glass",

@@ -27,6 +27,7 @@ card. `mint render --styled` picks these up automatically.
 import argparse
 import os
 import sys
+import tempfile
 
 from . import ART, comfy, render
 
@@ -106,6 +107,13 @@ def restyle(card, style, force=False, upscale=True):
     if dest.exists() and not force:
         return dest, False
     src = render.art_path(card, upscaled=False)[len("file://"):]
+    if style.get("grayscale_source"):
+        # monochrome styles: the starting latent keeps (1 - denoise) of the source,
+        # and that residue is where stray colour comes from -- remove it at the source
+        from PIL import Image
+        gray = os.path.join(tempfile.gettempdir(), os.path.basename(src) + ".gray.png")
+        Image.open(src).convert("L").convert("RGB").save(gray)
+        src = gray
     name = comfy.upload(src)
     outputs = comfy.run(workflow(name, style, "tcg-mint/" + card["illustration_id"] + "." + style["name"], upscale),
                         timeout=900)
