@@ -162,7 +162,8 @@
       "number": 48
     },
     "Llanowar Elves": {
-      "number": 49
+      "number": 49,
+      "printing": "plst:GNT-46"
     },
     "Llanowar Wastes": {
       "number": 50
