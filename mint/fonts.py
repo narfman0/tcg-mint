@@ -7,7 +7,7 @@ redistribute); see fonts/README.md for where each one is published.
 """
 import sys
 
-from . import FONTS, render
+from . import frame, workspace
 
 WANT = {
     "Beleren":  "M15 title, type line and P/T face",
@@ -16,20 +16,25 @@ WANT = {
 }
 
 
+def report(fonts_dir):
+    """{family: [description, ...]} of what is present, and the list of missing families."""
+    have = {}
+    for family, weight, style, fn in frame.font_files(fonts_dir):
+        have.setdefault(family, []).append(f"{fn.name} ({weight} {style})")
+    return have, [f for f in WANT if f not in have]
+
+
 def main(argv=None):
     if argv:
         sys.exit("mint fonts takes no arguments")
-    have = {}
-    for family, weight, style, fn in render.font_files():
-        have.setdefault(family, []).append(f"{fn.name} ({weight} {style})")
-    print(f"fonts dir: {FONTS}")
-    missing = 0
+    ws = workspace.default()
+    have, missing = report(ws.fonts)
+    print(f"fonts dir: {ws.fonts}")
     for family, role in WANT.items():
         if family in have:
             print(f"  ok       {family:12} {', '.join(have[family])}")
         else:
             print(f"  missing  {family:12} {role}")
-            missing += 1
     for family in have:
         if family not in WANT:
             print(f"  extra    {family:12} {', '.join(have[family])}")

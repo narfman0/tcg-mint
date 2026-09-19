@@ -7,7 +7,7 @@ COMMANDS = {
     "newset":    ("start a set file from a decklist", "newset"),
     "render":    ("render cards from a set file or by name", "render"),
     "calibrate": ("compare our text placement against Scryfall scans", "calibrate"),
-    "cards":     ("fetch Scryfall's bulk card file", "cards"),
+    "cards":     ("fetch Scryfall's bulk card file", "bulk"),
     "upscale":   ("4x-upscale card art through a local ComfyUI", "upscale"),
     "restyle":   ("regenerate card art in the set's style through ComfyUI", "restyle"),
     "fonts":     ("report which frame fonts are present", "fonts"),
@@ -34,7 +34,7 @@ def main(argv=None):
     import importlib
     mod = importlib.import_module("." + COMMANDS[argv[0]][1], __package__)
     rc = mod.main(argv[1:])
-    return rc if isinstance(rc, int) else 0  # render returns its file list for callers
+    return rc or 0
 
 
 if __name__ == "__main__":

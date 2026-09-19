@@ -29,7 +29,10 @@ import os
 import sys
 import tempfile
 
-from . import ART, comfy, render
+from . import comfy, sets, workspace
+from .art import Art
+from .cards import Cards
+from .errors import MintError, SetError
 
 DEFAULTS = {
     "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed",
@@ -55,7 +58,7 @@ def preprocessor(control, src):
     if control == "depth":
         return {"class_type": "DepthAnythingV2Preprocessor",
                 "inputs": {"image": src, "ckpt_name": "depth_anything_v2_vitl.pth", "resolution": 1024}}
-    raise SystemExit(f"unknown control {control!r}")
+    raise SetError(f"unknown control {control!r}")
 
 
 def workflow(image_name, s, prefix, upscale=True):
@@ -98,15 +101,9 @@ def workflow(image_name, s, prefix, upscale=True):
     return w
 
 
-def styled_path(card, style):
-    return ART / f"{card['illustration_id']}.{style['name']}.png"
-
-
-def restyle(card, style, force=False, upscale=True):
-    dest = styled_path(card, style)
-    if dest.exists() and not force:
-        return dest, False
-    src = render.art_path(card, upscaled=False)[len("file://"):]
+def restyle_file(server, src, dest, style, prefix="tcg-mint/restyle", upscale=True):
+    """Run the style workflow on any image file into dest."""
+    src = str(src)
     if style.get("grayscale_source"):
         # monochrome styles: the starting latent keeps (1 - denoise) of the source,
         # and that residue is where stray colour comes from -- remove it at the source
@@ -114,23 +111,35 @@ def restyle(card, style, force=False, upscale=True):
         gray = os.path.join(tempfile.gettempdir(), os.path.basename(src) + ".gray.png")
         Image.open(src).convert("L").convert("RGB").save(gray)
         src = gray
-    name = comfy.upload(src)
-    outputs = comfy.run(workflow(name, style, "tcg-mint/" + card["illustration_id"] + "." + style["name"], upscale),
-                        timeout=900)
-    images = [im for node in outputs.values() for im in node.get("images", [])]
-    if not images:
-        raise comfy.ComfyError("workflow produced no image")
-    comfy.fetch(images[0], dest)
+    name = server.upload(src)
+    return server.run_to_file(workflow(name, style, prefix, upscale), str(dest), timeout=900)
+
+
+def restyle(server, art, card, style, force=False, upscale=True):
+    dest = art.styled(card, style["name"])
+    if dest.exists() and not force:
+        return dest, False
+    restyle_file(server, art.crop(card), dest, style, "tcg-mint/" + card["illustration_id"] + "." + style["name"], upscale)
     return dest, True
 
 
 def load_style(st):
     if "style" not in st:
-        sys.exit("this set has no `style` block")
+        raise SetError("this set has no `style` block")
     s = {**DEFAULTS, **st["style"]}
     for k in ("name", "prompt"):
         if k not in s:
-            sys.exit(f"style block needs a `{k}`")
+            raise SetError(f"style block needs a `{k}`")
+    return s
+
+
+def card_style(style, ov, i):
+    """The effective recipe for one card: its own seed off the set's, and its `subject`
+    ("a gaunt long-haired man in black armour at a workbench") ahead of the prompt so
+    the style can't drift it into something else."""
+    s = {**style, "seed": style["seed"] * 1000 + i}
+    if ov.get("subject"):
+        s["prompt"] = f"{ov['subject']}, {s['prompt']}"
     return s
 
 
@@ -141,28 +150,23 @@ def main(argv=None):
     ap.add_argument("--force", action="store_true", help="regenerate cards that already have this style")
     ap.add_argument("--no-upscale", action="store_true", help="skip the ESRGAN pass (faster proofs)")
     a = ap.parse_args(argv)
-    st, _ = render.load_set(a.set)
-    style = load_style(st)
-    names = a.names or list(st.get("cards", {}))
-    if not names:
-        ap.error("the set has no cards")
-    if not comfy.alive():
-        sys.exit(f"no ComfyUI at {comfy.URL}; start it with: python main.py --listen 127.0.0.1 --port 8188")
-    cards = st.get("cards", {})
-    for i, name in enumerate(names):
-        card = render.load_card(name)
-        # each card gets its own seed off the set's, so cards differ but reruns are identical
-        s = {**style, "seed": style["seed"] * 1000 + i}
-        # a per-card `subject` pins what the picture is of ("a gaunt long-haired man in black
-        # armour at a workbench") so the style prompt can't drift it into something else
-        subject = render.overrides(cards, card).get("subject")
-        if subject:
-            s["prompt"] = f"{subject}, {s['prompt']}"
-        try:
-            dest, did = restyle(card, s, a.force, not a.no_upscale)
-        except comfy.ComfyError as e:
-            sys.exit(f"{card['name']}: {e}")
-        print(f"{'restyled' if did else 'cached  '} {card['name']} -> {os.path.relpath(dest)}")
+    ws = workspace.default()
+    try:
+        st, _ = sets.load(a.set)
+        style = load_style(st)
+        names = a.names or list(st.get("cards", {}))
+        if not names:
+            ap.error("the set has no cards")
+        server = comfy.Comfy(ws.comfy_url)
+        server.require()
+        cards, art = Cards(ws.cards_file), Art(ws.art)
+        for i, name in enumerate(names):
+            ov = sets.overrides(st, {"name": name})
+            card = cards.find(name, ov.get("printing"))
+            dest, did = restyle(server, art, card, card_style(style, ov, i), a.force, not a.no_upscale)
+            print(f"{'restyled' if did else 'cached  '} {card['name']} -> {os.path.relpath(dest)}")
+    except MintError as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":

@@ -21,6 +21,8 @@ import tempfile
 
 from PIL import Image
 
+from .browser import Browser
+
 PAPER = {"letter": (8.5, 11.0), "a4": (8.27, 11.69)}
 CARD = (2.5, 3.5)
 RENDER_BLEED = 0.11  # what render.py puts around the card
@@ -84,7 +86,6 @@ def main(argv=None):
     if a.bleed > RENDER_BLEED:
         ap.error(f"renders only carry {RENDER_BLEED}in of bleed")
 
-    from playwright.sync_api import sync_playwright
     pw, ph = PAPER[a.paper]
     css = ("<!doctype html><meta charset=utf-8><style>"
            f"@page {{ size: {pw}in {ph}in; margin: 0; }}"
@@ -96,8 +97,7 @@ def main(argv=None):
            "</style>")
     per_page = COLS * ROWS
     chunk = per_page * PAGES_PER_RUN
-    with tempfile.TemporaryDirectory() as tmp, sync_playwright() as p:
-        b = p.chromium.launch(channel="chromium")
+    with tempfile.TemporaryDirectory() as tmp, Browser() as b:
         parts = []
         # a few pages per Chromium run: decoded 600 DPI PNGs are ~10 MB each and a
         # whole 90-card set in one document was enough to get the process killed
@@ -107,14 +107,10 @@ def main(argv=None):
             fn = os.path.join(tmp, f"sheet{len(parts)}.html")
             open(fn, "w").write(css + "\n".join(page_html(pg, a.paper, a.bleed) for pg in pages))
             part = os.path.join(tmp, f"part{len(parts)}.pdf")
-            page = b.new_page()
-            page.goto("file://" + fn, wait_until="networkidle")
-            page.pdf(path=part, width=f"{pw}in", height=f"{ph}in", print_background=True, prefer_css_page_size=True)
-            page.close()
+            b.pdf(fn, part, f"{pw}in", f"{ph}in")
             parts.append(part)
             for fp in prepared:
                 os.unlink(fp)
-        b.close()
         if len(parts) == 1:
             shutil.move(parts[0], a.out)
         else:

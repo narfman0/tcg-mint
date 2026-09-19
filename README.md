@@ -43,6 +43,10 @@ Set `MINT_HOME` to keep the workspace (fonts, caches, card file) somewhere
 other than the current directory, and `MINT_CARDS` to share one Scryfall file
 between projects.
 
+The first lookup builds a small SQLite index beside the card file
+(`oracle-cards.jsonl.idx`, a few seconds); after that finding a card is
+instant, and the index rebuilds itself whenever the card file changes.
+
 ## Sets
 
 A set is a JSON file (see `sets/bls1.json`):
@@ -120,7 +124,7 @@ mint upscale --model RealESRGAN_x4plus.pth "Cyclonic Rift"
 
 4x-UltraSharp is the default: on painted card art it keeps canvas grain and
 brushwork where Real-ESRGAN x4plus goes smooth and plasticky. `COMFY_URL`
-points at a server elsewhere. `mint/comfy.py` is a ~60-line client (upload,
+points at a server elsewhere. `mint/comfy.py` is a ~100-line client (upload,
 queue a workflow, fetch outputs) that any other ComfyUI workflow can reuse.
 
 ## Art styles: one look per set

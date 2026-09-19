@@ -18,6 +18,8 @@ import os
 import re
 import sys
 
+from . import sets, workspace
+
 STYLES = {
     "neon": {
         "name": "neon",
@@ -77,7 +79,7 @@ def main(argv=None):
     ap.add_argument("--style", choices=STYLES, help="seed the style block from a built-in recipe")
     ap.add_argument("--out", help="set file (default sets/<code lowercased>.json)")
     a = ap.parse_args(argv)
-    out = a.out or os.path.join("sets", a.code.lower() + ".json")
+    out = a.out or str(workspace.default().sets / (a.code.lower() + ".json"))
 
     st = {"code": a.code, "name": a.name, "cards": {}}
     if os.path.exists(out):
@@ -98,10 +100,7 @@ def main(argv=None):
             nxt += 1
             added += 1
     st["size"] = len(cards)
-    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    with open(out, "w") as fh:
-        json.dump(st, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
+    sets.save(out, st)
     print(f"{out}: {len(cards)} cards ({added} new)" + (f", style {st['style']['name']}" if "style" in st else ""))
 
 

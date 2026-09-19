@@ -19,7 +19,10 @@ import statistics
 
 from PIL import Image
 
-from . import ART, render, scryfall
+from . import render, workspace
+from .art import Art
+from .cards import Cards
+from .errors import MintError
 
 # non-legendary M15-frame cards with clean bars; a couple with P/T
 DEFAULT = ["Cyclonic Rift", "Rhystic Study", "Demonic Tutor", "Consecrated Sphinx", "Blightsteel Colossus"]
@@ -33,11 +36,8 @@ ZONES = {
 }
 
 
-def scan(card):
-    fn = ART / ("scan_" + card["illustration_id"] + ".png")
-    if not fn.exists():
-        scryfall.fetch(card["image_uris"]["png"], fn)
-    return Image.open(fn).convert("L")
+def scan(art, card):
+    return Image.open(art.scan(card)).convert("L")
 
 
 def measure(im, ox, oy, ppu, zone, dark=95):
@@ -83,12 +83,17 @@ def main(argv=None):
     ap.add_argument("names", nargs="*", default=DEFAULT)
     ap.add_argument("--out", default=os.path.join("out", "calib"))
     a = ap.parse_args(argv)
-    outs = render.main(["--out", a.out, *a.names])
+    ws = workspace.default()
+    try:
+        results = render.render_cards(ws, a.names, out_dir=a.out)
+    except MintError as e:
+        raise SystemExit(str(e)) from None
+    cards, art = Cards(ws.cards_file), Art(ws.art)
     deltas = {z: [] for z in ZONES}
-    for name, out in zip(a.names, outs):
-        card = render.load_card(name)
-        real = scan(card)
-        ours = Image.open(out).convert("L")
+    for r in results:
+        card = cards.find(r.name)
+        real = scan(art, card)
+        ours = Image.open(r.out).convert("L")
         ppu_real = real.width / 250            # scan is the bare card
         ppu_ours = ours.width / 272            # ours has 11 units of bleed each side
         print(f"\n{card['name']}  (real scan {real.width}x{real.height}, ours {ours.width}x{ours.height})")

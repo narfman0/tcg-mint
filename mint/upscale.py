@@ -15,27 +15,25 @@ import argparse
 import os
 import sys
 
-from . import ART, comfy, render
+from . import comfy, sets, workspace
+from .art import Art
+from .cards import Cards
+from .errors import MintError
 
 DEFAULT_MODEL = "4x-UltraSharp.pth"
 
 
-def upscaled_path(card):
-    return ART / (card["illustration_id"] + ".x4.png")
+def upscale_file(server, src, dest, model=DEFAULT_MODEL, prefix="tcg-mint/enhance"):
+    """ESRGAN any image file through ComfyUI into dest."""
+    name = server.upload(str(src))
+    return server.run_to_file(comfy.upscale_workflow(name, model, prefix), str(dest))
 
 
-def upscale(card, model, force=False):
-    dest = upscaled_path(card)
+def upscale(server, art, card, model=DEFAULT_MODEL, force=False):
+    dest = art.upscaled(card)
     if dest.exists() and not force:
         return dest, False
-    src = render.art_path(card, upscaled=False)[len("file://"):]  # the raw crop, fetched if needed
-    name = comfy.upload(src)
-    prefix = "tcg-mint/" + card["illustration_id"]
-    outputs = comfy.run(comfy.upscale_workflow(name, model, prefix))
-    images = [im for node in outputs.values() for im in node.get("images", [])]
-    if not images:
-        raise comfy.ComfyError("workflow produced no image")
-    comfy.fetch(images[0], dest)
+    upscale_file(server, art.crop(card), dest, model, "tcg-mint/" + card["illustration_id"])
     return dest, True
 
 
@@ -43,22 +41,25 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="mint upscale", description=__doc__.split("\n\n")[0])
     ap.add_argument("names", nargs="*")
     ap.add_argument("--set", help="set JSON; upscales every card in it when no names are given")
-    ap.add_argument("--model", default=DEFAULT_MODEL, help=f"file in ComfyUI's models/upscale_models (default {DEFAULT_MODEL})")
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help=f"file in ComfyUI's models/upscale_models (default {DEFAULT_MODEL})")
     ap.add_argument("--force", action="store_true", help="redo cards that already have an upscale")
     a = ap.parse_args(argv)
-    st, _ = render.load_set(a.set)
-    names = a.names or list(st.get("cards", {}))
-    if not names:
-        ap.error("give card names or a --set")
-    if not comfy.alive():
-        sys.exit(f"no ComfyUI at {comfy.URL}; start it with: python main.py --listen 127.0.0.1 --port 8188")
-    for name in names:
-        card = render.load_card(name)
-        try:
-            dest, did = upscale(card, a.model, a.force)
-        except comfy.ComfyError as e:
-            sys.exit(f"{card['name']}: {e}")
-        print(f"{'upscaled' if did else 'cached  '} {card['name']} -> {os.path.relpath(dest)}")
+    ws = workspace.default()
+    try:
+        st = sets.load(a.set)[0] if a.set else {}
+        names = a.names or list(st.get("cards", {}))
+        if not names:
+            ap.error("give card names or a --set")
+        server = comfy.Comfy(ws.comfy_url)
+        server.require()
+        cards, art = Cards(ws.cards_file), Art(ws.art)
+        for name in names:
+            card = cards.find(name, sets.overrides(st, {"name": name}).get("printing"))
+            dest, did = upscale(server, art, card, a.model, a.force)
+            print(f"{'upscaled' if did else 'cached  '} {card['name']} -> {os.path.relpath(dest)}")
+    except MintError as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":

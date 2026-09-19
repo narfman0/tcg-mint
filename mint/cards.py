@@ -1,95 +1,138 @@
-"""Fetch Scryfall's bulk card file.
+"""Find cards in Scryfall's bulk file.
 
-    mint cards [--kind oracle_cards] [--max-age DAYS] [--force]
+The bulk file is ~200 MB of JSON lines, one card (or printing) per line. A
+SQLite index beside it -- name, set, collector number, illustration id, byte
+offset -- is built on first use and rebuilt whenever the file changes, so a
+lookup is a seek instead of a scan of the whole file.
 
-Scryfall rebuilds its bulk files daily and has no delta feed, so this checks
-the few-KB metadata endpoint and only downloads the archive when Scryfall's
-copy is newer than the one we hold. The file lands at MINT_CARDS (default
-oracle-cards.jsonl in the workspace); it is ~200 MB decompressed and belongs
-in .gitignore, never in git.
-
-`oracle_cards` is one entry per distinct card (the default printing); switch
-to `default_cards` when you want to pick art from a specific printing.
+`oracle_cards` holds one printing per card; `default_cards` (see `mint cards
+--kind`) holds every printing, and then `printings()` lists them and `find()`
+prefers one that is not a Universes Beyond crossover.
 """
-import argparse
-import gzip
 import json
 import os
-import shutil
-import sys
-import urllib.error
-from datetime import datetime, timedelta, timezone
+import sqlite3
+from pathlib import Path
 
-from . import CARDS, scryfall
+from .errors import CardNotFound, MintError
 
-BULK = scryfall.API + "/bulk-data"
-
-
-def remote_meta(kind):
-    for entry in scryfall.get_json(BULK)["data"]:
-        if entry["type"] == kind:
-            return entry
-    sys.exit(f"scryfall no longer publishes a {kind!r} bulk file")
+# Universes Beyond printings (Scryfall: security_stamp == "triangle") are not
+# wanted as art, except these: Lord of the Rings fits Magic well enough.
+UB_EXEMPT = {"ltr", "ltc"}
 
 
-def stamp_path():
-    return CARDS.with_suffix(".stamp.json")
+def front_face(card):
+    """Double-faced cards (transform, modal_dfc) keep art, text, cost and type per
+    face; present the front face's fields at the top level so the frame renders
+    it as a normal card. The full 'A // B' name is kept as full_name."""
+    faces = card.get("card_faces")
+    if faces and "image_uris" not in card:
+        card = {**card, **{k: v for k, v in faces[0].items() if k != "object"}, "full_name": card["name"]}
+    return card
 
 
-def local_stamp():
-    try:
-        return json.load(open(stamp_path()))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+def is_universes_beyond(card):
+    return card.get("security_stamp") == "triangle" and card.get("set") not in UB_EXEMPT
 
 
-def download(uri):
-    archive = CARDS.with_suffix(CARDS.suffix + ".gz")
-    scryfall.fetch(uri, archive)
-    # decompress to a temp file so a failure mid-stream can't leave a truncated card file
-    tmp = str(CARDS) + ".part"
-    with gzip.open(archive, "rb") as src, open(tmp, "wb") as dst:
-        shutil.copyfileobj(src, dst)
-    os.replace(tmp, CARDS)
-    archive.unlink()
+def warnings(card):
+    """Things about this printing the user should hear about, as short strings."""
+    out = []
+    if is_universes_beyond(card):
+        out.append(f"art source is a Universes Beyond printing ({card['set'].upper()})")
+    return out
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(prog="mint cards", description=__doc__.split("\n\n")[0])
-    ap.add_argument("--kind", default="oracle_cards", choices=["oracle_cards", "default_cards", "all_cards"])
-    ap.add_argument("--max-age", type=float, default=7, metavar="DAYS",
-                    help="skip the network entirely if the local file is newer than this (default 7)")
-    ap.add_argument("--force", action="store_true", help="re-download even if Scryfall's copy is not newer")
-    a = ap.parse_args(argv)
+class Cards:
+    def __init__(self, path):
+        self.path = Path(path)
+        self.index_path = self.path.with_name(self.path.name + ".idx")
+        self._db = None
 
-    have = CARDS.exists()
-    st = local_stamp()
-    fetched = datetime.fromisoformat(st["fetched"]) if st.get("fetched") else None
-    if have and fetched and datetime.now(timezone.utc) - fetched < timedelta(days=a.max_age) and not a.force \
-            and st.get("kind") == a.kind:
-        print(f"{CARDS.name} is fresh (fetched {fetched:%Y-%m-%d}, max-age {a.max_age}d); nothing to do")
-        return
+    # --- index ---------------------------------------------------------------
+    def _signature(self):
+        st = os.stat(self.path)
+        return f"{st.st_size}:{int(st.st_mtime)}"
 
-    try:
-        meta = remote_meta(a.kind)
-    except (urllib.error.URLError, TimeoutError) as err:
-        if have:
-            print(f"scryfall unreachable ({err}); keeping the cached card file, which may be stale")
-            return
-        sys.exit(f"scryfall unreachable and no cached card file: {err}")
+    def db(self):
+        if self._db is None:
+            if not self.path.exists():
+                raise MintError(f"no card file at {self.path}; run `mint cards` or point MINT_CARDS at one")
+            db = sqlite3.connect(self.index_path)
+            db.execute("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)")
+            row = db.execute("SELECT v FROM meta WHERE k = 'sig'").fetchone()
+            if not row or row[0] != self._signature():
+                self.build(db)
+            self._db = db
+        return self._db
 
-    updated = datetime.fromisoformat(meta["updated_at"])
-    if have and meta["updated_at"] == st.get("updated_at") and st.get("kind") == a.kind and not a.force:
-        print(f"scryfall's {a.kind} is unchanged since {updated:%Y-%m-%d}; no download needed")
-    else:
-        print(f"downloading {a.kind} ({meta['compressed_size'] / 1e6:.0f} MB compressed, "
-              f"updated {updated:%Y-%m-%d %H:%M} UTC) -> {CARDS}")
-        CARDS.parent.mkdir(parents=True, exist_ok=True)
-        download(meta["jsonl_download_uri"])
-    with open(stamp_path(), "w") as fh:
-        json.dump({"kind": a.kind, "updated_at": meta["updated_at"],
-                   "fetched": datetime.now(timezone.utc).isoformat(timespec="seconds")}, fh, indent=1)
+    def build(self, db=None):
+        """(Re)build the index from the card file. A few seconds for oracle_cards."""
+        db = db or sqlite3.connect(self.index_path)
+        db.executescript("""
+            DROP TABLE IF EXISTS cards;
+            CREATE TABLE cards (name TEXT, lname TEXT, set_code TEXT, number TEXT, illustration_id TEXT,
+                                layout TEXT, stamp TEXT, released TEXT, offset INTEGER, length INTEGER);
+            CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+        """)
+        rows = []
+        with open(self.path, "rb") as f:
+            offset = 0
+            for line in f:
+                n = len(line)
+                if n > 1:
+                    c = front_face(json.loads(line))
+                    rows.append((c["name"], c["name"].lower(), c.get("set"), c.get("collector_number"),
+                                 c.get("illustration_id"), c.get("layout"), c.get("security_stamp"),
+                                 c.get("released_at"), offset, n))
+                offset += n
+        db.executemany("INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
+        db.execute("CREATE INDEX cards_lname ON cards(lname)")
+        db.execute("CREATE INDEX cards_illustration ON cards(illustration_id)")
+        db.execute("INSERT OR REPLACE INTO meta VALUES ('sig', ?)", (self._signature(),))
+        db.execute("INSERT OR REPLACE INTO meta VALUES ('count', ?)", (str(len(rows)),))
+        db.commit()
+        return len(rows)
 
+    def _read(self, offset, length):
+        with open(self.path, "rb") as f:
+            f.seek(offset)
+            return json.loads(f.read(length))
 
-if __name__ == "__main__":
-    main()
+    # --- lookup --------------------------------------------------------------
+    def printings(self, name):
+        """Every record for this name (exact, or the front face of an 'A // B' card),
+        newest first. Art-series cards (same name, no rules text) are excluded."""
+        want = name.lower()
+        like = want.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + " //%"
+        rows = self.db().execute(
+            "SELECT offset, length FROM cards WHERE (lname = ? OR lname LIKE ? ESCAPE '\\') "
+            "AND (layout IS NULL OR layout != 'art_series') ORDER BY released DESC, set_code", (want, like)).fetchall()
+        return [front_face(self._read(o, n)) for o, n in rows]
+
+    def find(self, name, printing=None):
+        """The card to render for this name. With several printings on file, the
+        newest that is not a Universes Beyond crossover wins; `printing` ("rvr:40")
+        picks one explicitly."""
+        cands = self.printings(name)
+        if not cands:
+            raise CardNotFound(f"not in {self.path.name}: {name}")
+        if printing:
+            code, _, num = printing.partition(":")
+            for c in cands:
+                if c["set"] == code.lower() and (not num or c["collector_number"] == num):
+                    return c
+            raise CardNotFound(f"{name}: no printing {printing!r} on file (have {', '.join(self.printing_ids(cands))})")
+        return next((c for c in cands if not is_universes_beyond(c)), cands[0])
+
+    @staticmethod
+    def printing_ids(cards):
+        return [f"{c['set']}:{c['collector_number']}" for c in cards]
+
+    def by_illustration(self, illustration_id):
+        row = self.db().execute("SELECT offset, length FROM cards WHERE illustration_id = ?", (illustration_id,)).fetchone()
+        return front_face(self._read(*row)) if row else None
+
+    def count(self):
+        row = self.db().execute("SELECT v FROM meta WHERE k = 'count'").fetchone()
+        return int(row[0]) if row else 0
