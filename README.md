@@ -92,7 +92,7 @@ printer = "EPSON_ET_8500"
 | command | what |
 |---|---|
 | `mint newset` | start a set file from a decklist (commander first); `--style neon|ink|glass` seeds a style block |
-| `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet |
+| `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet; `--faces` the backs of double-faced cards too |
 | `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
 | `mint upscale` | 4× ESRGAN the art (or any variant, `--base HASH`) through a local ComfyUI; renders pick the result up automatically |
 | `mint check` | validate set files and say which image each card renders with, plain and styled |
@@ -102,6 +102,8 @@ printer = "EPSON_ET_8500"
 | `mint fonts` | report which frame fonts are present |
 | `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
+| `mint serve` | the workbench: compare art, recipes and frames in a browser, and run the tools from it |
+| `mint gallery` | export a set as a static, read-only gallery page |
 
 End to end, on this machine:
 
@@ -112,6 +114,38 @@ mint impose  --out proofs/bls1.pdf proofs/0*.png
 mint print   --test proofs/bls1.pdf        # one page on plain paper first
 mint print   -p matte proofs/bls1.pdf
 ```
+
+## The workbench
+
+```sh
+pip install -e '.[web]'
+mint serve --open          # http://127.0.0.1:8300
+```
+
+A local page over the workspace, for comparing and deciding:
+
+- **Sets** — every card as a tile (styled render, plain render, or just the
+  art), with badges from the render manifest: no restyle for the current
+  recipe, not rendered, rules text shrunk, Universes Beyond art, own art.
+  Shift-click to select cards; render, enhance or restyle the selection.
+- **Compare** (click a card) — the Scryfall crop, every variant the cache
+  holds with the knobs that differ from the set's recipe, and the renders,
+  side by side. Mark two images A and B for a wipe with zoom and pan, or a
+  blind A/B. Each image offers *enhance* (an ESRGAN pass, from any image),
+  *restyle from this* and *use as base* (which image the next restyle starts
+  from), and a restyled variant offers *use recipe for set*. The card's
+  printing, subject and seed are set here too.
+- **Recipe lab** — a form for every knob in the style block, a few probe
+  cards, and a run button; results land as variants in a probe-by-recipe
+  grid as they finish. New knobs are one field in `sets.Style` and one node
+  in the workflow; the form follows.
+- **Frame** — edit the set's CSS and render a 300 DPI proof; overlay a
+  Scryfall scan on your render to check text placement; render one card in
+  every font theme.
+- **Jobs** — what is queued and running, with logs and cancel.
+
+`mint gallery --set sets/x.json` exports the Sets and Compare views as a
+static read-only page with thumbnails, for sharing a set's look.
 
 ## Fonts
 
@@ -268,7 +302,8 @@ crossover set will always warn — that's a deck decision, not a render one.
 ## What's not here yet
 
 - IP-Adapter style anchoring for set-wide consistency
-- layouts beyond `normal`: split, MDFC, planeswalker, saga
+- layouts beyond `normal`: split, adventure, planeswalker, saga (double-faced
+  cards render both faces in the normal frame with `--faces`)
 
 ## Legal
 
