@@ -121,19 +121,24 @@ mint print   -p matte proofs/bls1.pdf
 ```sh
 pip install -e '.[web]'
 mint serve --open          # http://127.0.0.1:8300
+mint serve --host 0.0.0.0  # reachable from a phone on the same network
 ```
 
-A local page over the workspace, for comparing and deciding:
+A local page over the workspace, for comparing and deciding. It fits a phone
+too: the set nav scrolls, tiles and images fall into two columns, and every
+control is thumb-sized.
 
 - **Sets** — *new set* makes a set file from a pasted decklist (code, name,
   a style template, private or not). Every card is a tile (styled render,
   plain render, or just the art), with badges from the render manifest: no restyle for the current
   recipe, not rendered, rules text shrunk, Universes Beyond art, own art.
   A search box matches name, type and artist.
-  Shift-click to select cards; render, enhance or restyle the selection.
+  Shift-click to select cards (or turn *select* on in the toolbar, or long-press
+  a tile on a phone); render, enhance or restyle the selection.
   *all* in the nav puts every set on one board.
 - **Viewer** (click a card) — the tile's image large: ← → or a swipe steps
   through the board in its current order, wheel / pinch / drag zoom and pan,
+  double-click or double-tap for 2.5×,
   `s` `p` `a` switch styled / plain / art, `c` opens compare, `f` fullscreen.
 - **Card** (`c`, or click a tile) — type, printing and subject up top, then
   three parts in pipeline order. *Generate*: one mode (restyle, repose, new, inspire)
@@ -142,7 +147,8 @@ A local page over the workspace, for comparing and deciding:
   own overrides, with a reset back to the set's. *Images*: the Scryfall crop,
   every variant the cache holds grouped by look with the knobs that differ
   from the set's recipe, each enhance beside the image it was made from.
-  Mark two images A and B for a wipe with zoom and pan, or a blind A/B.
+  Mark two images A and B for a wipe (drag the line; wheel or pinch to zoom,
+  then drag to pan), or a blind A/B.
   *Card*, at the bottom: the styled art — the variant the styled render
   uses — with the renders and their buttons.
   A restyled variant offers *keep* — it becomes the card's styled art (the

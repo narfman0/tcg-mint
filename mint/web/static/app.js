@@ -19,7 +19,7 @@ const REMIX_BADGE = {repose: 'repose', new: 'new scene', inspire: 'inspired'};
    else any label the art cache holds); q: the board's search text. */
 const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
-               takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false};
+               takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false};
 
 async function api(path, opts = {}) {
   if (STATIC) {
@@ -252,10 +252,31 @@ function tileHtml(c) {
         <div class="badges">${badges(c)}</div>
       </div>`;
 }
+/* A tile opens its card. Shift/ctrl-click selects it instead, as does any tap while the toolbar's
+   "select" is on; on a touch screen a long press selects it and turns "select" on, so the taps that
+   follow select too. The press redraws the board at once; the click the finger's release still
+   sends (its own task, on whatever tile is there by then) is swallowed by name for a moment. */
+const toggleSel = name => { state.sel.has(name) ? state.sel.delete(name) : state.sel.add(name); };
+let pressed = null;  // {name, t}: the tile a long press just selected, whose click is not a click
 function bindTile(t) {
+  let hold = null, at = null;
+  t.onpointerdown = e => {
+    if (e.pointerType !== 'touch') return;
+    at = {x: e.clientX, y: e.clientY};
+    hold = setTimeout(() => {
+      hold = null; pressed = {name: t.dataset.name, t: Date.now()}; state.selecting = true; toggleSel(t.dataset.name);
+      navigator.vibrate?.(20); board();
+    }, 450);
+  };
+  t.onpointermove = e => { if (hold && Math.hypot(e.clientX - at.x, e.clientY - at.y) > 10) { clearTimeout(hold); hold = null; } };
+  t.onpointerup = t.onpointercancel = () => { if (hold) { clearTimeout(hold); hold = null; } };
+  t.oncontextmenu = e => { if (hold || pressed) e.preventDefault(); };
   t.onclick = e => {
-    const name = t.dataset.name, sel = state.sel;
-    if (e.shiftKey || e.ctrlKey || e.metaKey) { sel.has(name) ? sel.delete(name) : sel.add(name); board(); }
+    const name = t.dataset.name;
+    const swallow = pressed && pressed.name === name && Date.now() - pressed.t < 1000;
+    pressed = null;
+    if (swallow) { e.preventDefault(); return; }
+    if (e.shiftKey || e.ctrlKey || e.metaKey || state.selecting) { toggleSel(name); board(); }
     else location.hash = `#/set/${t.dataset.set}/card/${encodeURIComponent(name)}`;
   };
 }
@@ -326,6 +347,7 @@ function board() {
       <input type="text" id="q" placeholder="search name, type, artist${all ? ', set' : ''}" value="${esc(state.q || '')}">
       <select id="filter"><option value="">all cards</option>${filters.map(f => `<option ${filt === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
       ${filt || state.q ? `<button id="selshown" class="small" title="select the ${cards.length} card(s) shown, so the jobs below run on just them">select shown</button>` : ''}
+      <button id="selmode" class="small ${state.selecting ? 'on' : ''}" title="on: a tap selects a card instead of opening it. Shift-click, or a long press on a phone, selects too">select</button>
     </div>
     <div class="toolbar jobs">
       <span class="muted">${n ? `${n} selected` : 'all cards'}:</span>
@@ -354,7 +376,8 @@ function board() {
   bindTakes();
   $('#filter').onchange = e => { state.filter = e.target.value; board(); };
   $('#q').oninput = e => { state.q = e.target.value; grid(); };  // the grid alone, so typing keeps its focus
-  if ($('#clearsel')) $('#clearsel').onclick = () => { sel.clear(); board(); };
+  if ($('#clearsel')) $('#clearsel').onclick = () => { sel.clear(); state.selecting = false; board(); };
+  $('#selmode').onclick = () => { state.selecting = !state.selecting; board(); };
   if ($('#selshown')) $('#selshown').onclick = () => { boardCards().forEach(c => sel.add(c.name)); board(); };
   $('#missing').onchange = e => { state.missing = e.target.checked; board(); };
   $('#dpi').onchange = e => { state.dpi = +e.target.value; };
@@ -482,10 +505,10 @@ function drawViewer() {
       <span class="seg">${['art', 'card'].map(m => `<button data-vshow="${m}" class="${state.show === m ? 'on' : ''}">${m}</button>`).join('')}</span>` : ''}
       ${onBoard ? lookPicker('vstyle', state.set.cards_detail, state.set.style, !!state.set.all) : ''}
       <span class="spacer"></span>
-      <span class="mono muted" id="vzoom">1×</span>
-      <button class="small" data-v="out" title="zoom out (−)">−</button><button class="small" data-v="in" title="zoom in (+)">+</button><button class="small" data-v="fit" title="fit (0)">fit</button>
+      <span class="mono muted wide" id="vzoom">1×</span>
+      <span class="wide"><button class="small" data-v="out" title="zoom out (−)">−</button><button class="small" data-v="in" title="zoom in (+)">+</button><button class="small" data-v="fit" title="fit (0)">fit</button></span>
       ${onBoard ? `<a class="pill" href="#/set/${esc(setOf(c))}/card/${encodeURIComponent(c.name)}" title="compare (c)">compare</a>` : ''}
-      ${s.path ? `<a class="pill" href="${file(s.path)}" target="_blank" title="the full file in a new tab">open</a>` : ''}
+      ${s.path ? `<a class="pill wide" href="${file(s.path)}" target="_blank" title="the full file in a new tab">open</a>` : ''}
       <button class="small" data-v="full" title="fullscreen (f)">⛶</button>
       <button class="small" data-v="close" title="close (Esc)">✕</button>
     </div>
@@ -499,7 +522,7 @@ function drawViewer() {
       <span class="badges">${s.badges || ''}</span>
       ${s.recipe ? `<span class="recipe vrecipe">${recipeDiff(s.recipe, c.recipe)}</span>` : ''}
       <span class="spacer"></span>
-      <span class="muted">← → ${onBoard ? 'card' : 'image'} · wheel / pinch zoom · drag pan · double-click 2.5×${onBoard ? ' · p s plain/styled · a r art/card · c compare' : ''} · f fullscreen · Esc</span>
+      <span class="muted wide">← → ${onBoard ? 'card' : 'image'} · wheel / pinch zoom · drag pan · double-click 2.5×${onBoard ? ' · p s plain/styled · a r art/card · c compare' : ''} · f fullscreen · Esc</span>
     </div>`;
   applyZoom();
   el.querySelectorAll('[data-vmode]').forEach(b => b.onclick = () => { state.mode = b.dataset.vmode; board(); V.slides = boardSlides(); drawViewer(); });
@@ -514,9 +537,11 @@ function drawViewer() {
   });
   const stage = $('#vstage');
   stage.onwheel = e => { e.preventDefault(); const r = stage.getBoundingClientRect(); zoomTo(V.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - r.left, e.clientY - r.top); };
-  stage.ondblclick = e => { const r = stage.getBoundingClientRect(); zoomTo(V.z > 1 ? 1 : 2.5, e.clientX - r.left, e.clientY - r.top); };
+  const dbl = (x, y) => { const r = stage.getBoundingClientRect(); zoomTo(V.z > 1 ? 1 : 2.5, x - r.left, y - r.top); };
+  stage.ondblclick = e => { if (!V.touch) dbl(e.clientX, e.clientY); };  // a touch screen's double tap is read below
   stage.onpointerdown = e => {
     if (e.target.classList.contains('vnav')) return;
+    V.touch = e.pointerType === 'touch';
     stage.setPointerCapture(e.pointerId); V.ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
     if (V.ptrs.size === 2) { const [a, b] = [...V.ptrs.values()]; V.pinch = {d: Math.hypot(a.x - b.x, a.y - b.y), z: V.z}; V.drag = null; }
     else { V.drag = {x: e.clientX - V.x, y: e.clientY - V.y}; V.swipe = {x: e.clientX, y: e.clientY, t: Date.now()}; }
@@ -536,6 +561,12 @@ function drawViewer() {
     if (V.swipe && V.z === 1 && e.type === 'pointerup') {
       const dx = e.clientX - V.swipe.x, dy = e.clientY - V.swipe.y;
       if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy) && Date.now() - V.swipe.t < 600) viewerStep(dx < 0 ? 1 : -1);
+    }
+    // a tap is a press that went nowhere; two within 300 ms and a finger's width are a double tap
+    if (V.touch && e.type === 'pointerup' && V.swipe && Math.hypot(e.clientX - V.swipe.x, e.clientY - V.swipe.y) < 10 && !V.ptrs.size) {
+      const last = V.tap, now = Date.now();
+      V.tap = {x: e.clientX, y: e.clientY, t: now};
+      if (last && now - last.t < 300 && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 40) { V.tap = null; dbl(e.clientX, e.clientY); }
     }
     V.drag = null; V.swipe = null;
   };
@@ -814,9 +845,9 @@ function abPanel(A, B) {
       <button class="small" id="fit">fit</button>
       <label><input type="checkbox" id="blind" ${ab.blind ? 'checked' : ''}> blind</label>
       ${ab.blind ? '<button class="small" id="reveal">reveal</button>' : ''}
-      <span class="muted">drag to pan · wheel to zoom</span>
+      <span class="muted">drag the line · wheel / pinch to zoom · drag to pan when zoomed</span>
     </div>
-    <div class="stage ${cardish ? 'card' : ''}" id="stage">
+    <div class="stage ${cardish ? 'card' : ''} ${ab.zoom > 1 ? 'zoomed' : ''}" id="stage">
       <img src="${file(R.path)}" style="transform:${t}">
       <div class="clip" id="clip" style="clip-path: inset(0 ${100 - ab.wipe}% 0 0)"><img src="${file(L.path)}" style="transform:${t}"></div>
       <div class="split" style="left:${ab.wipe}%"></div>
@@ -830,22 +861,40 @@ function bindAB(A, B, r) {
     const t = `translate(${ab.x}px, ${ab.y}px) scale(${ab.zoom})`;
     stage.querySelectorAll('img').forEach(i => i.style.transform = t);
     $('#clip').style.clipPath = `inset(0 ${100 - ab.wipe}% 0 0)`; $('.split', stage).style.left = ab.wipe + '%'; $('#zoomv').textContent = ab.zoom + '×';
+    stage.classList.toggle('zoomed', ab.zoom > 1);
+  };
+  const zoomAt = (z, px, py) => {
+    z = Math.min(8, Math.max(1, z));
+    ab.x = px - (px - ab.x) * z / ab.zoom; ab.y = py - (py - ab.y) * z / ab.zoom; ab.zoom = +z.toFixed(2);
+    if (ab.zoom === 1) { ab.x = ab.y = 0; } $('#zoom').value = ab.zoom; apply();
   };
   $('#wipe').oninput = e => { ab.wipe = +e.target.value; apply(); };
   $('#zoom').oninput = e => { ab.zoom = +e.target.value; apply(); };
   $('#fit').onclick = () => { ab.zoom = 1; ab.x = ab.y = 0; $('#zoom').value = 1; apply(); };
   $('#blind').onchange = e => { ab.blind = e.target.checked; ab.swap = Math.random() < 0.5; card(r); };
   if ($('#reveal')) $('#reveal').onclick = () => { toast(`left was ${ab.swap ? 'B' : 'A'}: ${(ab.swap ? B : A).title} ${(ab.swap ? B : A).sub}`); ab.blind = false; card(r); };
-  let drag = null;
-  stage.onpointerdown = e => { drag = {x: e.clientX - ab.x, y: e.clientY - ab.y}; stage.setPointerCapture(e.pointerId); };
-  stage.onpointermove = e => { if (drag) { ab.x = e.clientX - drag.x; ab.y = e.clientY - drag.y; apply(); } };
-  stage.onpointerup = stage.onpointercancel = () => { drag = null; };
+  const ptrs = new Map(); let drag = null, pinch = null;
+  const wipeTo = x => { const r = stage.getBoundingClientRect(); ab.wipe = Math.round(Math.min(100, Math.max(0, 100 * (x - r.left) / r.width))); $('#wipe').value = ab.wipe; apply(); };
+  stage.onpointerdown = e => {
+    stage.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = {d: Math.hypot(a.x - b.x, a.y - b.y), z: ab.zoom}; drag = null; }
+    else if (ab.zoom > 1) drag = {x: e.clientX - ab.x, y: e.clientY - ab.y};
+    else { drag = 'wipe'; wipeTo(e.clientX); }
+  };
+  stage.onpointermove = e => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    if (pinch && ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()], r = stage.getBoundingClientRect();
+      zoomAt(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d, (a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top);
+    } else if (drag === 'wipe') wipeTo(e.clientX);
+    else if (drag) { ab.x = e.clientX - drag.x; ab.y = e.clientY - drag.y; apply(); }
+  };
+  stage.onpointerup = stage.onpointercancel = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (!ptrs.size) drag = null; };
   stage.onwheel = e => {
     e.preventDefault();
-    const rect = stage.getBoundingClientRect(), px = e.clientX - rect.left, py = e.clientY - rect.top;
-    const z = Math.min(8, Math.max(1, ab.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
-    ab.x = px - (px - ab.x) * z / ab.zoom; ab.y = py - (py - ab.y) * z / ab.zoom; ab.zoom = +z.toFixed(2);
-    if (ab.zoom === 1) { ab.x = ab.y = 0; } $('#zoom').value = ab.zoom; apply();
+    const rect = stage.getBoundingClientRect();
+    zoomAt(ab.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - rect.left, e.clientY - rect.top);
   };
 }
 
@@ -877,13 +926,13 @@ function lab() {
         <p class="muted" style="font-size:.85em">Changed knobs are highlighted. A run makes one variant per probe card under the label; variants that match the set's current recipe are marked current. "Use recipe for set" on a variant (in the card view) promotes it.</p>
       </div>
       <div>
-        <div class="labgrid" style="grid-template-columns: 120px repeat(${cols.length}, minmax(140px, 1fr))">
+        <div class="labwrap"><div class="labgrid" style="grid-template-columns: 120px repeat(${cols.length}, minmax(140px, 1fr))">
           <div class="head"></div>${cols.map(v => `<div class="head"><b>${esc(v.label)}</b> <span class="mono">${v.hash}</span><div class="mono muted" style="font-size:.85em">${esc(labSummary(v.recipe, st))}</div></div>`).join('')}
           ${probes.map(c => `<div class="head">${esc(c.name)}</div>${cols.map(v => {
             const mine = (c.variants || []).find(x => x.label === v.label && sameKnobs(x.recipe, v.recipe));
             return `<div class="cell">${mine ? `<img loading="lazy" src="${img(mine.path, 320)}" data-open="${esc(mine.path)}"><div class="cap"><span>${mine.hash}${c.current?.hash === mine.hash ? ' · current' : ''}</span><button class="small" data-promote="${esc(c.name)}|${mine.hash}">use for set</button></div>` : '<div class="cap muted">—</div>'}</div>`;
           }).join('')}`).join('')}
-        </div>
+        </div></div>
         ${cols.length ? '' : '<div class="empty">no restyle variants for the probe cards yet — run one</div>'}
       </div>
     </div>`;
