@@ -118,15 +118,90 @@ brushwork where Real-ESRGAN x4plus goes smooth and plasticky. `COMFY_URL`
 points at a server elsewhere. `mint/comfy.py` is a ~60-line client (upload,
 queue a workflow, fetch outputs) that any other ComfyUI workflow can reuse.
 
+## Art styles: one look per set
+
+A set can carry a `style` block, and `mint restyle` regenerates every card's
+art in that style through ComfyUI. The idea is that the style *is* the set's
+identity — you don't mix styles inside one set, you make a set per look:
+
+| set | look | why |
+|---|---|---|
+| Satoru (ninjas, Kamigawa: Neon Dynasty) | cyberpunk neon | the source set is already cyberpunk Kamigawa |
+| Meren (graveyard, sacrifice, Yawgmoth) | dark-fantasy ink manga, heavy cross-hatching | tonally already there |
+| Niv-Mizzet (Izzet) | stained glass / art nouveau | the guild's whole aesthetic |
+
+### How it works
+
+Plain img2img can't do this: at the denoise strength a real style change
+needs (0.7+) the composition dissolves; below that you get a filter. So the
+workflow is **img2img with structure control**: a ControlNet fed from the
+original art — lineart or canny for ink styles, depth for painterly ones —
+keeps *what's there* (the figure, the pose, the light) while the prompt and
+an optional style LoRA reinvent *how it's drawn*. Denoise 0.8–0.95.
+
+```
+LoadImage (art crop) ─┬─ preprocessor (canny / lineart / depth) ─ ControlNet ─┐
+                      └─ VAEEncode ────────────────────────────── KSampler ───┴─ VAEDecode ─ UltraSharp ─ SaveImage
+CheckpointLoader ── CLIPTextEncode (style prompt / negative) ───────┘
+```
+
+The style block lives in the set JSON:
+
+```json
+"style": {
+  "name": "neon",
+  "prompt": "cyberpunk fantasy illustration, neon-lit rain, holographic signage, chrome and lacquer, cinematic rim light",
+  "negative": "blurry, text, watermark, frame, border",
+  "control": "canny", "control_strength": 0.8,
+  "denoise": 0.85, "steps": 28, "cfg": 6, "seed": 7,
+  "checkpoint": "juggernautXL_v9.safetensors",
+  "loras": [{"name": "some-style.safetensors", "strength": 0.7}]
+}
+```
+
+Results are cached as `art/<illustration_id>.<style name>.png`; `mint render
+--styled` uses them, falling back to the CSS `art_filter` for cards that
+haven't been restyled yet. Because everything is in the set file, a set's look
+is reproducible and committed — same seed, same prompt, same models.
+
+### Models
+
+Nothing is bundled. SDXL is the practical choice on a 16 GB card (mature
+ControlNets, ~5–8 s a card); Flux is prettier for painterly work but heavier.
+Into ComfyUI's `models/`:
+
+- `checkpoints/` — an SDXL checkpoint tuned for illustration (Juggernaut XL,
+  DreamShaper XL, or base SDXL 1.0)
+- `controlnet/` — xinsir's **ControlNet Union SDXL (promax)**: one file that
+  covers canny, lineart, depth and more
+- `loras/` — style LoRAs as wanted (Civitai is the usual source)
+- later: IP-Adapter Plus, to anchor a whole set on one reference image
+
+Preprocessors beyond canny (lineart, depth) come from the
+`comfyui_controlnet_aux` custom node pack.
+
+### On naming artists
+
+Describe the style, don't invoke the person. "Confident single-weight pen
+lines, dense architectural detail, fisheye crowds, no underdrawing" gets you
+the Kim Jung Gi *feel*; a LoRA trained on his work days after his death in
+2022 is the poster case for why not to do the other thing. Same for Miura —
+"dark fantasy manga, heavy cross-hatching, screentone, black-ink dominant"
+is the style; the name is a person. The original illustrator stays credited
+in the footer either way: the composition is still theirs.
+
+### Notes per style
+
+- **Cyberpunk neon** — easiest, works from prompt alone with depth or canny control.
+- **Ink line art** — most distinctive on a card (black ink in a full-colour
+  M15 frame reads like WotC's artist-sketch cards). Lineart control at high
+  weight; generate large — hatching is what the upscaler destroys first.
+- **Dark manga / Berserk-style** — the hardest without a LoRA; base models
+  give "generic dark manga." Worth it with a good dark-fantasy-manga LoRA.
+
 ## What's not here yet
 
-- **alternate art styles per set** — the `--styled` variant is only a CSS
-  filter today. The real version is a ComfyUI img2img workflow through the
-  same client: a checkpoint plus ControlNet (canny/depth) to keep the
-  original composition while restyling it per set — woodcut, ukiyo-e, neon,
-  whatever the set's identity is — with the style prompt living in the set
-  file next to `art_filter`. Needs a diffusion checkpoint in ComfyUI's
-  `models/`; none is bundled.
+- IP-Adapter style anchoring for set-wide consistency
 - layouts beyond `normal`: split, MDFC, planeswalker, saga
 - picking art from a specific printing (`mint cards --kind default_cards`
   fetches the data; the render still uses the oracle default)
