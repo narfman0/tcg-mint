@@ -695,6 +695,13 @@ async function card(r) {
         </div></div>
       <div class="row" style="margin-left:auto"><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a><a class="pill" href="#/set/${esc(code)}/lab">lab</a></div>
     </div>
+    ${generatePanel(c, cols)}
+    <section class="sect">
+      <h2>images</h2>
+      ${A && B ? abPanel(A, B) : `<p class="muted">Pick <b>A</b> and <b>B</b> on two images to wipe between them.</p>`}
+      <div class="groups">${groups.filter(g => !g.renders && g.cols.length).map(g => `<div class="group"><h3>${esc(g.title)}</h3><div class="cols">${g.cols.map(x => columnHtml(x, c)).join('')}</div></div>`).join('')
+        || '<div class="empty">no images yet: fetch the crop (mint art) or generate one</div>'}</div>
+    </section>
     <section class="sect">
       <h2>card</h2>
       <div class="kv">
@@ -705,13 +712,6 @@ async function card(r) {
           <select id="dpi">${[300, 600, 1200].map(d => `<option ${state.dpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span></span>
       </div>
       ${renders.cols.length ? `<div class="cols renders">${renders.cols.map(x => columnHtml(x, c)).join('')}</div>` : ''}
-    </section>
-    ${generatePanel(c, cols)}
-    <section class="sect">
-      <h2>images</h2>
-      ${A && B ? abPanel(A, B) : `<p class="muted">Pick <b>A</b> and <b>B</b> on two images to wipe between them.</p>`}
-      <div class="groups">${groups.filter(g => !g.renders && g.cols.length).map(g => `<div class="group"><h3>${esc(g.title)}</h3><div class="cols">${g.cols.map(x => columnHtml(x, c)).join('')}</div></div>`).join('')
-        || '<div class="empty">no images yet: fetch the crop (mint art) or generate one</div>'}</div>
     </section>`;
   const put = body => api(`/api/sets/${code}/cards/${encodeURIComponent(c.name)}`, {method: 'PUT', body}).then(() => refresh()).catch(e => toast(e.message, true));
   // printings: a grid of art crops, each fetched from Scryfall the first time it is shown
