@@ -25,3 +25,6 @@ dist/
 
 # subagent worktrees
 .claude/worktrees/
+
+# workbench thumbnails and other caches
+.cache/
