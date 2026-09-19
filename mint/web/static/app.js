@@ -73,7 +73,7 @@ window.addEventListener('hashchange', go);
 function renderNav() {
   const r = route();
   $('#setnav').innerHTML = (state.ws?.sets || []).map(s =>
-    `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}">${esc(s.code)}</a>`).join('');
+    `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}"${s.private ? ' title="private: sets/private/, not in git"' : ''}>${esc(s.code)}${s.private ? ' <span class="lock">⌂</span>' : ''}</a>`).join('');
   $('#comfy').className = 'dot' + (state.ws?.comfy?.alive ? ' on' : '');
   $('#comfy').title = `ComfyUI ${state.ws?.comfy?.url}: ${state.ws?.comfy?.alive ? 'running' : 'not running'}`;
 }
@@ -116,7 +116,7 @@ function home() {
     <p class="muted">${esc(ws.home)} · ${ws.cards.count.toLocaleString()} cards on file · you are <b>${esc(ws.maker)}</b> (${esc(ws.maker_code)})</p>
     <div class="setlist">${ws.sets.map(s => `
       <a class="setcard" href="#/set/${esc(s.code)}">
-        <h3>${esc(s.code)} <span class="muted">${esc(s.name)}</span></h3>
+        <h3>${esc(s.code)} <span class="muted">${esc(s.name)}</span>${s.private ? ' <span class="badge" title="sets/private/ is git-ignored">private</span>' : ''}</h3>
         <div class="meta">${s.cards} cards${s.style ? ` · style <b>${esc(s.style)}</b>` : ' · no style'}${s.error ? `<div class="bad">${esc(s.error)}</div>` : ''}</div>
       </a>`).join('') || '<div class="empty">no set files in sets/ — <code>mint newset</code> makes one</div>'}
     </div>`;

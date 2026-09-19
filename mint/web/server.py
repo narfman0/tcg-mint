@@ -42,7 +42,7 @@ class State:
         return alive
 
     def set_paths(self):
-        return sorted(self.ws.sets.glob("*.json"))
+        return self.ws.set_files()
 
     def find_set(self, code):
         for p in self.set_paths():
@@ -121,7 +121,7 @@ def create_app(ws):
             try:
                 st = sets.load(p)
                 out.append({"code": st.code, "name": st.name, "path": str(p), "size": st.size, "cards": len(st.cards),
-                            "style": st.style.name if st.style else None})
+                            "style": st.style.name if st.style else None, "private": ws.is_private(p)})
             except MintError as e:
                 out.append({"code": p.stem, "name": "", "path": str(p), "error": str(e)})
         try:

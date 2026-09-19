@@ -91,11 +91,12 @@ printer = "EPSON_ET_8500"
 
 | command | what |
 |---|---|
-| `mint newset` | start a set file from a decklist (commander first); `--style neon|ink|glass` seeds a style block |
+| `mint newset` | start a set file from a decklist (commander first); `--style` seeds a style block from a template or a built-in; `--private` keeps the set out of git |
 | `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet; `--faces` the backs of double-faced cards too |
 | `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
 | `mint upscale` | 4× ESRGAN the art (or any variant, `--base HASH`) through a local ComfyUI; renders pick the result up automatically |
 | `mint check` | validate set files and say which image each card renders with, plain and styled |
+| `mint style` | save a set's art style as a template in `styles/` for other sets to start from; `list` and `show` them |
 | `mint migrate` | move a pre-variant art cache (`art/<id>.<style>.png`) into `art/<id>/` with recipe sidecars |
 | `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
@@ -251,6 +252,31 @@ mint render  --set sets/sat.json --styled --out proofs
 Three recipes ship in `mint newset`: `neon` (canny control), `ink`
 (lineart control, monochrome), `glass` (canny). They are starting points;
 the block in the set file is the source of truth once created.
+
+### Style templates and private sets
+
+A style you want to reuse lives in `styles/<name>.json` — a bare style block,
+plus an optional `styles/<name>.css` with the frame rules that go with it:
+
+```sh
+mint style save NIV                 # -> styles/glass.json, named after NIV's style
+mint style save NIV --as cathedral  # under a name of your own
+mint style list                     # templates on disk, then the built-ins they don't shadow
+mint newset --code ABC --name "..." --style cathedral decks/abc.txt
+```
+
+`styles/` is version-controlled, so a template is how a look gets shared.
+What should *not* be shared goes in a `private/` tier that git ignores:
+`sets/private/` and `styles/private/`. A set or template there works exactly
+like one beside it — `mint check`, the workbench and `mint style list` find it,
+`--set sets/private/x.json` renders it — but `git status` never shows it, and
+its art variants and renders were already ignored (`art/`, `out/`).
+
+```sh
+mint newset --code XXX --name "..." --style glass --private decks/xxx.txt   # sets/private/xxx.json
+mint style save XXX --private                    # styles/private/<style>.json
+mint style save XXX                              # refused: a private set's style needs --force to be shared
+```
 
 ### Models
 

@@ -2,7 +2,8 @@
 
     mint check [sets/x.json ...]
 
-Validates every set file (all of sets/ by default) against the schema, looks
+Validates every set file (sets/ and sets/private/ by default) against the
+schema, looks
 each card up, and says which image a plain and a styled render would use:
 whether the current recipe has a restyle variant, whether the crop has been
 enhanced, and any warnings about the printing.
@@ -47,7 +48,7 @@ def main(argv=None):
     ap.add_argument("paths", nargs="*")
     a = ap.parse_args(argv)
     ws = workspace.default()
-    paths = a.paths or sorted(ws.sets.glob("*.json"))
+    paths = a.paths or ws.set_files()
     cards, art = Cards(ws.cards_file), Art(ws.art)
     problems = 0
     for p in paths:

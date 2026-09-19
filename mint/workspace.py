@@ -1,8 +1,13 @@
 """Where everything lives.
 
 The *workspace* (MINT_HOME, default: the current directory) holds what is yours
-or cached: fonts/, art/, symbols/, sets/, the Scryfall card file and .cache/.
-The package itself ships only code and templates. A Workspace is passed to the
+or cached: fonts/, art/, symbols/, sets/, styles/, the Scryfall card file and
+.cache/. The package itself ships only code and templates.
+
+sets/ and styles/ each have a private/ subdirectory that git ignores (the repo's
+.gitignore lists both): a set or a style template there behaves exactly like
+one beside it, but never reaches version control. `mint newset --private` and
+`mint style save --private` write there. A Workspace is passed to the
 library explicitly; the CLI builds one from the environment.
 
     MINT_HOME    the workspace directory
@@ -60,11 +65,34 @@ class Workspace:
         return self.home / "sets"
 
     @property
+    def styles(self):
+        return self.home / "styles"
+
+    @property
     def cache(self):
         return self.home / ".cache"
 
+    PRIVATE = "private"
+
+    def set_files(self):
+        """Every set file: sets/*.json, then sets/private/*.json (a private set never shadows a shared one)."""
+        return _tiers(self.sets)
+
+    def style_files(self):
+        """Every style template, styles/private/*.json first: a private template shadows a shared one by name."""
+        return _tiers(self.styles, private_first=True)
+
+    def is_private(self, path):
+        """Whether a set or template path lies in a git-ignored private/ tier."""
+        return Path(path).resolve().parent.name == self.PRIVATE
+
     def path(self, *parts):
         return self.home.joinpath(*parts)
+
+
+def _tiers(d, private_first=False):
+    shared, private = sorted(d.glob("*.json")), sorted((d / Workspace.PRIVATE).glob("*.json"))
+    return private + shared if private_first else shared + private
 
 
 def read_config(path):

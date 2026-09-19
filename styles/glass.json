@@ -1,0 +1,12 @@
+{
+  "name": "glass",
+  "prompt": "stained glass window illustration, art nouveau, thick black leading between panes of jewel-toned glass, backlit, ornamental borders and flowing curves, gold and ruby and sapphire, art-nouveau decorative composition, cathedral window",
+  "negative": "blurry, low quality, text, watermark, signature, frame, photographic, realistic, 3d render, nude, nsfw, portrait of a woman",
+  "control": "canny",
+  "control_strength": 0.7,
+  "denoise": 0.88,
+  "steps": 28,
+  "cfg": 6,
+  "seed": 23,
+  "seed_rule": "position"
+}

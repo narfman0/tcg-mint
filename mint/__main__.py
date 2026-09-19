@@ -11,6 +11,7 @@ COMMANDS = {
     "upscale":   ("4x-upscale card art through a local ComfyUI", "upscale"),
     "restyle":   ("regenerate card art in the set's style through ComfyUI", "restyle"),
     "check":     ("validate set files and report each card's art", "check"),
+    "style":     ("save a set's art style as a template, or list them", "style"),
     "migrate":   ("move a pre-variant art cache into art/<id>/", "migrate"),
     "fonts":     ("report which frame fonts are present", "fonts"),
     "back":      ("render the BLS card back", "back"),

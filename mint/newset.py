@@ -1,6 +1,6 @@
 """Start a set file from a plain decklist.
 
-    mint newset --code SAT --name "Satoru, ..." [--style neon] [--out sets/satoru.json] decklist.txt
+    mint newset --code SAT --name "Satoru, ..." [--style neon] [--private] [--out sets/satoru.json] decklist.txt
 
 The decklist is `<count> <Card Name>` per line, mainboard first, then a blank
 line and the commander(s); anything from the first `#` header on is ignored
@@ -9,15 +9,19 @@ commander becomes card 1 and the rest follow in list order. An existing set
 file is updated in place: new cards are appended, numbers and per-card edits
 (flavor, subject, art) are kept.
 
---style seeds the set's `style` block from one of the built-in recipes
-(`neon`, `ink`, `glass`); edit it afterwards, it is just JSON.
+--style seeds the set's `style` block from a template in styles/ (see
+style.py) or one of the built-in recipes (`neon`, `ink`, `glass`); edit it
+afterwards, it is just JSON. A template's .css becomes the set's .css.
+--private puts the set in sets/private/, which git ignores.
 """
 import argparse
 import os
 import re
 import sys
+from pathlib import Path
 
-from . import sets, workspace
+from . import sets, style, workspace
+from .errors import MintError
 
 STYLES = {
     "neon": {
@@ -75,15 +79,21 @@ def main(argv=None):
     ap.add_argument("decklist")
     ap.add_argument("--code", required=True, help="set code, e.g. SAT (the company code is added by the renderer)")
     ap.add_argument("--name", required=True)
-    ap.add_argument("--style", choices=STYLES, help="seed the style block from a built-in recipe")
+    ap.add_argument("--style", help="seed the style block from a template in styles/ or a built-in recipe")
+    ap.add_argument("--private", action="store_true", help="put the set in sets/private/, which git ignores")
     ap.add_argument("--out", help="set file (default sets/<code lowercased>.json)")
     a = ap.parse_args(argv)
-    out = a.out or str(workspace.default().sets / (a.code.lower() + ".json"))
+    ws = workspace.default()
+    out = a.out or str((ws.sets / ws.PRIVATE if a.private else ws.sets) / (a.code.lower() + ".json"))
 
     st = sets.load(out) if os.path.exists(out) else sets.SetFile(code=a.code, name=a.name)
     st.code, st.name = a.code, a.name
+    css = None
     if a.style and st.style is None:
-        st.style = sets.from_dict({"code": "x", "style": STYLES[a.style]}).style
+        try:
+            st.style, css = style.load(ws, a.style)
+        except MintError as e:
+            raise SystemExit(str(e)) from None
 
     names = read_decklist(a.decklist)
     seen = set()
@@ -98,6 +108,9 @@ def main(argv=None):
             added += 1
     st.size = len(cards)
     sets.save(out, st)
+    css_fn = Path(out).with_suffix(".css")
+    if css and not css_fn.exists():
+        css_fn.write_text(css)
     print(f"{out}: {len(cards)} cards ({added} new)" + (f", style {st.style.name}" if st.style else ""))
 
 

@@ -23,6 +23,10 @@ build/
 dist/
 .venv/
 
+# private sets and style templates: local only, never committed (`--private`)
+sets/private/
+styles/private/
+
 # subagent worktrees
 .claude/worktrees/
 
