@@ -22,7 +22,9 @@
       "number": 2
     },
     "Arcane Signet": {
-      "number": 3
+      "number": 3,
+      "printing": "cmr:689",
+      "pick": "038a0926"
     },
     "Archpriest of Shadows": {
       "number": 4
