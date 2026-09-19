@@ -22,6 +22,9 @@ pip install -e .
 playwright install chromium
 ```
 
+For development, `pip install -e .[dev]` adds ruff and pytest; `pytest` runs the
+unit tests and `pytest -m render` the one that drives Chromium.
+
 If `playwright install` times out on your network, fetch the same build with
 curl and unzip it where Playwright expects it — the path is printed by
 `python -c "from playwright.sync_api import sync_playwright as p; print(p().start().chromium.executable_path)"`.
@@ -31,7 +34,7 @@ Then, in the directory you want to work in (your *workspace*):
 ```sh
 mint cards            # fetch Scryfall's oracle-cards bulk file (~200 MB, gitignored)
 mint fonts            # see which frame fonts you have; fonts/README.md says where to get them
-mint render "Cyclonic Rift"                        # -> ./014_Cyclonic_Rift.png at 1200 DPI
+mint render "Cyclonic Rift"                        # -> ./001_Cyclonic_Rift.png at 1200 DPI
 mint render --set sets/bls1.json --out proofs      # a whole set
 mint render --set sets/bls1.json --styled --out proofs   # the set's stylized art variant
 ```
@@ -56,7 +59,7 @@ A set is a JSON file (see `sets/bls1.json`):
 ```
 
 - `number` is the card's collector number in *your* set; the footer also
-  records the original printing (`after RVR #40`) so the mapping runs both ways.
+  records the original printing (`RVR 40`) so the mapping runs both ways.
 - `flavor` replaces the printed flavor text; omit the key to keep the original.
 - `art` points at your own image; otherwise Scryfall's art crop is used.
 - `art_filter` (set-wide or per card) is a CSS filter applied with

@@ -29,9 +29,8 @@ import re
 import string
 import sys
 import tempfile
-import urllib.request
 
-from . import ART, CARDS, FONTS, PKG, SYMBOLS
+from . import ART, CARDS, FONTS, PKG, SYMBOLS, scryfall
 
 # --- identity: change these -------------------------------------------------
 MAKER = "narfman0"
@@ -51,9 +50,7 @@ THEMES = {
     "marcellus": (["Marcellus"], ["Libre Baskerville"]),
     "spectral":  (["Spectral SC"], ["Spectral"]),
 }
-LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", "Liberation Serif", "Cantarell", "Liberation Sans"}  # never ask Google for these
-# collector line: a light geometric sans, as printed (Gotham on the real cards)
-FOOTER = ["Inter", "Cantarell", "Liberation Sans"]
+LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", "Liberation Serif"}  # never ask Google for these
 
 # M15 frame palette: (frame, frame-dark, bar, bar-edge, text box)
 FRAMES = {
@@ -86,6 +83,9 @@ NOISE = base64.b64encode(
 
 # the template is 100 CSS px per inch; the card is 2.5x3.5in plus 0.11in bleed
 PAGE = {"width": 272, "height": 372}
+
+# rules text starts at 11.6px and fit() shrinks it; below this it is hard to read in print
+TEXT_FLOOR = 8.0
 
 # Universes Beyond printings (Scryfall: security_stamp == "triangle") are not
 # wanted as art, except these: Lord of the Rings fits Magic well enough.
@@ -130,14 +130,14 @@ def symbols():
     SYMBOLS.mkdir(parents=True, exist_ok=True)
     idx = SYMBOLS / "symbology.json"
     if not idx.exists():
-        urllib.request.urlretrieve("https://api.scryfall.com/symbology", idx)
+        scryfall.fetch(scryfall.API + "/symbology", idx)
     return {s["symbol"]: s["svg_uri"] for s in json.load(open(idx))["data"]}
 
 
 def symbol_data_uri(sym, table):
     fn = SYMBOLS / (re.sub(r"[^A-Za-z0-9]", "_", sym) + ".svg")
     if not fn.exists():
-        urllib.request.urlretrieve(table[sym], fn)
+        scryfall.fetch(table[sym], fn)
     return "data:image/svg+xml;base64," + base64.b64encode(fn.read_bytes()).decode()
 
 
@@ -152,7 +152,7 @@ def art_path(card, override=None, upscaled=True):
         return "file://" + str(big)
     fn = ART / (card["illustration_id"] + ".jpg")
     if not fn.exists():
-        urllib.request.urlretrieve(card["image_uris"]["art_crop"], fn)
+        scryfall.fetch(card["image_uris"]["art_crop"], fn)
     return "file://" + str(fn)
 
 
@@ -199,7 +199,8 @@ def local_fonts():
 def font_link(families):
     web = [f for f in families if f not in LOCAL_FAMILIES]
     fams = "&".join("family=" + f.replace(" ", "+") + ":ital,wght@0,300;0,400;0,700;1,400" for f in dict.fromkeys(web))
-    return f"https://fonts.googleapis.com/css2?{fams}&display=swap" if fams else "data:text/css,"
+    # no stylesheet at all when every face is local: the render then makes no network request
+    return f'<link rel="stylesheet" href="https://fonts.googleapis.com/css2?{fams}&display=swap">' if fams else ""
 
 
 def stack(families):
@@ -255,8 +256,8 @@ def build_html(card, theme, table, number, set_code, set_size, override, art_fil
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
     tpl = string.Template((PKG / "template.html").read_text())
     return tpl.substitute(
-        font_link=font_link(title + body + FOOTER), local_fonts=local_fonts(),
-        title_font=stack(title), body_font=stack(body), footer_font=stack(FOOTER).replace(", serif", ", sans-serif"),
+        font_link=font_link(title + body), local_fonts=local_fonts(),
+        title_font=stack(title), body_font=stack(body),
         frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box,
         noise="data:image/svg+xml;base64," + NOISE, set_css=set_css,
         crown='<div class="crown-o"></div><div class="crown"></div>' if legendary else "",
@@ -272,6 +273,7 @@ def build_html(card, theme, table, number, set_code, set_size, override, art_fil
 
 
 def render(page, html, out, fit=True):
+    """Screenshot html to out. Returns the shrink-to-fit result, {"text": px, "name": px}, or None."""
     # Chromium needs a file:// page for the file:// art and font references to resolve
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
         f.write(html)
@@ -280,9 +282,12 @@ def render(page, html, out, fit=True):
         # network to go quiet, then for the font set to settle, *then* fit text
         page.goto("file://" + f.name, wait_until="networkidle")
         page.evaluate("document.fonts.ready")
+        sizes = None
         if fit:
-            page.evaluate("fit()")
+            fs, ns = page.evaluate("fit()")
+            sizes = {"text": round(fs, 2), "name": round(ns, 2)}
         page.screenshot(path=out, clip={"x": 0, "y": 0, **PAGE})
+        return sizes
     finally:
         os.unlink(f.name)
 
@@ -346,9 +351,12 @@ def main(argv=None):
                 tag = f".{th}" if a.compare else ""
                 prefix = f"{set_code}-" if a.set else ""
                 out = os.path.join(a.out, f"{prefix}{number:03d}_{slug}{'.styled' if a.styled else ''}{tag}.png")
-                render(page, build_html(card, th, table, number, set_code, set_size, ov, art_filter, set_css), out)
+                sizes = render(page, build_html(card, th, table, number, set_code, set_size, ov, art_filter, set_css), out)
                 outs.append(out)
-                print(out)
+                note = ""
+                if sizes and sizes["text"] < TEXT_FLOOR:
+                    note = f"  (rules text shrunk to {sizes['text']}px)"
+                print(out + note)
         b.close()
     if a.compare:
         from PIL import Image

@@ -18,24 +18,15 @@ import os
 import shutil
 import sys
 import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from . import CARDS, __version__
+from . import CARDS, scryfall
 
-BULK = "https://api.scryfall.com/bulk-data"
-UA = f"tcg-mint/{__version__} (+https://github.com/narfman0/tcg-mint)"
-
-
-def get_json(url):
-    # Scryfall 403s requests without a User-Agent.
-    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.load(resp)
+BULK = scryfall.API + "/bulk-data"
 
 
 def remote_meta(kind):
-    for entry in get_json(BULK)["data"]:
+    for entry in scryfall.get_json(BULK)["data"]:
         if entry["type"] == kind:
             return entry
     sys.exit(f"scryfall no longer publishes a {kind!r} bulk file")
@@ -54,11 +45,7 @@ def local_stamp():
 
 def download(uri):
     archive = CARDS.with_suffix(CARDS.suffix + ".gz")
-    req = urllib.request.Request(uri, headers={"User-Agent": UA})
-    tmp = str(archive) + ".part"
-    with urllib.request.urlopen(req, timeout=300) as resp, open(tmp, "wb") as fh:
-        shutil.copyfileobj(resp, fh)
-    os.replace(tmp, archive)
+    scryfall.fetch(uri, archive)
     # decompress to a temp file so a failure mid-stream can't leave a truncated card file
     tmp = str(CARDS) + ".part"
     with gzip.open(archive, "rb") as src, open(tmp, "wb") as dst:

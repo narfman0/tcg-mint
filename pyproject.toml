@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 fonts = ["fonttools>=4.40"]
+dev = ["pytest>=8", "ruff>=0.5"]
 
 [project.scripts]
 mint = "mint.__main__:main"
@@ -28,4 +29,16 @@ Repository = "https://github.com/narfman0/tcg-mint"
 packages = ["mint"]
 
 [tool.setuptools.package-data]
-mint = ["template.html"]
+mint = ["*.html"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E731", "B905"]  # named lambdas and plain zip() are used deliberately
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["render: needs a Playwright Chromium"]

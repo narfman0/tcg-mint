@@ -15,13 +15,11 @@ sides, so any bias cancels.
 """
 import argparse
 import os
-import re
 import statistics
-import urllib.request
 
 from PIL import Image
 
-from . import ART, render
+from . import ART, render, scryfall
 
 # non-legendary M15-frame cards with clean bars; a couple with P/T
 DEFAULT = ["Cyclonic Rift", "Rhystic Study", "Demonic Tutor", "Consecrated Sphinx", "Blightsteel Colossus"]
@@ -38,7 +36,7 @@ ZONES = {
 def scan(card):
     fn = ART / ("scan_" + card["illustration_id"] + ".png")
     if not fn.exists():
-        urllib.request.urlretrieve(card["image_uris"]["png"], fn)
+        scryfall.fetch(card["image_uris"]["png"], fn)
     return Image.open(fn).convert("L")
 
 
@@ -63,7 +61,8 @@ def measure(im, ox, oy, ppu, zone, dark=95):
         elif i is not None and i - prev <= 2:
             prev = i
         else:
-            runs.append((start, prev)); start = prev = i
+            runs.append((start, prev))
+            start = prev = i
     t0, t1 = max(runs, key=lambda r: r[1] - r[0])
     peak = max(counts[t0:t1 + 1])
     body = [i for i in range(t0, t1 + 1) if counts[i] >= 0.30 * peak]
