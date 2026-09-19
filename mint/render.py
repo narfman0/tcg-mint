@@ -228,7 +228,7 @@ def render_text(card, table, flavor=None):
     # a basic land shows one big mana symbol instead of its "({T}: Add {G}.)" line
     m = re.fullmatch(r"\(\{T\}: Add (\{[WUBRGC]\})\.\)", text.strip())
     if card["type_line"].startswith("Basic") and m:
-        return f'<p class="big-sym"><img src="{symbol_data_uri(m.group(1), table)}"></p>'
+        return f'<p class="big-sym"><span class="pip"><img src="{symbol_data_uri(m.group(1), table)}"></span></p>'
     paras = []
     for p in text.split("\n"):
         p = syms(p)
@@ -247,7 +247,8 @@ def render_text(card, table, flavor=None):
 def build_html(card, theme, table, number, set_code, set_size, override, art_filter, set_css=""):
     title, body = THEMES[theme]
     frame, frame_dark, bar, bar_edge, box = frame_for(card)
-    cost = "".join(f'<img src="{symbol_data_uri(m, table)}">' for m in re.findall(r"\{[^}]+\}", card.get("mana_cost") or ""))
+    cost = "".join(f'<span class="pip"><img src="{symbol_data_uri(m, table)}"></span>'
+                   for m in re.findall(r"\{[^}]+\}", card.get("mana_cost") or ""))
     pt = f'<div class="pt"><span>{card["power"]}/{card["toughness"]}</span></div>' if card.get("power") is not None else ""
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
     tpl = string.Template((PKG / "template.html").read_text())

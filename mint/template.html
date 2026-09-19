@@ -49,8 +49,13 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   position: relative; top: var(--title-dy); }
 .type { font-family: var(--title-font); font-size: 10.8px; font-weight: 700; white-space: nowrap; position: relative; top: var(--type-dy); }
 .cost { display: flex; gap: 1px; flex: none; margin-left: 4px; }
-/* solid black shadow from a light at ~75 degrees upper-right: mostly down, a little left */
-.cost img { height: 12px; width: 12px; filter: drop-shadow(-0.24px 0.88px 0 #000); }
+/* Pip shadow: a black disc behind the symbol, offset for a light at ~75 degrees
+   upper-right (mostly down, a little left). Not drop-shadow(): Chromium floors
+   its offsets to whole CSS px, which at 100 px/in turns (-0.24, 0.88) into (-1, 0). */
+.pip { position: relative; width: 12px; height: 12px; display: block; }
+.pip::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #000;
+  transform: translate(-0.24px, 0.88px); }
+.pip img { position: relative; height: 12px; width: 12px; display: block; }
 .setsym { height: 13px; width: 13px; }
 .art { position: absolute; left: 14px; top: 38.5px; width: 222px; height: 156.5px;
   background: #222 center / cover no-repeat; background-image: url("$art");
@@ -66,8 +71,9 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .textbox img.sym { height: .82em; width: .82em; vertical-align: -0.06em; margin: 0 .03em; }
 .textbox .reminder, .flavor { font-style: italic; }
 .flavor .upright { font-style: normal; }
-.textbox .big-sym { text-align: center; }
-.textbox .big-sym img { width: 58px; height: 58px; filter: drop-shadow(-1.2px 1.4px 0 rgba(0,0,0,.55)); }
+.textbox .big-sym { display: flex; justify-content: center; }
+.textbox .big-sym .pip, .textbox .big-sym .pip img { width: 58px; height: 58px; }
+.textbox .big-sym .pip::before { background: rgba(0,0,0,.55); transform: translate(-1.2px, 4.4px); }
 .textbox .nowrap { white-space: nowrap; }
 .flavor { margin-top: 2px; padding-top: 3.5px; position: relative; }
 .flavor::before { content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 0.7px;
@@ -99,7 +105,7 @@ $set_css
   $pt
   <div class="footer">
     <span><b>$number/$set_size $rarity</b><br>$set_code · EN · <span class="brush">✎</span> $artist</span>
-    <span><b>$maker_code</b> · $maker · $date · $orig_set #$orig_number</span>
+    <span>$maker_code · $maker · $date · $orig_set #$orig_number</span>
   </div>
 </div>
 <script>
