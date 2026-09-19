@@ -11,6 +11,7 @@ prefers one that is not a Universes Beyond crossover.
 """
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 
@@ -46,6 +47,69 @@ def faces(card):
 
 def is_universes_beyond(card):
     return card.get("security_stamp") == "triangle" and card.get("set") not in UB_EXEMPT
+
+
+# The default printing: the newest one that looks like a normal card. Every printing gets
+# a penalty for each way it is not one; the lowest penalty wins, newest first among equals.
+# With a per-printing card file (`mint cards --kind default_cards`) the newest printing of a
+# staple is usually a Secret Lair, a promo or a showcase frame, and that is not what anyone
+# means by "the card".
+ODD_SET_TYPES = {"box": 25, "masterpiece": 25, "promo": 30, "spellbook": 20, "funny": 20, "memorabilia": 60,
+                 "token": 60, "minigame": 60, "vanguard": 60, "planechase": 30, "archenemy": 30}
+ODD_FRAME = {"showcase", "extendedart", "inverted", "etched", "shatteredglass", "textless", "borderless", "fullart"}
+
+
+def TODAY():
+    import datetime as dt
+    return dt.date.today().isoformat()
+
+
+def oddness(card):
+    """(penalty, reasons) for a printing as the default; 0 is a plain black-bordered card."""
+    why = []
+    if card.get("digital"):
+        why.append(("digital", 100))
+    if card.get("lang", "en") != "en":
+        why.append((card["lang"], 100))
+    if card.get("oversized"):
+        why.append(("oversized", 100))
+    if not card.get("illustration_id"):
+        why.append(("no art", 100))
+    if (card.get("released_at") or "") > TODAY():
+        why.append(("unreleased", 50))
+    if is_universes_beyond(card):
+        why.append(("Universes Beyond", 40))
+    t = card.get("set_type")
+    if t in ODD_SET_TYPES:
+        why.append((t.replace("box", "Secret Lair / box set"), ODD_SET_TYPES[t]))
+    if card.get("promo") and t != "promo":
+        why.append(("promo", 30))
+    if card.get("set") == "plst" or card.get("set", "").startswith("mb"):
+        why.append(("The List / Mystery Booster", 15))
+    if card.get("border_color") not in (None, "black"):
+        why.append((card["border_color"] + " border", 10))
+    odd = ODD_FRAME & set(card.get("frame_effects") or [])
+    if odd:
+        why.append((", ".join(sorted(odd)), 10))
+    if card.get("full_art") and "Land" not in card.get("type_line", ""):
+        why.append(("full art", 10))
+    if card.get("textless"):
+        why.append(("textless", 20))
+    return sum(p for _, p in why), [w for w, _ in why]
+
+
+def default_printing(cands):
+    """The printing `find` uses without an explicit one: least odd, newest among those, and
+    the lowest collector number within a set (the plain printing sits before its variants)."""
+    def key(c):
+        m = re.match(r"\d+", c.get("collector_number", ""))
+        return (oddness(c)[0], c.get("released_at") or "", int(m.group()) if m else 10**6)  # released: newest first, below
+    if not cands:
+        return None
+    best = min(oddness(c)[0] for c in cands)
+    tied = [c for c in cands if oddness(c)[0] == best]
+    newest = max(c.get("released_at") or "" for c in tied)
+    return min((c for c in tied if (c.get("released_at") or "") == newest), key=key)
 
 
 def warnings(card):
@@ -125,8 +189,8 @@ class Cards:
         return [front_face(self._read(o, n)) for o, n in rows]
 
     def find(self, name, printing=None):
-        """The card to render for this name. With several printings on file, the
-        newest that is not a Universes Beyond crossover wins; `printing` ("rvr:40")
+        """The card to render for this name. With several printings on file, the newest
+        that looks like a normal card wins (default_printing); `printing` ("rvr:40")
         picks one explicitly."""
         cands = self.printings(name)
         if not cands:
@@ -137,7 +201,7 @@ class Cards:
                 if c["set"] == code.lower() and (not num or c["collector_number"] == num):
                     return c
             raise CardNotFound(f"{name}: no printing {printing!r} on file (have {', '.join(self.printing_ids(cands))})")
-        return next((c for c in cands if not is_universes_beyond(c)), cands[0])
+        return default_printing(cands)
 
     @staticmethod
     def printing_ids(cards):
