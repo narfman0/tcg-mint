@@ -15,16 +15,17 @@ losslessly at their exact physical size.
 """
 import argparse
 import os
+import shutil
+import subprocess
 import tempfile
 
 from PIL import Image
-
-from . import render
 
 PAPER = {"letter": (8.5, 11.0), "a4": (8.27, 11.69)}
 CARD = (2.5, 3.5)
 RENDER_BLEED = 0.11  # what render.py puts around the card
 COLS, ROWS = 3, 3
+PAGES_PER_RUN = 3    # pages per Chromium document; parts are joined with pdfunite (poppler)
 
 
 def prepare(path, bleed, dpi, tmpdir, i):
@@ -85,26 +86,41 @@ def main(argv=None):
 
     from playwright.sync_api import sync_playwright
     pw, ph = PAPER[a.paper]
-    with tempfile.TemporaryDirectory() as tmp:
-        prepared = [prepare(p, a.bleed, a.dpi, tmp, i) for i, p in enumerate(a.cards)]
-        pages = [prepared[i:i + COLS * ROWS] for i in range(0, len(prepared), COLS * ROWS)]
-        html = ("<!doctype html><meta charset=utf-8><style>"
-                f"@page {{ size: {pw}in {ph}in; margin: 0; }}"
-                "* { margin: 0; padding: 0; } body { background: #fff; }"
-                ".page { position: relative; page-break-after: always; overflow: hidden; }"
-                ".page img { position: absolute; display: block; }"
-                ".page i { position: absolute; background: #000; }"
-                ".page i.v { width: 0.6pt; margin-left: -0.3pt; } .page i.h { height: 0.6pt; margin-top: -0.3pt; }"
-                "</style>" + "\n".join(page_html(p, a.paper, a.bleed) for p in pages))
-        fn = os.path.join(tmp, "sheet.html")
-        open(fn, "w").write(html)
-        with sync_playwright() as p:
-            b = p.chromium.launch(channel="chromium")
+    css = ("<!doctype html><meta charset=utf-8><style>"
+           f"@page {{ size: {pw}in {ph}in; margin: 0; }}"
+           "* { margin: 0; padding: 0; } body { background: #fff; }"
+           ".page { position: relative; page-break-after: always; overflow: hidden; }"
+           ".page img { position: absolute; display: block; }"
+           ".page i { position: absolute; background: #000; }"
+           ".page i.v { width: 0.6pt; margin-left: -0.3pt; } .page i.h { height: 0.6pt; margin-top: -0.3pt; }"
+           "</style>")
+    per_page = COLS * ROWS
+    chunk = per_page * PAGES_PER_RUN
+    with tempfile.TemporaryDirectory() as tmp, sync_playwright() as p:
+        b = p.chromium.launch(channel="chromium")
+        parts = []
+        # a few pages per Chromium run: decoded 600 DPI PNGs are ~10 MB each and a
+        # whole 90-card set in one document was enough to get the process killed
+        for c0 in range(0, len(a.cards), chunk):
+            prepared = [prepare(path, a.bleed, a.dpi, tmp, c0 + i) for i, path in enumerate(a.cards[c0:c0 + chunk])]
+            pages = [prepared[i:i + per_page] for i in range(0, len(prepared), per_page)]
+            fn = os.path.join(tmp, f"sheet{len(parts)}.html")
+            open(fn, "w").write(css + "\n".join(page_html(pg, a.paper, a.bleed) for pg in pages))
+            part = os.path.join(tmp, f"part{len(parts)}.pdf")
             page = b.new_page()
             page.goto("file://" + fn, wait_until="networkidle")
-            page.pdf(path=a.out, width=f"{pw}in", height=f"{ph}in", print_background=True, prefer_css_page_size=True)
-            b.close()
-    print(f"{a.out}: {len(pages)} page(s), {len(a.cards)} cards, {a.paper} at 100%, {a.bleed}in bleed, {a.dpi} DPI")
+            page.pdf(path=part, width=f"{pw}in", height=f"{ph}in", print_background=True, prefer_css_page_size=True)
+            page.close()
+            parts.append(part)
+            for fp in prepared:
+                os.unlink(fp)
+        b.close()
+        if len(parts) == 1:
+            shutil.move(parts[0], a.out)
+        else:
+            subprocess.run(["pdfunite", *parts, a.out], check=True)
+    npages = -(-len(a.cards) // per_page)
+    print(f"{a.out}: {npages} page(s), {len(a.cards)} cards, {a.paper} at 100%, {a.bleed}in bleed, {a.dpi} DPI")
 
 
 if __name__ == "__main__":
