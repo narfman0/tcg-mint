@@ -40,6 +40,11 @@ class Job:
         self.log.append(msg)
         self._jobs.emit("log", {"id": self.id, "msg": msg})
 
+    def made(self, **what):
+        """One unit of the job's output is on disk -- a card's variant, a render -- and the page can
+        show it now rather than when the whole batch ends. `what` names it (set, name, ...)."""
+        self._jobs.emit("item", {"id": self.id, **what})
+
     def step(self, done, total=None):
         self.done = done
         if total is not None:
@@ -65,7 +70,7 @@ class Jobs:
         self.worker.start()
 
     def submit(self, kind, title, params, fn):
-        """fn(job) does the work; it may call job.say(), job.step() and return a JSON-able result."""
+        """fn(job) does the work; it may call job.say(), job.step(), job.made() and return a JSON-able result."""
         job = Job(uuid.uuid4().hex[:8], kind, title, params, _fn=fn, _jobs=self)
         with self.lock:
             self.jobs[job.id] = job

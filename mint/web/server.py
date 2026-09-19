@@ -628,6 +628,7 @@ def submit_render(S, st, names, body):
             done.append(r.out)
             job.say(f"{os.path.basename(r.out)}" + (f"  text {r.sizes['text']}px" if r.shrunk else "") +
                     "".join(f"  warning: {w}" for w in r.warnings))
+            job.made(set=st.code, name=r.name)
             job.step(len(done))
         render.render_cards(S.ws, names, set_path=st.path, styled=styled, dpi=dpi, out_dir=out_dir,
                             on_rendered=on_rendered)
@@ -646,6 +647,7 @@ def submit_themes(S, st, names, body):
         def on_rendered(r):
             done.append(r.out)
             job.say(f"{r.theme}: {os.path.basename(r.out)}")
+            job.made(set=st.code, name=name)
             job.step(len(done))
         render.render_cards(S.ws, [name], set_path=st.path, themes=list(frame.THEMES), dpi=int(body.get("dpi") or 300),
                             out_dir=out_dir, compare=True, on_rendered=on_rendered)
@@ -668,6 +670,8 @@ def submit_enhance(S, st, names, body):
             v, did = upscale.enhance(server, S.art, card, model, base, force)
             job.say(f"{'enhanced' if did else 'cached'} {name} -> {v.label}-{v.hash}")
             made.append(v.hash)
+            if st:
+                job.made(set=st.code, name=name)
             job.step(i + 1)
         return {"variants": made}
     title = f"enhance {len(names)} card(s) from {base}"
@@ -712,6 +716,7 @@ def submit_restyle(S, st, names, body):
                 take = f"  (take {t + 1}, seed {sd})" if takes > 1 else ""
                 job.say(f"{'restyled' if did else 'cached'} {name} -> {v.label}-{v.hash}{take}")
                 made.append(v.hash)
+                job.made(set=st.code, name=name)
                 job.step(i * takes + t + 1)
         return {"variants": made}
     title = f"restyle {len(names)} card(s) as {sty.name}" + (f" x {takes} takes" if takes > 1 else "")

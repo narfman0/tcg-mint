@@ -154,6 +154,7 @@ function connect() {
     if (route().view === 'jobs') jobs();
   });
   es.addEventListener('progress', e => { const d = JSON.parse(e.data); const j = state.jobs[d.id]; if (j) { j.done = d.done; j.total = d.total; renderJobstrip(); } });
+  es.addEventListener('item', e => arrived(JSON.parse(e.data)));
   es.addEventListener('log', e => { const d = JSON.parse(e.data); const j = state.jobs[d.id]; if (j) { j.log.push(d.msg); if (route().view === 'jobs') jobs(); } });
   es.onerror = () => setTimeout(() => { es.close(); connect(); }, 3000);
 }
@@ -249,6 +250,37 @@ function tileHtml(c) {
         <div class="badges">${badges(c)}</div>
       </div>`;
 }
+function bindTile(t) {
+  t.onclick = e => {
+    const name = t.dataset.name, sel = state.sel;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) { sel.has(name) ? sel.delete(name) : sel.add(name); board(); }
+    else location.hash = `#/set/${t.dataset.set}/card/${encodeURIComponent(name)}`;
+  };
+}
+/* A job finished one card (an `item` event): fetch that card's detail alone, swap it into the
+   set, and redraw just its tile -- or the card page, if that is what is open. So a batch of 80
+   restyles shows each as it lands rather than when the whole job ends; the final refresh on
+   `done` still brings the look picker's counts and the filters up to date. */
+async function arrived(d) {
+  const st = state.set;
+  if (!st || !d.set || !d.name) return;
+  const all = !!st.all, code = d.set.toLowerCase();
+  if (!all && st.code.toLowerCase() !== code) return;
+  const i = st.cards_detail.findIndex(c => c.name === d.name && (!all || (c.inSet || '').toLowerCase() === code));
+  if (i < 0) return;
+  let c;
+  try { c = await api(`/api/sets/${encodeURIComponent(d.set)}/cards/${encodeURIComponent(d.name)}`); } catch (e) { return; }
+  if (state.set !== st) return;  // the page moved on while we fetched
+  const old = st.cards_detail[i];
+  st.cards_detail[i] = all ? {...c, inSet: old.inSet, setStyle: old.setStyle} : c;
+  const r = route();
+  if ((r.view === 'board' || r.view === 'viewer') && $('.grid')) {
+    const t = document.querySelector(`.grid .tile[data-name="${CSS.escape(d.name)}"][data-set="${CSS.escape(setOf(old))}"]`);
+    if (!t) return;
+    const tmp = document.createElement('div'); tmp.innerHTML = tileHtml(st.cards_detail[i]);
+    const fresh = tmp.firstElementChild; bindTile(fresh); t.replaceWith(fresh);
+  } else if (r.view === 'card' && r.name === d.name && !r.key) card(r);
+}
 function board() {
   const st = state.set, code = st.code, all = !!st.all;
   const sel = state.sel, n = sel.size;
@@ -310,13 +342,7 @@ function board() {
     <div class="grid"></div>`;
   const grid = () => {
     $('.grid').innerHTML = boardCards().map(tileHtml).join('') || '<div class="empty">nothing matches</div>';
-    document.querySelectorAll('.tile').forEach(t => {
-      t.onclick = e => {
-        const name = t.dataset.name;
-        if (e.shiftKey || e.ctrlKey || e.metaKey) { sel.has(name) ? sel.delete(name) : sel.add(name); board(); }
-        else location.hash = `#/set/${t.dataset.set}/card/${encodeURIComponent(name)}`;
-      };
-    });
+    document.querySelectorAll('.tile').forEach(bindTile);
   };
   grid();
   $('#gallery').onclick = () => { const cs = boardCards(); if (!cs.length) return toast('nothing to show'); V.fromPage = true; location.hash = viewHash(setOf(cs[0]), cs[0].name); };
