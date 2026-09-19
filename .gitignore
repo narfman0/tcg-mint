@@ -1,0 +1,23 @@
+# Scryfall bulk data: ~200 MB, rebuilt daily upstream; `mint cards` fetches it
+oracle-cards.jsonl*
+default-cards.jsonl*
+all-cards.jsonl*
+
+# caches: art crops, scans and mana-symbol SVGs pulled from Scryfall
+art/
+symbols/
+
+# rendered cards -- WotC art, never in git; release them via MPC Autofill
+out/
+*.png
+!docs/*.png
+
+# fonts are not ours to redistribute; fonts/README.md says where they live
+fonts/*
+!fonts/README.md
+
+__pycache__/
+*.egg-info/
+build/
+dist/
+.venv/

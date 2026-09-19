@@ -1,0 +1,116 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="$font_link">
+<style>
+/* M15-style frame. 1 CSS px = 1/100 in; card 2.5x3.5in inside 0.11in bleed -> 272x372.
+   Geometry measured off Scryfall's 745x1040 scans, rounded to the nearest 1/100 in. */
+$local_fonts
+:root {
+  --frame: $frame;          /* the coloured frame between border and boxes */
+  --frame-dark: $frame_dark;
+  --bar: $bar;              /* title / type bar fill */
+  --bar-edge: $bar_edge;
+  --box: $box;              /* text box fill */
+  --ink: #111;
+  --title-font: $title_font;
+  --body-font: $body_font;
+  /* text position inside its bar, calibrated against Scryfall scans with
+     calibrate.py: real title text sits ~0.6 below the bar's geometric centre,
+     type-line text ~1.1 below. Positive = down. */
+  --title-dy: 1.1px;
+  --type-dy: 1.1px;
+  --pt-dy: 0.6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
+.card { position: absolute; left: 11px; top: 11px; width: 250px; height: 350px;
+  background: #000; border-radius: 9px; overflow: hidden; color: var(--ink); }
+/* Geometry below is measured off Scryfall's 745x1040 scans (mint/calibrate.py):
+   border 10, title bar 17-36.6, art 38.5-195, type bar 196.5-216, text box
+   218.5-322.5, P/T box 313-335, bottom border from 324. */
+.frame { position: absolute; left: 9.5px; top: 9.5px; right: 9.5px; bottom: 26px; border-radius: 5px;
+  background:
+    url("$noise"),
+    linear-gradient(90deg, var(--frame-dark) 0%, var(--frame) 12%, var(--frame) 88%, var(--frame-dark) 100%);
+  /* dark edge, then a light pinline just inside it: the bevel that reads as a crisp perimeter */
+  box-shadow: inset 0 0 0 0.8px rgba(0,0,0,.6), inset 0 0 0 1.7px rgba(255,255,255,.28); }
+.crown-o, .crown { position: absolute; left: 12px; width: 226px; top: 8px; height: 13px;
+  clip-path: polygon(0 100%, 0 45%, 12% 25%, 27% 55%, 50% 0, 73% 55%, 88% 25%, 100% 45%, 100% 100%); }
+.crown-o { background: #000; }
+.crown { left: 13px; width: 224px; top: 9px; background: linear-gradient(var(--bar), var(--frame)); }
+.bar { position: absolute; left: 14px; width: 222px; height: 20px; padding: 0 5px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bar) 88%, var(--frame)), var(--bar) 18%, var(--bar) 82%, color-mix(in srgb, var(--bar) 88%, var(--frame)));
+  border: 1px solid var(--bar-edge); border-radius: 3px; box-shadow: 0 0.6px 0.8px rgba(0,0,0,.35); }
+.titlebar { top: 16.5px; }
+.typebar { top: 196.5px; height: 19.5px; }
+.name { font-family: var(--title-font); font-size: 13.5px; font-weight: 700; white-space: nowrap; letter-spacing: .005em;
+  position: relative; top: var(--title-dy); }
+.type { font-family: var(--title-font); font-size: 10.8px; font-weight: 700; white-space: nowrap; position: relative; top: var(--type-dy); }
+.cost { display: flex; gap: 1px; flex: none; margin-left: 4px; }
+/* solid black shadow, down-left, ~6% of the pip: Scryfall's own -0.06em/0.07em */
+.cost img { height: 12px; width: 12px; filter: drop-shadow(-0.7px 0.8px 0 #000); }
+.setsym { height: 13px; width: 13px; }
+.art { position: absolute; left: 14px; top: 38.5px; width: 222px; height: 156.5px;
+  background: #222 center / cover no-repeat; background-image: url("$art");
+  filter: $art_filter; box-shadow: inset 0 0 0 0.8px rgba(0,0,0,.7); }
+.textbox { position: absolute; left: 14px; top: 218.5px; width: 222px; height: 104px; padding: 4px 5px;
+  background: url("$noise"), var(--box);
+  border: 1px solid var(--bar-edge);
+  font-family: var(--body-font); font-size: 11.6px; line-height: 1.15;
+  display: flex; flex-direction: column; justify-content: safe center; overflow: hidden; }
+.textbox.has-pt { padding-bottom: 12px; }
+.textbox p { margin-bottom: 3.5px; }
+.textbox p:last-child { margin-bottom: 0; }
+.textbox img.sym { height: .82em; width: .82em; vertical-align: -0.06em; margin: 0 .03em; }
+.textbox .reminder, .flavor { font-style: italic; }
+.textbox .nowrap { white-space: nowrap; }
+.flavor { margin-top: 2px; padding-top: 3.5px; position: relative; }
+.flavor::before { content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 0.7px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,.55), transparent); }
+.pt { position: absolute; right: 13px; top: 313px; min-width: 41px; height: 22px; padding: 0 6px;
+  background: linear-gradient(var(--bar), color-mix(in srgb, var(--bar) 85%, var(--frame)));
+  border: 1.2px solid #000; border-radius: 4px; box-shadow: inset 0 0 0 0.8px var(--bar-edge);
+  font-family: var(--title-font); font-size: 12px; font-weight: 700; text-align: center; }
+.pt span { position: relative; top: var(--pt-dy); display: block; line-height: 19.5px; }
+.footer { position: absolute; left: 12px; right: 12px; bottom: 5px; color: #fff;
+  font-family: var(--body-font); font-size: 5.6px; line-height: 1.2; }
+.footer .row { display: flex; justify-content: space-between; }
+.footer b { font-weight: 700; letter-spacing: .06em; }
+.footer .brush { font-family: var(--title-font); font-weight: 700; opacity: .9; }
+</style>
+<style>
+/* per-set frame identity: sets/<code>.css, injected last so it can override any rule above */
+$set_css
+</style>
+<div class="card">
+  <div class="frame"></div>
+  $crown
+  <div class="bar titlebar"><span class="name">$name</span><span class="cost">$cost</span></div>
+  <div class="art"></div>
+  <div class="bar typebar"><span class="type">$type_line</span>$set_symbol</div>
+  <div class="textbox $text_class" id="text">$text</div>
+  $pt
+  <div class="footer">
+    <div class="row"><span><b>$number/$set_size $rarity</b></span><span><b>$maker_code</b> · $maker · $date</span></div>
+    <div class="row"><span><b>$set_code</b> · EN &nbsp;<span class="brush">✎</span> $artist</span><span>after $orig_set #$orig_number</span></div>
+  </div>
+</div>
+<script>
+// Shrink rules text until it fits its box; same trick the real frames use.
+// Called by mint.py once the fonts have loaded -- measuring before that uses
+// the fallback face's metrics and the real font then reflows wider.
+window.fit = () => {
+  const t = document.getElementById('text');
+  t.style.fontSize = '';
+  let fs = parseFloat(getComputedStyle(t).fontSize);
+  while (t.scrollHeight > t.clientHeight && fs > 6) { fs -= 0.2; t.style.fontSize = fs + 'px'; }
+  // long names shrink until name + cost fit the title bar, as on the real cards
+  const bar = document.querySelector('.titlebar'), name = bar.querySelector('.name');
+  name.style.fontSize = '';
+  let ns = parseFloat(getComputedStyle(name).fontSize);
+  while (bar.scrollWidth > bar.clientWidth && ns > 8) { ns -= 0.2; name.style.fontSize = ns + 'px'; }
+  return [fs, ns];
+};
+</script>

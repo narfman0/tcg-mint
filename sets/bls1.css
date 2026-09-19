@@ -1,0 +1,8 @@
+/* BLS1 frame identity. Injected after the base M15 rules, so anything here wins.
+   Empty on purpose beyond the starter below: this is where the set's look goes.
+   Examples of the knobs:
+     :root { --title-dy: -0.5px; }                       nudge title/type text up
+     .frame { background-image: url("file:///abs/path/frame-texture.png"); }
+     .titlebar, .typebar { border-radius: 0; }           square bars
+     .card { border-radius: 6px; }                       tighter corners
+*/

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tcg-mint"
+version = "0.1.0"
+description = "Render trading cards from Scryfall data into your own print-resolution frame"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "narfman0" }]
+requires-python = ">=3.10"
+dependencies = [
+  "playwright>=1.40",
+  "pillow>=10",
+]
+
+[project.optional-dependencies]
+fonts = ["fonttools>=4.40"]
+
+[project.scripts]
+mint = "mint.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/narfman0/tcg-mint"
+
+[tool.setuptools]
+packages = ["mint"]
+
+[tool.setuptools.package-data]
+mint = ["template.html"]
