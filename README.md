@@ -125,11 +125,11 @@ mint serve --open          # http://127.0.0.1:8300
 
 A local page over the workspace, for comparing and deciding:
 
-- **Sets** — every card as a tile (styled render, plain render, or just the
-  art), with badges from the render manifest: no restyle for the current
+- **Sets** — *new set* makes a set file from a pasted decklist (code, name,
+  a style template, private or not). Every card is a tile (styled render,
+  plain render, or just the art), with badges from the render manifest: no restyle for the current
   recipe, not rendered, rules text shrunk, Universes Beyond art, own art.
-  In styled mode a picker shows any restyle label the art cache holds, not
-  just the set's own recipe; a search box matches name, type and artist.
+  A search box matches name, type and artist.
   Shift-click to select cards; render, enhance or restyle the selection.
   *all* in the nav puts every set on one board.
 - **Viewer** (click a card) — the tile's image large: ← → or a swipe steps
@@ -142,6 +142,29 @@ A local page over the workspace, for comparing and deciding:
   *restyle from this*, *use as base* (which image the next restyle starts
   from) and *delete*; a restyled variant offers *use recipe for set*. The
   card's printing, subject, seed and the set-wide restyle base are set here.
+- **Edit** — the set file as a form: its own fields (code, name, size, note,
+  art filter, restyle base), the style block (edit the knobs, replace it
+  from a template, save it as one, remove it) and the card list — every
+  entry's number, subject, flavor, own art, art filter, seed and remix in a
+  table, with move, rename, remove, add-from-decklist and renumber. Delete
+  the set from here too; renders and the art cache stay.
+- **Styles** (*styles* in the nav) — the templates in `styles/`: make one,
+  edit every knob and its css, move it between the shared and private
+  tiers, apply it to a set, delete it. Which sets carry each is shown; a
+  set's block is a copy, so editing a template changes no set until it is
+  applied again.
+- **The look** — one picker on the board, in the viewer and beside the
+  card's restyle button: the set's own recipe, any restyle the art cache
+  holds, or a template not run yet. A styled tile shows that look, the
+  filter finds cards without it, and *restyle* makes it — from each card's
+  own base, subject, seed and remix mode. Variants land under the look's
+  name, side by side in Compare; *use recipe for set* adopts one. The
+  `× N` beside the button makes N takes per card, each from its own random
+  seed, to choose between. Takes are drafts — no ESRGAN pass, which is a
+  large share of a take's time — so pin the seed of the one you keep and
+  *enhance* it; the renderer picks the enhance up. (The base's resolution
+  doesn't matter for speed: everything is scaled to the generation size
+  first.)
 - **Recipe lab** — a form for every knob in the style block, a few probe
   cards, and a run button; results land as variants in a probe-by-recipe
   grid as they finish. New knobs are one field in `sets.Style` and one node
@@ -242,9 +265,13 @@ never changes another's; sets migrated from before this carry
 
 `"remix"` in the style block (or per card) is what a restyle keeps of the
 picture it starts with — three modes: **`restyle`** redraws it in the style
-(img2img + ControlNet, the default); **`repose`** is a fresh picture laid out
-by the original's structure, the ControlNet letting go at `control_end`, so
-the figure is free to move; **`new`** is a new scene from the prompt alone,
+(img2img + ControlNet, the default); **`repose`** is a fresh picture that
+holds only an OpenPose skeleton — read from the card's `"pose"` image (a
+variant hash, or a path to any picture), else its base — at
+`repose_strength` (0.5) until `repose_end` (0.3) of the steps; body,
+clothes, hair and background are new, and a different pose image moves
+the joints (a canny / lineart / depth map *is* the pose, whatever the
+strength, which is why a restyle never moves a figure); **`new`** is a new scene from the prompt alone,
 with the card's `subject` line (else its name and type line) as the only
 thread back to the original. `"refine": 0.4` adds a second sampling pass at
 1.5× the size for detail, and `"clip_skip": 2` is what Pony-family

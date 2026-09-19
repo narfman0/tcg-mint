@@ -18,6 +18,7 @@ with --force.
 import argparse
 import dataclasses
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -85,21 +86,49 @@ def save(ws, st, name=None, private=False, force=False):
     if st.style is None:
         raise SetError(f"{st.path}: this set has no style block to save")
     name = name or st.style.name
-    d = ws.styles / ws.PRIVATE if private else ws.styles
-    p = d / f"{name}.json"
     if not private and ws.is_private(st.path) and not force:
         raise SetError(f"{st.path} is a private set; saving its style to a shared template needs --force "
                        "(or --private to keep it out of git)")
+    p = (ws.styles / ws.PRIVATE if private else ws.styles) / f"{name}.json"
     if p.exists() and not force:
         raise SetError(f"{p} exists; --force replaces it")
+    return write(ws, name, st.style, st.css, private=private)
+
+
+def check_name(name):
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", name or ""):
+        raise SetError(f"a template name is letters, digits, - and _, not {name!r}")
+
+
+def write(ws, name, style, css="", private=False):
+    """Write a Style (and its css) as the template `name` in the shared or the private tier,
+    removing a copy in the other tier so the name lives in one place. Returns the path."""
+    check_name(name)
+    d = ws.styles / ws.PRIVATE if private else ws.styles
+    p = d / f"{name}.json"
     d.mkdir(parents=True, exist_ok=True)
-    body = sets._slim(dataclasses.asdict(st.style), sets.Style, st.style.explicit)
+    body = sets._slim(dataclasses.asdict(style), sets.Style, style.explicit)
     body["name"] = name
     p.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n")
     css_fn = p.with_suffix(".css")
-    if st.css:
-        css_fn.write_text(st.css)
+    if css:
+        css_fn.write_text(css)
     elif css_fn.exists():
+        css_fn.unlink()
+    other = (ws.styles if private else ws.styles / ws.PRIVATE) / f"{name}.json"
+    if other.exists():
+        delete(ws, name, other)
+    return p
+
+
+def delete(ws, name, path=None):
+    """Remove a template file and its css; a built-in has no file and cannot be removed."""
+    p = path or find(ws, name)
+    if p is None:
+        raise SetError(f"no template file for {name!r}" + (" (it is a built-in recipe)" if builtin(name) else ""))
+    p.unlink()
+    css_fn = p.with_suffix(".css")
+    if css_fn.exists():
         css_fn.unlink()
     return p
 

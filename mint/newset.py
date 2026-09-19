@@ -15,7 +15,6 @@ afterwards, it is just JSON. A template's .css becomes the set's .css.
 --private puts the set in sets/private/, which git ignores.
 """
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
@@ -57,10 +56,16 @@ STYLES = {
 
 
 def read_decklist(path):
+    return parse_decklist(open(path).read())
+
+
+def parse_decklist(text, plain=False):
+    """The card names in a decklist's text, commanders first (the module docstring says the
+    shape). Lines without a count are skipped; with `plain` they count as one copy each,
+    so the workbench takes a bare list of names too."""
     main, commanders = [], []
     section = main
-    for line in open(path):
-        line = line.rstrip("\n")
+    for line in text.splitlines():
         if line.startswith("#"):
             break
         if not line.strip():
@@ -69,9 +74,49 @@ def read_decklist(path):
         m = re.match(r"(\d+)x?\s+(.+)", line.strip())
         if m:
             section.append(m.group(2).strip())
+        elif plain:
+            section.append(line.strip())
     if not commanders:  # no blank line: whole list is the deck
         return main
     return commanders + main
+
+
+def dedupe(names):
+    """The names in order, each once (basic lands repeat in a decklist)."""
+    seen = set()
+    return [n for n in names if not (n in seen or seen.add(n))]
+
+
+def create(ws, code, name, names, style_name=None, private=False, out=None):
+    """Make or update a set file: new cards are appended after the existing ones with the
+    next numbers; per-card edits and an existing style block are kept. A style template
+    seeds the style block (and its .css) only when the set has none. Returns (path, set, added)."""
+    out = Path(out or (ws.sets / ws.PRIVATE if private else ws.sets) / (code.lower() + ".json"))
+    st = sets.load(out) if out.exists() else sets.SetFile(code=code, name=name)
+    st.code, st.name = code, name
+    css = None
+    if style_name and st.style is None:
+        st.style, css = style.load(ws, style_name)
+    added = add_cards(st, names)
+    sets.save(out, st)
+    css_fn = out.with_suffix(".css")
+    if css and not css_fn.exists():
+        css_fn.write_text(css)
+    st.css = css_fn.read_text() if css_fn.exists() else ""
+    return out, st, added
+
+
+def add_cards(st, names):
+    """Append the names a set does not have yet, numbered after its highest; returns how many."""
+    nxt = max((c.number or 0 for c in st.cards.values()), default=0) + 1
+    added = 0
+    for n in dedupe(names):
+        if n not in st.cards:
+            st.cards[n] = sets.CardEntry(number=nxt)
+            nxt += 1
+            added += 1
+    st.size = len(st.cards)
+    return added
 
 
 def main(argv=None):
@@ -83,35 +128,12 @@ def main(argv=None):
     ap.add_argument("--private", action="store_true", help="put the set in sets/private/, which git ignores")
     ap.add_argument("--out", help="set file (default sets/<code lowercased>.json)")
     a = ap.parse_args(argv)
-    ws = workspace.default()
-    out = a.out or str((ws.sets / ws.PRIVATE if a.private else ws.sets) / (a.code.lower() + ".json"))
-
-    st = sets.load(out) if os.path.exists(out) else sets.SetFile(code=a.code, name=a.name)
-    st.code, st.name = a.code, a.name
-    css = None
-    if a.style and st.style is None:
-        try:
-            st.style, css = style.load(ws, a.style)
-        except MintError as e:
-            raise SystemExit(str(e)) from None
-
-    names = read_decklist(a.decklist)
-    seen = set()
-    names = [n for n in names if not (n in seen or seen.add(n))]  # basic lands repeat
-    cards = st.cards
-    nxt = max((c.number or 0 for c in cards.values()), default=0) + 1
-    added = 0
-    for n in names:
-        if n not in cards:
-            cards[n] = sets.CardEntry(number=nxt)
-            nxt += 1
-            added += 1
-    st.size = len(cards)
-    sets.save(out, st)
-    css_fn = Path(out).with_suffix(".css")
-    if css and not css_fn.exists():
-        css_fn.write_text(css)
-    print(f"{out}: {len(cards)} cards ({added} new)" + (f", style {st.style.name}" if st.style else ""))
+    try:
+        out, st, added = create(workspace.default(), a.code, a.name, read_decklist(a.decklist),
+                                style_name=a.style, private=a.private, out=a.out)
+    except MintError as e:
+        raise SystemExit(str(e)) from None
+    print(f"{out}: {len(st.cards)} cards ({added} new)" + (f", style {st.style.name}" if st.style else ""))
 
 
 if __name__ == "__main__":

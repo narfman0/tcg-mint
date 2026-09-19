@@ -10,13 +10,13 @@ const snapW = w => STATIC ? [320, 640, 1280].filter(x => x <= Math.max(320, STAT
 const img = (path, w = 320) => STATIC ? (STATIC.thumbs[`${path}|${snapW(w)}`] || STATIC.thumbs[`${path}|320`] || '') : `/img?path=${encodeURIComponent(path)}&w=${w}`;
 const file = path => STATIC ? img(path, 1280) : `/file?path=${encodeURIComponent(path)}`;
 const short = h => h ? h.slice(0, 8) : '';
-const REMIX = {restyle: 'same picture, redrawn', repose: 'same layout, new picture', new: 'from the prompt alone'};
+const REMIX = {restyle: 'same picture, redrawn', repose: 'new picture in the pose image\'s pose', new: 'from the prompt alone'};
 
 /* mode: plain or styled art on a board tile; show: the art alone or the whole rendered card (when
    there is one); style: which restyle label a styled tile shows ('current' = the set's own recipe,
    else any label the art cache holds); q: the board's search text. */
 const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
-               ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {}};
+               ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {}, takes: 1};
 
 async function api(path, opts = {}) {
   if (STATIC) {
@@ -64,6 +64,37 @@ async function loadAll() {
                path: '', cards_detail: cards, sets: all};
   state.setCode = ALL;
 }
+/* Style templates (styles/ and the built-ins), fetched once for the "restyle as" pickers; a view
+   that finds them missing draws without and again once they arrive. */
+function templates(redraw) {
+  if (state.templates || STATIC) return state.templates || [];
+  if (!state.templatesLoading) { state.templatesLoading = true; api('/api/styles').then(l => { state.templates = l; redraw(); }).catch(() => { state.templates = []; }); }
+  return [];
+}
+/* The look picker (state.style): 'current' is the set's own recipe; a label is a restyle the art cache
+   holds (with how many cards have it); a template not run yet is listed too. A styled tile shows the
+   look, the board's filter finds cards without it, and restyle makes it -- when it is runnable: the
+   set's recipe or a template (a lab label has no template to run; save one, or promote it). */
+function lookPicker(id, cards, setStyle, all = false) {
+  const labels = styleLabels(cards), have = new Set(labels.map(([l]) => l));
+  const tpls = templates(() => go()).filter(t => !have.has(t.name) && t.name !== setStyle?.name);
+  return `<select id="${id}" title="the look: what a styled tile shows, and what restyle makes. The set's recipe, any restyle in the art cache, or a template not run yet">
+    <option value="current">${all ? "each set's recipe" : setStyle ? `set's recipe: ${esc(setStyle.name)}` : 'set\'s recipe (none)'}</option>
+    ${labels.map(([l, k]) => `<option value="${esc(l)}" ${state.style === l ? 'selected' : ''}>${esc(l)} (${k})</option>`).join('')}
+    ${tpls.map(t => `<option value="${esc(t.name)}" ${state.style === t.name ? 'selected' : ''}>${esc(t.name)} (template)</option>`).join('')}</select>`;
+}
+/* How many takes a restyle makes per card: each from its own random seed, to choose between. */
+const takesPicker = () => `<label class="takes" title="takes per card: each a variant from its own random seed, side by side in Compare. More than one = drafts without the ESRGAN pass (a large share of a take\'s time); enhance the one you keep"><span class="muted">×</span><input type="number" id="takes" min="1" max="16" value="${state.takes}"></label>`;
+const bindTakes = () => { if ($('#takes')) $('#takes').onchange = e => { state.takes = Math.max(1, Math.min(16, +e.target.value || 1)); e.target.value = state.takes; }; };
+/* The template a restyle in the current look runs: undefined for the set's own recipe, null when the
+   look cannot be made (no template of that name), else the name. */
+function lookTemplate(setStyle) {
+  if (state.style === 'current' || state.style === setStyle?.name) return setStyle ? undefined : null;
+  return templates(() => go()).some(t => t.name === state.style) ? state.style : null;
+}
+const lookTitle = setStyle => lookTemplate(setStyle) === null
+  ? (state.style === 'current' ? 'the set has no style block: pick a template to restyle as' : `${state.style} is not a template; save one from the lab (styles page) or promote a variant`)
+  : `generate in the look picked beside: ${lookTemplate(setStyle) || (setStyle?.name ?? '')}`;
 const setOf = c => c.inSet || state.set.code;
 const styleOf = c => c.setStyle !== undefined ? c.setStyle : state.set.style;
 const cardOf = name => state.set && state.set.cards_detail.find(c => c.name === name);
@@ -163,6 +194,7 @@ function badges(c) {
   if (c.entry.art) b.push(['accent', 'own art']);
   if (c.entry.printing) b.push(['accent', c.entry.printing]);
   if (c.entry.base) b.push(['accent', 'base ' + c.entry.base]);
+  if (c.entry.pose) b.push(['accent', 'pose ' + short(c.entry.pose.split('/').pop())]);
   if (c.base_missing) b.push(['warn', `no ${c.base_missing} to start from`]);
   if (c.entry.seed != null) b.push(['accent', 'seed pinned']);
   const remix = c.entry.remix || styleOf(c)?.remix || 'restyle';
@@ -220,7 +252,7 @@ function board() {
   const sel = state.sel, n = sel.size, names = [...sel];
   const filt = state.filter || '';
   const labels = styleLabels(st.cards_detail);
-  if (state.style !== 'current' && !labels.some(([l]) => l === state.style)) state.style = 'current';
+  if (state.style !== 'current' && !labels.some(([l]) => l === state.style) && !templates(() => go()).some(t => t.name === state.style)) state.style = 'current';
   const cards = boardCards();
   const filters = ['no restyle', ...(state.style !== 'current' ? [`no ${state.style}`] : []), 'not rendered', 'text shrunk', 'UB art', 'own art'];
   $('#main').innerHTML = `
@@ -230,8 +262,7 @@ function board() {
     <div class="toolbar">
       <span class="seg">${['plain', 'styled'].map(m => `<button data-mode="${m}" class="${state.mode === m ? 'on' : ''}">${m}</button>`).join('')}</span>
       <span class="seg" title="the art alone, or the whole rendered card where there is one">${[['art', 'art'], ['card', 'card']].map(([m, t]) => `<button data-show="${m}" class="${state.show === m ? 'on' : ''}">${t}</button>`).join('')}</span>
-      ${state.mode === 'styled' && labels.length ? `<select id="style" title="which restyle a styled tile shows"><option value="current">${all ? "each set's recipe" : 'current recipe'}</option>
-        ${labels.map(([l, k]) => `<option value="${esc(l)}" ${state.style === l ? 'selected' : ''}>${esc(l)} (${k})</option>`).join('')}</select>` : ''}
+      ${lookPicker('style', st.cards_detail, st.style, all)}
       <span class="sep"></span>
       <input type="text" id="q" placeholder="search name, type, artist${all ? ', set' : ''}" value="${esc(state.q || '')}">
       <select id="filter"><option value="">all cards</option>${filters.map(f => `<option ${filt === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
@@ -240,7 +271,7 @@ function board() {
       <button data-job="render-plain">render plain</button>
       <button data-job="render-styled" ${st.style ? '' : 'disabled'}>render styled</button>
       <button data-job="enhance">enhance</button>
-      <button data-job="restyle" ${st.style ? '' : 'disabled'}>restyle</button>
+      <button data-job="restyle" ${all ? (st.sets.some(x => x.style) || lookTemplate(null) ? '' : 'disabled') : lookTemplate(st.style) === null ? 'disabled' : ''} title="${esc(all ? 'each set in the look picked' : lookTitle(st.style))}">restyle</button>${takesPicker()}
       <select id="dpi"><option>300</option><option>600</option><option selected>1200</option></select><span class="muted">dpi</span>
       ${n ? '<button id="clearsel" class="small">clear selection</button>' : ''}
     </div>
@@ -260,6 +291,7 @@ function board() {
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; board(); });
   document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { state.show = b.dataset.show; board(); });
   if ($('#style')) $('#style').onchange = e => { state.style = e.target.value; board(); };
+  bindTakes();
   $('#filter').onchange = e => { state.filter = e.target.value; board(); };
   $('#q').oninput = e => { state.q = e.target.value; grid(); };  // the grid alone, so typing keeps its focus
   if ($('#clearsel')) $('#clearsel').onclick = () => { sel.clear(); board(); };
@@ -275,7 +307,7 @@ function board() {
         'render-plain': {kind: 'render', set: s, names: list, styled: false, dpi},
         'render-styled': styled && {kind: 'render', set: s, names: list, styled: true, dpi},
         'enhance': {kind: 'enhance', set: s, names: list, base: 'crop'},
-        'restyle': styled && {kind: 'restyle', set: s, names: list},
+        'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
       };
       if (jobs[b.dataset.job]) submit(jobs[b.dataset.job]);
     });
@@ -373,15 +405,14 @@ function applyZoom() {
 }
 function drawViewer() {
   const s = V.slides[V.i]; if (!s) return closeViewer();
-  const n = V.slides.length, onBoard = V.kind === 'board', c = s.c, labels = onBoard ? styleLabels(state.set.cards_detail) : [];
+  const n = V.slides.length, onBoard = V.kind === 'board', c = s.c;
   const el = $('#viewer');
   el.innerHTML = `
     <div class="vtop">
       <span class="vtitle"><b>${esc(s.title)}</b> <span class="muted">${esc(s.sub)}</span></span>
       ${onBoard ? `<span class="seg">${['plain', 'styled'].map(m => `<button data-vmode="${m}" class="${state.mode === m ? 'on' : ''}">${m}</button>`).join('')}</span>
       <span class="seg">${['art', 'card'].map(m => `<button data-vshow="${m}" class="${state.show === m ? 'on' : ''}">${m}</button>`).join('')}</span>` : ''}
-      ${onBoard && state.mode === 'styled' && labels.length ? `<select id="vstyle"><option value="current">${state.set.all ? "each set's recipe" : 'current recipe'}</option>
-        ${labels.map(([l, k]) => `<option value="${esc(l)}" ${state.style === l ? 'selected' : ''}>${esc(l)} (${k})</option>`).join('')}</select>` : ''}
+      ${onBoard ? lookPicker('vstyle', state.set.cards_detail, state.set.style, !!state.set.all) : ''}
       <span class="spacer"></span>
       <span class="mono muted" id="vzoom">1×</span>
       <button class="small" data-v="out" title="zoom out (−)">−</button><button class="small" data-v="in" title="zoom in (+)">+</button><button class="small" data-v="fit" title="fit (0)">fit</button>
@@ -461,15 +492,15 @@ function columns(c) {
   const cols = [];
   const cur = c.current?.hash;
   if (c.crop) cols.push({key: 'crop', title: 'crop', sub: `${c.card.set.toUpperCase()} ${c.card.collector_number} · ${c.card.artist}`,
-                         path: c.crop, kind: 'crop', acts: [['enhance', 'crop'], ['base', 'crop']]});
+                         path: c.crop, kind: 'crop', acts: [['enhance', 'crop'], ['base', 'crop'], ['pose', 'crop']]});
   const vs = [...(c.variants || [])].sort((a, b) => (a.kind === 'enhance' ? 0 : 1) - (b.kind === 'enhance' ? 0 : 1) || a.label.localeCompare(b.label) || (b.created > a.created ? 1 : -1));
   for (const v of vs) {
-    const acts = v.kind === 'restyle' ? [['promote', v.hash], ['enhance', v.hash], ['base', v.hash], ['delete', v.hash]]
-                                      : [['base', v.hash], ['delete', v.hash]];
+    const acts = v.kind === 'restyle' ? [['promote', v.hash], ['enhance', v.hash], ['base', v.hash], ['pose', v.hash], ['delete', v.hash]]
+                                      : [['base', v.hash], ['pose', v.hash], ['delete', v.hash]];
     const base = c.entry.base || state.set.base || 'crop';
     cols.push({key: v.hash, title: v.label, sub: v.hash + (v.hash === cur ? ' · current' : '') + (v.base !== 'crop' ? ` · from ${v.base}` : ''),
                path: v.path, kind: v.kind, recipe: v.recipe, current: v.hash === cur, acts,
-               isBase: base === v.hash || (base === v.label && v === c.variants.filter(x => x.kind === 'restyle' && x.label === v.label).sort((a, b) => (b.created || '').localeCompare(a.created || ''))[0])});
+               isPose: c.entry.pose === v.hash, isBase: base === v.hash || (base === v.label && v === c.variants.filter(x => x.kind === 'restyle' && x.label === v.label).sort((a, b) => (b.created || '').localeCompare(a.created || ''))[0])});
   }
   for (const k of ['plain', 'styled']) {
     const r = c.renders?.[k];
@@ -497,6 +528,7 @@ async function card(r) {
             <span class="muted" id="printing-n"></span><div class="printings" id="printings" hidden></div></span>
           <span>restyle base</span><span><span class="badge">${esc(c.entry.base || state.set.base || 'crop')}</span>${!c.entry.base && state.set.base ? ' <span class="muted">(set-wide)</span>' : ''} ${c.entry.base ? '<button class="small" id="basecrop">use set default</button>' : ''}
             <select id="setbase" title="set-wide base: every card starts its restyle from this"><option value="">set-wide: crop</option>${styleLabels(state.set.cards_detail).filter(([l]) => l !== state.set.style?.name).map(([l, k]) => `<option value="${esc(l)}" ${state.set.base === l ? 'selected' : ''}>set-wide: ${esc(l)} (${k})</option>`).join('')}</select></span>
+          <span>pose</span><span title="repose only: the image whose OpenPose skeleton the new picture takes; a hash from this card's columns, or a path to any image file"><input type="text" id="pose" value="${esc(c.entry.pose || '')}" placeholder="the base (${esc(c.entry.base || state.set.base || 'crop')}); or any image's path" style="width:22em"> ${c.entry.pose ? '<button class="small" id="posebase">use base</button>' : ''}</span>
           <span>subject</span><span><input type="text" id="subject" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene"></span>
           <span>seed</span><span><input type="number" id="seed" value="${c.entry.seed ?? ''}" placeholder="derived: ${c.recipe?.seed ?? '-'}" style="width:9em" title="the number the picture is generated from; same seed + same recipe = same picture. Empty = a fixed value derived from the set, so it is reproducible. Pin a number (or roll one) to explore other takes.">
 ${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rolled seed each generate">unpin</button>' : '<span class="muted">rolled fresh each generate until you pin one</span>'}</span>
@@ -511,7 +543,8 @@ ${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rol
     </div>
     <div class="toolbar" title="jobs for this card; a restyle starts from the base shown above">
       <span class="muted">this card:</span>
-      <button data-cjob="restyle" ${state.set.style ? '' : 'disabled'} title="generate from the base, subject and remix mode above in the set's style; a fresh seed each click unless you pin one, so click again for another take">${esc(c.entry.remix || state.set.style?.remix || 'restyle')}</button>
+      <button data-cjob="restyle" ${lookTemplate(state.set.style) === null ? 'disabled' : ''} title="${esc(lookTitle(state.set.style))}, from the base, subject and remix mode above; a fresh seed each click unless you pin one, so click again for another take">${esc(c.entry.remix || state.set.style?.remix || 'restyle')}</button>
+      ${lookPicker('style', state.set.cards_detail, state.set.style)}${takesPicker()}
       <span class="sep"></span>
       <button data-cjob="enhance">enhance</button>
       <button data-cjob="render-plain">render plain</button>
@@ -522,10 +555,10 @@ ${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rol
       <div class="col ${x.current ? 'current' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
         <div class="pic ${x.kind === 'card' ? 'card' : ''}" data-open="${esc(x.path)}"><img loading="lazy" src="${img(x.path, 640)}">
           <div class="ab"><b data-ab="a">A</b><b data-ab="b">B</b></div></div>
-        <div class="title"><span>${esc(x.title)}${x.isBase ? ' <span class="badge accent">base</span>' : ''}</span><small>${esc(x.sub)}</small></div>
+        <div class="title"><span>${esc(x.title)}${x.isBase ? ' <span class="badge accent">base</span>' : ''}${x.isPose ? ' <span class="badge accent">pose</span>' : ''}</span><small>${esc(x.sub)}</small></div>
         ${x.recipe ? `<div class="recipe">${recipeDiff(x.recipe, c.recipe)}</div>` : ''}
         <div class="acts">${x.acts.map(([a, arg]) => `<button class="small" data-act="${a}" data-arg="${esc(arg)}">${
-          {enhance: 'enhance', base: 'use as base', promote: 'use recipe for set',
+          {enhance: 'enhance', base: 'use as base', pose: 'use as pose', promote: 'use recipe for set',
            'render-plain': 're-render', 'render-styled': 're-render', delete: 'delete', 'delete-render': 'delete'}[a]}</button>`).join('')}</div>
       </div>`).join('')}
     </div>`;
@@ -549,6 +582,8 @@ ${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rol
   document.onclick = () => { const box = $('#printings'); if (box) box.hidden = true; };  // anywhere else closes it
   document.onkeydown = e => { if (e.key === 'Escape' && $('#printings') && !$('#printings').hidden) { $('#printings').hidden = true; e.preventDefault(); } };
   $('#subject').onchange = e => put({subject: e.target.value || null});
+  $('#pose').onchange = e => put({pose: e.target.value.trim() || null});
+  if ($('#posebase')) $('#posebase').onclick = () => put({pose: null});
   $('#seed').onchange = e => put({seed: e.target.value === '' ? null : +e.target.value});
   $('#remix').onchange = e => put({remix: e.target.value || null});
   if ($('#unpin')) $('#unpin').onclick = () => put({seed: null});
@@ -558,9 +593,11 @@ ${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rol
     e.stopPropagation(); const key = b.closest('.col').dataset.key;
     ab[b.dataset.ab] = ab[b.dataset.ab] === key ? null : key; card(r);
   });
+  $('#style').onchange = e => { state.style = e.target.value; card(r); };
+  bindTakes();
   document.querySelectorAll('[data-cjob]').forEach(b => b.onclick = () => {
     const j = b.dataset.cjob, names = [c.name];
-    if (j === 'restyle') submit({kind: 'restyle', set: code, names, seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined});
+    if (j === 'restyle') submit({kind: 'restyle', set: code, names, template: lookTemplate(state.set.style), takes: state.takes, seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined});
     else if (j === 'enhance') submit({kind: 'enhance', set: code, names, base: c.entry.base || state.set.base || 'crop'});
     else if (j === 'render-plain') submit({kind: 'render', set: code, names, styled: false, dpi: 1200});
     else if (j === 'render-styled') submit({kind: 'render', set: code, names, styled: true, dpi: 1200});
@@ -571,6 +608,7 @@ ${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rol
     const act = b.dataset.act, arg = b.dataset.arg, names = [c.name];
     if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg});
     else if (act === 'base') put({base: arg === 'crop' ? null : arg});
+    else if (act === 'pose') put({pose: arg});
     else if (act === 'delete-render') {
       if (!confirm(`Delete the render ${arg}? The PNG is removed from out/${code.toLowerCase()}/; re-render makes it again.`)) return;
       api(`/api/sets/${code}/renders/${encodeURIComponent(arg)}`, {method: 'DELETE'}).then(() => { toast(`deleted ${arg}`); refresh(); }).catch(e => toast(e.message, true));
@@ -690,7 +728,7 @@ function lab() {
     api(`/api/sets/${code}/promote`, {method: 'POST', body: {name, hash}}).then(() => { toast('set style updated'); refresh(); }).catch(e => toast(e.message, true));
   });
 }
-const KNOBS = ['control', 'control_strength', 'control_end', 'denoise', 'steps', 'cfg', 'sampler', 'scheduler', 'checkpoint', 'controlnet', 'loras', 'width', 'height', 'grayscale_source', 'negative'];
+const KNOBS = ['control', 'control_strength', 'control_end', 'repose_strength', 'repose_end', 'remix', 'denoise', 'steps', 'cfg', 'sampler', 'scheduler', 'checkpoint', 'controlnet', 'loras', 'width', 'height', 'grayscale_source', 'negative'];
 function sameKnobs(a, b) { return KNOBS.every(k => JSON.stringify(a?.[k]) === JSON.stringify(b?.[k])) && stripSubject(a?.prompt) === stripSubject(b?.prompt); }
 function stripSubject(p) { return (p || '').split(', ').slice(-1)[0]; }
 function labSummary(recipe, st) {
@@ -753,7 +791,8 @@ const FIELD_HELP = {
   controlnet: 'the ControlNet model file', upscaler: 'the ESRGAN model file', loras: 'JSON: [{"name": "x.safetensors", "strength": 0.7}]',
   width: 'generation width', height: 'generation height', grayscale_source: 'desaturate the base first (for ink styles)',
   refine: 'a second pass at refine_scale x the size with this denoise; 0 = off', refine_scale: '1-3',
-  clip_skip: '1 = the checkpoint\'s CLIP; 2 for Pony-family checkpoints', remix: 'restyle: redraw the base; repose: new picture on its layout; new: from the prompt alone',
+  clip_skip: '1 = the checkpoint\'s CLIP; 2 for Pony-family checkpoints', remix: 'restyle: redraw the base; repose: a new picture holding only the pose image\'s skeleton; new: from the prompt alone',
+  repose_strength: 'repose only: how hard the OpenPose skeleton is held (0-1)', repose_end: 'repose only: the fraction of the steps the skeleton is held for',
 };
 function fieldInput(f, v) {
   if (f.choices) return `<select data-f="${f.name}">${f.choices.map(c => `<option ${v === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
@@ -868,7 +907,7 @@ function edit() {
         <h2>cards <span class="muted" style="text-transform:none">${st.cards_detail.length}</span></h2>
         <div class="tablewrap"><table class="cards">
           <thead><tr><th title="collector number">#</th><th>card</th><th title="what the picture is of; goes ahead of the style prompt">subject</th><th title="replaces the printed flavor text">flavor</th>
-            <th title="your own image instead of Scryfall's: a path under the workspace">art</th><th title="per-card CSS filter for --styled">art_filter</th><th title="pin this card's seed">seed</th><th title="what a restyle keeps of the base">remix</th><th>printing · base</th><th></th></tr></thead>
+            <th title="your own image instead of Scryfall's: a path under the workspace">art</th><th title="per-card CSS filter for --styled">art_filter</th><th title="pin this card's seed">seed</th><th title="what a restyle keeps of the base">remix</th><th>printing · base · pose</th><th></th></tr></thead>
           <tbody>${st.cards_detail.map((c, i) => `<tr data-name="${esc(c.name)}">
             <td><input type="number" class="num" data-k="number" value="${entryOf(c).number ?? ''}"></td>
             <td class="who"><a href="#/set/${esc(code)}/card/${encodeURIComponent(c.name)}">${esc(c.name)}</a>${c.error ? `<small class="err">${esc(c.error)}</small>` : `<small class="muted">${esc(c.card?.type_line || '')}</small>`}</td>
@@ -878,8 +917,8 @@ function edit() {
             <td><input type="text" data-k="art_filter" value="${esc(entryOf(c).art_filter || '')}"></td>
             <td><input type="number" class="num seed" data-k="seed" value="${entryOf(c).seed ?? ''}" placeholder="${c.recipe?.seed ?? ''}" title="pinned seed; the placeholder is the derived one"></td>
             <td><select data-k="remix">${remixOpts(c)}</select></td>
-            <td class="picks">${entryOf(c).printing ? `<span class="badge accent">${esc(entryOf(c).printing)}</span>` : ''}${entryOf(c).base ? `<span class="badge accent">base ${esc(entryOf(c).base)}</span>` : ''}
-              ${!entryOf(c).printing && !entryOf(c).base ? `<a class="muted" href="#/set/${esc(code)}/card/${encodeURIComponent(c.name)}" title="the printing and the restyle base are picked in the card view">pick…</a>` : ''}</td>
+            <td class="picks">${entryOf(c).printing ? `<span class="badge accent">${esc(entryOf(c).printing)}</span>` : ''}${entryOf(c).base ? `<span class="badge accent">base ${esc(entryOf(c).base)}</span>` : ''}${entryOf(c).pose ? `<span class="badge accent" title="${esc(entryOf(c).pose)}">pose ${esc(short(entryOf(c).pose.split('/').pop()))}</span>` : ''}
+              ${!entryOf(c).printing && !entryOf(c).base && !entryOf(c).pose ? `<a class="muted" href="#/set/${esc(code)}/card/${encodeURIComponent(c.name)}" title="the printing, the restyle base and the pose image are picked in the card view">pick…</a>` : ''}</td>
             <td class="acts"><button class="small" data-move="${i}|-1" title="move up" ${i ? '' : 'disabled'}>↑</button><button class="small" data-move="${i}|1" title="move down" ${i < st.cards_detail.length - 1 ? '' : 'disabled'}>↓</button>
               <button class="small" data-rename="${esc(c.name)}" title="change which card this entry names, keeping its edits">rename</button><button class="small" data-remove="${esc(c.name)}" title="remove from the set">✕</button></td>
           </tr>`).join('')}</tbody></table></div>

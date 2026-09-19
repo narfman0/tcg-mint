@@ -153,6 +153,8 @@ table.cards td.picks { white-space: nowrap; font-size: .9em; }
 table.cards td.acts { white-space: nowrap; }
 table.cards td.acts button { padding: 0 .4em; }
 button.danger { border-color: var(--bad); color: var(--bad); }
+.takes { display: inline-flex; align-items: center; gap: 3px; }
+.takes input { width: 3.6em; }
 
 /* styles */
 .styles { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 16px; align-items: start; }

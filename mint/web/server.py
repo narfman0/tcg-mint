@@ -3,6 +3,7 @@ import dataclasses
 import json
 import os
 import queue
+import random
 import threading
 import time
 
@@ -487,6 +488,12 @@ def create_app(ws):
     return app
 
 
+def app():
+    """The app for the workspace in the environment: `mint serve --reload`, or `uvicorn --factory mint.web.server:app`."""
+    from .. import workspace
+    return create_app(workspace.default())
+
+
 # --- detail builders ------------------------------------------------------------------------
 def card_names(body):
     """The card names a request carries: `names` (a list) or `decklist` (text, counts optional)."""
@@ -661,33 +668,46 @@ def submit_enhance(S, st, names, body):
 
 
 def submit_restyle(S, st, names, body):
-    if st.style is None and not body.get("style"):
-        raise HTTPException(400, f"{st.code} has no style block")
-    overrides = body.get("style") or {}
-    style = st.style
-    if overrides:
+    """A restyle job: the set's style, or `template` (a template / built-in by name, taken whole,
+    so a set's own knobs never leak into it), or `style` overrides on top of the set's (the lab).
+    Whichever, each card keeps its own base, subject, seed and remix mode."""
+    overrides, template = body.get("style") or {}, body.get("template")
+    if st.style is None and not overrides and not template:
+        raise HTTPException(400, f"{st.code} has no style block; pick a template to restyle as")
+    sty = st.style
+    if template:
+        sty, _ = style.load(S.ws, template)
+    elif overrides:
         base = dataclasses.asdict(st.style) if st.style else {"name": "lab", "prompt": ""}
         base.pop("explicit", None)
         base.update(overrides)
         if body.get("label"):
             base["name"] = body["label"]
-        style = sets.from_dict({"code": "x", "style": base}).style
-    force, up = bool(body.get("force")), body.get("upscale", True)
+        sty = sets.from_dict({"code": "x", "style": base}).style
+    # `takes`: several variants per card, each from its own random seed, to choose between. They
+    # are drafts: the ESRGAN pass (a large share of a take's time) is skipped unless `upscale` says
+    # otherwise -- enhance the keeper instead, and the renderer picks the enhance up.
+    takes = max(1, min(int(body.get("takes") or 1), 16))
+    force, up = bool(body.get("force")), bool(body.get("upscale", takes == 1))
     seed = body.get("seed")
+    seeds = [seed] if takes == 1 else [random.randrange(1, 2 ** 31) for _ in range(takes)]
 
     def run(job):
         server = S.comfy()
         server.require()
         cards = S.cards()
-        job.step(0, len(names))
+        job.step(0, len(names) * takes)
         made = []
         for i, name in enumerate(names):
             card = cards.find(name, st.card({"name": name}).printing)
-            v, did = restyle.restyle(server, S.art, card, st, style=style, force=force, upscale=up, seed=seed)
-            job.say(f"{'restyled' if did else 'cached'} {name} -> {v.label}-{v.hash}")
-            made.append(v.hash)
-            job.step(i + 1)
+            for t, sd in enumerate(seeds):
+                v, did = restyle.restyle(server, S.art, card, st, style=sty, force=force, upscale=up, seed=sd)
+                take = f"  (take {t + 1}, seed {sd})" if takes > 1 else ""
+                job.say(f"{'restyled' if did else 'cached'} {name} -> {v.label}-{v.hash}{take}")
+                made.append(v.hash)
+                job.step(i * takes + t + 1)
         return {"variants": made}
-    title = f"restyle {len(names)} card(s) as {style.name}" + (" (lab)" if overrides else "")
-    params = {"set": st.code, "names": names, "style": overrides, "label": style.name}
+    title = f"restyle {len(names)} card(s) as {sty.name}" + (f" x {takes} takes" if takes > 1 else "")
+    title += (" (lab)" if overrides else "") + ("" if up else ", drafts: enhance the keeper")
+    params = {"set": st.code, "names": names, "style": overrides, "template": template, "label": sty.name, "takes": takes}
     return S.jobs.submit("restyle", title, params, run)
