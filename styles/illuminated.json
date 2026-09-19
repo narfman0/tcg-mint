@@ -1,0 +1,13 @@
+{
+  "name": "illuminated",
+  "prompt": "medieval illuminated manuscript miniature, gold leaf and burnished gilt, flat perspective, tempera on vellum, lapis blue and vermilion and verdigris, ornate acanthus border, book of hours, gothic",
+  "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, nude, nsfw, photograph, 3d render, realistic lighting, anime, modern, neon",
+  "control": "canny",
+  "control_strength": 0.7,
+  "control_end": 0.85,
+  "denoise": 0.88,
+  "steps": 30,
+  "cfg": 6.5,
+  "seed": 47,
+  "seed_rule": "stable"
+}
