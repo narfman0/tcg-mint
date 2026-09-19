@@ -51,6 +51,13 @@ class Manifest:
             "rendered_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         }
 
+    def remove(self, filename):
+        """Drop a render: the file beside the manifest and its entry."""
+        self.entries.pop(filename, None)
+        p = self.path.parent / filename
+        if p.exists():
+            p.unlink()
+
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".json.part")

@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .. import PKG, comfy, frame, render, restyle, sets, upscale
 from ..art import Art
-from ..cards import Cards, warnings
+from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
 from ..manifest import Manifest
 from .jobs import Jobs
@@ -186,6 +186,46 @@ def create_app(ws):
             sets.save(st.path, st)
         return set_detail(S, st)
 
+    @app.put("/api/sets/{code}/base")
+    def put_base(code: str, body: dict):
+        """The set-wide restyle base: a label ("spore"), a variant hash, or null for the crop."""
+        st = S.find_set(code)
+        with S.lock:
+            st.base = body.get("base") or None
+            sets.save(st.path, st)
+        return set_detail(S, st)
+
+    @app.delete("/api/sets/{code}/cards/{name}/variants/{h}")
+    def delete_variant(code: str, name: str, h: str):
+        """Remove one variant (image + sidecar). A card entry that named it as its base goes back to the default."""
+        st = S.find_set(code)
+        card = S.cards().find(name, st.card({"name": name}).printing)
+        v = S.art.variant(card, h)
+        if not v:
+            raise HTTPException(404, f"no variant {h} for {name}")
+        with S.lock:
+            S.art.delete(v)
+            entry = st.cards.get(name)
+            if entry and entry.base == h:
+                entry.base = None
+                sets.save(st.path, st)
+        return card_detail(S, st, name)
+
+    @app.delete("/api/sets/{code}/renders/{filename}")
+    def delete_render(code: str, filename: str):
+        """Remove one rendered card (the PNG in out/<set>/ and its manifest entry)."""
+        st = S.find_set(code)
+        if "/" in filename or not filename.endswith(".png"):
+            raise HTTPException(400, "a render is a .png in the set's out directory")
+        with S.lock:
+            m = Manifest(S.out_dir(st))
+            if filename not in m.entries and not (S.out_dir(st) / filename).exists():
+                raise HTTPException(404, f"no render {filename} for {st.code}")
+            name = m.entries.get(filename, {}).get("card")
+            m.remove(filename)
+            m.save()
+        return card_detail(S, st, name) if name else {"ok": True}
+
     @app.get("/api/sets/{code}/cards/{name}")
     def get_card(code: str, name: str):
         st = S.find_set(code)
@@ -196,11 +236,27 @@ def create_app(ws):
         st = S.find_set(code)
         entry = st.card({"name": name})
         out = []
-        for c in S.cards().printings(name):
-            out.append({**card_summary(c), "ub": bool(warnings(c)), "crop": str(S.art.crop(c, fetch=False)),
-                        "crop_cached": S.art.crop(c, fetch=False).exists(),
+        cands = S.cards().printings(name)
+        default = default_printing(cands)
+        for c in cands:
+            penalty, why = oddness(c)
+            crop = S.art.crop(c, fetch=False) if c.get("illustration_id") else None
+            out.append({**card_summary(c), "ub": bool(warnings(c)), "crop": str(crop) if crop else None,
+                        "crop_cached": bool(crop and crop.exists()),
+                        "set_name": c.get("set_name"), "odd": why, "penalty": penalty, "default": c is default,
                         "selected": entry.printing == f"{c['set']}:{c['collector_number']}"})
         return out
+
+    @app.get("/api/sets/{code}/cards/{name}/printings/{printing}/crop")
+    def printing_crop(code: str, name: str, printing: str, w: int = 320):
+        """A printing's art crop as a thumbnail, fetched from Scryfall on first sight (for the picker)."""
+        S.find_set(code)  # 404 for an unknown set
+        card = S.cards().find(name, printing)
+        try:
+            crop = S.art.crop(card)
+        except (OSError, MintError) as e:
+            raise HTTPException(502, f"could not fetch the crop: {e}") from None
+        return FileResponse(thumbnail(ws, str(crop), w), headers={"Cache-Control": "max-age=3600"})
 
     @app.post("/api/sets/{code}/cards/{name}/scan")
     def scan(code: str, name: str):
@@ -268,7 +324,8 @@ def style_fields():
         t = sets._base_type(f.type)
         out.append({"name": f.name, "type": t, "default": default,
                     "choices": list(sets.CONTROLS) if f.name == "control" else
-                    list(sets.SEED_RULES) if f.name == "seed_rule" else None})
+                    list(sets.SEED_RULES) if f.name == "seed_rule" else
+                    list(sets.REMIX) if f.name == "remix" else None})
     return out
 
 
@@ -297,9 +354,10 @@ def card_detail(S, st, name, cards=None):
     info["crop"] = str(crop) if crop.exists() else None
     info["variants"] = [variant_dict(v) for v in art.variants(card)]
     if st.style:
-        recipe = st.recipe(card)
+        recipe = st.recipe(card, art=art)
         info["style_hash"] = sets.recipe_hash(recipe)
         info["recipe"] = recipe
+        info["base_missing"] = recipe["base"] if sets.is_label(recipe["base"]) else None
         cur = art.variant(card, info["style_hash"])
         info["current"] = variant_dict(cur) if cur else None
     if crop.exists() or entry.art:
