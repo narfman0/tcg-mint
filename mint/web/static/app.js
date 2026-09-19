@@ -74,6 +74,7 @@ function route() {
   const p = h.split('/').map(decodeURIComponent);
   if (!p[0]) return {view: 'home'};
   if (p[0] === 'jobs') return {view: 'jobs'};
+  if (p[0] === 'styles') return {view: 'styles', name: p[1]};
   if (p[0] === 'all') return p[1] === 'view' ? {view: 'viewer', code: ALL, inSet: p[2], name: p[3]} : {view: 'board', code: ALL};
   if (p[0] === 'set') return {view: p[2] === 'view' ? 'viewer' : p[2] || 'board', code: p[1], name: p[3], key: p[4] === 'view' ? p[5] : undefined};
   return {view: 'home'};
@@ -83,7 +84,7 @@ async function go() {
   try {
     if (!state.ws) await loadWorkspace();
     if (r.code && (!state.set || state.set.code.toLowerCase() !== r.code.toLowerCase())) { await loadSet(r.code); state.sel.clear(); }
-    const views = {home, board, card, lab, frame, jobs, viewer};
+    const views = {home, board, card, lab, frame, jobs, viewer, edit, styles};
     if (r.view !== 'viewer' && !(r.view === 'card' && r.key)) closeViewer();
     (views[r.view] || home)(r);
     renderNav();
@@ -95,7 +96,7 @@ function renderNav() {
   const r = route();
   $('#setnav').innerHTML = (state.ws?.sets || []).map(s =>
     `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}"${s.private ? ' title="private: sets/private/, not in git"' : ''}>${esc(s.code)}${s.private ? ' <span class="lock">⌂</span>' : ''}</a>`).join('') +
-    (STATIC ? '' : `<a href="#/all" class="all ${r.code === ALL ? 'on' : ''}" title="every set on one board">all</a>`);
+    (STATIC ? '' : `<a href="#/all" class="all ${r.code === ALL ? 'on' : ''}" title="every set on one board">all</a><a href="#/styles" class="all ${r.view === 'styles' ? 'on' : ''}" title="style templates">styles</a>`);
   $('#comfy').className = 'dot' + (state.ws?.comfy?.alive ? ' on' : '');
   $('#comfy').title = `ComfyUI ${state.ws?.comfy?.url}: ${state.ws?.comfy?.alive ? 'running' : 'not running'}`;
 }
@@ -141,12 +142,15 @@ function home() {
       </a>`).join('') || `<div class="empty">${ws.sets.length ? 'nothing matches' : 'no set files in sets/ — <code>mint newset</code> makes one'}</div>`;
   $('#main').innerHTML = `
     <div class="row"><h1>Sets</h1>
-      ${STATIC ? '' : `<a class="pill" href="#/all">all sets on one board</a>`}
+      ${STATIC ? '' : `<a class="pill" href="#/all">all sets on one board</a><a class="pill" href="#/styles">styles</a>`}
       <input type="text" id="q" placeholder="filter sets" value="${esc(state.q || '')}" style="margin-left:auto">
+      ${STATIC ? '' : '<button id="newset">new set</button>'}
     </div>
+    <div class="panel newset" id="newset-form" hidden></div>
     <p class="muted">${esc(ws.home)} · ${ws.cards.count.toLocaleString()} cards on file · you are <b>${esc(ws.maker)}</b> (${esc(ws.maker_code)})</p>
     <div class="setlist">${setsHtml()}</div>`;
   $('#q').oninput = e => { state.q = e.target.value; $('.setlist').innerHTML = setsHtml(); };
+  if ($('#newset')) $('#newset').onclick = newSetForm;
 }
 
 /* --- set board ------------------------------------------------------------------ */
@@ -221,7 +225,7 @@ function board() {
   const filters = ['no restyle', ...(state.style !== 'current' ? [`no ${state.style}`] : []), 'not rendered', 'text shrunk', 'UB art', 'own art'];
   $('#main').innerHTML = `
     <div class="row"><h1>${esc(code)} <span class="muted">${esc(st.name)}</span></h1>
-      ${all ? '' : `<a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>`}
+      ${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>`}
       <span class="muted">${st.cards_detail.length} cards${all ? ` across ${st.sets.length} sets` : ''}${st.style && !all ? ` · style ${esc(st.style.name)}` : ''}${st.base && !all ? ` · from <b>${esc(st.base)}</b>` : ''}${all ? '' : ` · <span class="mono">${esc(st.path)}</span>`}</span></div>
     <div class="toolbar">
       <span class="seg">${['plain', 'styled'].map(m => `<button data-mode="${m}" class="${state.mode === m ? 'on' : ''}">${m}</button>`).join('')}</span>
@@ -456,11 +460,11 @@ function columns(c) {
   const cols = [];
   const cur = c.current?.hash;
   if (c.crop) cols.push({key: 'crop', title: 'crop', sub: `${c.card.set.toUpperCase()} ${c.card.collector_number} · ${c.card.artist}`,
-                         path: c.crop, kind: 'crop', acts: [['enhance', 'crop'], ['restyle-from', 'crop'], ['base', 'crop']]});
+                         path: c.crop, kind: 'crop', acts: [['enhance', 'crop'], ['base', 'crop']]});
   const vs = [...(c.variants || [])].sort((a, b) => (a.kind === 'enhance' ? 0 : 1) - (b.kind === 'enhance' ? 0 : 1) || a.label.localeCompare(b.label) || (b.created > a.created ? 1 : -1));
   for (const v of vs) {
-    const acts = v.kind === 'restyle' ? [['promote', v.hash], ['enhance', v.hash], ['restyle-from', v.hash], ['base', v.hash], ['delete', v.hash]]
-                                      : [['restyle-from', v.hash], ['base', v.hash], ['delete', v.hash]];
+    const acts = v.kind === 'restyle' ? [['promote', v.hash], ['enhance', v.hash], ['base', v.hash], ['delete', v.hash]]
+                                      : [['base', v.hash], ['delete', v.hash]];
     const base = c.entry.base || state.set.base || 'crop';
     cols.push({key: v.hash, title: v.label, sub: v.hash + (v.hash === cur ? ' · current' : '') + (v.base !== 'crop' ? ` · from ${v.base}` : ''),
                path: v.path, kind: v.kind, recipe: v.recipe, current: v.hash === cur, acts,
@@ -521,7 +525,7 @@ async function card(r) {
         <div class="title"><span>${esc(x.title)}${x.isBase ? ' <span class="badge accent">base</span>' : ''}</span><small>${esc(x.sub)}</small></div>
         ${x.recipe ? `<div class="recipe">${recipeDiff(x.recipe, c.recipe)}</div>` : ''}
         <div class="acts">${x.acts.map(([a, arg]) => `<button class="small" data-act="${a}" data-arg="${esc(arg)}">${
-          {enhance: 'enhance', 'restyle-from': 'restyle from this', base: 'use as base', promote: 'use recipe for set',
+          {enhance: 'enhance', base: 'use as base', promote: 'use recipe for set',
            'render-plain': 're-render', 'render-styled': 're-render', delete: 'delete', 'delete-render': 'delete'}[a]}</button>`).join('')}</div>
       </div>`).join('')}
     </div>`;
@@ -568,7 +572,6 @@ async function card(r) {
   document.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
     const act = b.dataset.act, arg = b.dataset.arg, names = [c.name];
     if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg});
-    else if (act === 'restyle-from') { await put({base: arg === 'crop' ? null : arg}); submit({kind: 'restyle', set: code, names}); }
     else if (act === 'base') put({base: arg === 'crop' ? null : arg});
     else if (act === 'delete-render') {
       if (!confirm(`Delete the render ${arg}? The PNG is removed from out/${code.toLowerCase()}/; re-render makes it again.`)) return;
@@ -637,16 +640,7 @@ function lab() {
   const base = st.style || {name: 'lab', prompt: ''};
   if (!state.lab || state.lab.code !== code) state.lab = {code, values: {...base}, probes: st.cards_detail.slice(0, 3).map(c => c.name), label: (base.name || 'lab') + '-lab'};
   const L = state.lab;
-  const val = f => L.values[f.name] ?? f.default ?? '';
   const changed = f => JSON.stringify(L.values[f.name] ?? f.default) !== JSON.stringify(base[f.name] ?? f.default);
-  const input = f => {
-    if (f.choices) return `<select data-f="${f.name}">${f.choices.map(c => `<option ${val(f) === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
-    if (f.type === 'bool') return `<input type="checkbox" data-f="${f.name}" ${val(f) ? 'checked' : ''}>`;
-    if (f.type === 'list') return `<input type="text" data-f="${f.name}" value="${esc(JSON.stringify(val(f) || []))}" placeholder='[{"name": "x.safetensors", "strength": 0.7}]'>`;
-    if (f.name === 'prompt' || f.name === 'negative') return `<textarea data-f="${f.name}">${esc(val(f))}</textarea>`;
-    if (f.type === 'int' || f.type === 'float') return `<input type="number" data-f="${f.name}" value="${esc(val(f))}" step="${f.type === 'int' ? 1 : 0.05}">`;
-    return `<input type="text" data-f="${f.name}" value="${esc(val(f))}">`;
-  };
   const probes = st.cards_detail.filter(c => L.probes.includes(c.name));
   const labels = new Map();  // label-hash -> {label, hash, recipe} across probe cards, newest first
   for (const c of probes) for (const v of c.variants || []) if (v.kind === 'restyle') { const k = v.label + '-' + v.hash; if (!labels.has(k)) labels.set(k, v); }
@@ -656,7 +650,7 @@ function lab() {
     <div class="lab">
       <div>
         <div class="form">
-          ${fields.filter(f => f.name !== 'name').map(f => `<label class="${changed(f) ? 'changed' : ''}">${esc(f.name)}</label>${input(f)}`).join('')}
+          ${styleForm(fields, L.values, changed)}
           <label>run as</label><input type="text" id="label" value="${esc(L.label)}" title="the label the variants get; the set's style name keeps them comparable side by side">
           <label>probe cards</label><div class="probe">${st.cards_detail.map(c => `<label class="${L.probes.includes(c.name) ? 'on' : ''}" data-probe="${esc(c.name)}">${esc(c.name)}</label>`).join('')}</div>
           <label></label><div class="row">
@@ -678,12 +672,7 @@ function lab() {
         ${cols.length ? '' : '<div class="empty">no restyle variants for the probe cards yet — run one</div>'}
       </div>
     </div>`;
-  document.querySelectorAll('[data-f]').forEach(el => el.onchange = () => {
-    const f = fields.find(x => x.name === el.dataset.f); let v = el.type === 'checkbox' ? el.checked : el.value;
-    if (f.type === 'int') v = parseInt(v, 10); else if (f.type === 'float') v = parseFloat(v);
-    else if (f.type === 'list') { try { v = JSON.parse(v || '[]'); } catch { toast('loras must be JSON', true); return; } }
-    L.values[f.name] = v; lab();
-  });
+  bindStyleForm(fields, L.values, () => lab());
   $('#label').onchange = e => { L.label = e.target.value; };
   document.querySelectorAll('[data-probe]').forEach(el => el.onclick = () => { const n = el.dataset.probe; L.probes = L.probes.includes(n) ? L.probes.filter(x => x !== n) : [...L.probes, n]; lab(); });
   $('#reset').onclick = () => { L.values = {...base}; lab(); };
@@ -753,6 +742,326 @@ function frame() {
   $('#getscan').onclick = () => api(`/api/sets/${code}/cards/${encodeURIComponent(F.name)}/scan`, {method: 'POST'}).then(d => { F.scan = d.path; frame(); }).catch(e => toast(e.message, true));
   $('#op').oninput = e => { F.opacity = +e.target.value; const o = $('#ours'); if (o) o.style.opacity = 1 - F.opacity / 100; };
   document.querySelectorAll('[data-open]').forEach(p => p.onclick = () => window.open(file(p.dataset.open), '_blank'));
+}
+
+/* --- style form: one input per Style field, shared by the lab, the set editor and the styles page --- */
+const FIELD_HELP = {
+  prompt: 'the medium, palette and mood; a card\'s subject goes ahead of it', negative: 'what the sampler steers away from',
+  control: 'which ControlNet reads the base image', control_strength: 'how hard the control holds the base\'s structure (0-1)',
+  control_end: 'the fraction of the steps the control is on for (0-1)', denoise: 'how much of the base is redrawn (0-1)',
+  steps: 'sampling steps', cfg: 'prompt strength', seed: 'the set seed; each card\'s comes from it by the rule',
+  seed_rule: 'stable: from the illustration id, so adding a card moves no other; position: seed*1000+index',
+  sampler: 'ComfyUI sampler name', scheduler: 'ComfyUI scheduler name', checkpoint: 'the SDXL checkpoint file',
+  controlnet: 'the ControlNet model file', upscaler: 'the ESRGAN model file', loras: 'JSON: [{"name": "x.safetensors", "strength": 0.7}]',
+  width: 'generation width', height: 'generation height', grayscale_source: 'desaturate the base first (for ink styles)',
+  refine: 'a second pass at refine_scale x the size with this denoise; 0 = off', refine_scale: '1-3',
+  clip_skip: '1 = the checkpoint\'s CLIP; 2 for Pony-family checkpoints', remix: 'restyle: redraw the base; repose: new picture on its layout; new: from the prompt alone',
+};
+function fieldInput(f, v) {
+  if (f.choices) return `<select data-f="${f.name}">${f.choices.map(c => `<option ${v === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
+  if (f.type === 'bool') return `<input type="checkbox" data-f="${f.name}" ${v ? 'checked' : ''}>`;
+  if (f.type === 'list') return `<input type="text" data-f="${f.name}" value="${esc(JSON.stringify(v || []))}" placeholder='[{"name": "x.safetensors", "strength": 0.7}]'>`;
+  if (f.name === 'prompt' || f.name === 'negative') return `<textarea data-f="${f.name}">${esc(v ?? '')}</textarea>`;
+  if (f.type === 'int' || f.type === 'float') return `<input type="number" data-f="${f.name}" value="${esc(v ?? '')}" step="${f.type === 'int' ? 1 : 0.05}">`;
+  return `<input type="text" data-f="${f.name}" value="${esc(v ?? '')}">`;
+}
+/* The value an input holds, typed as its field is; undefined when it cannot be read (a toast says why). */
+function fieldValue(f, el) {
+  let v = el.type === 'checkbox' ? el.checked : el.value;
+  if (f.type === 'int') v = parseInt(v, 10); else if (f.type === 'float') v = parseFloat(v);
+  else if (f.type === 'list') { try { v = JSON.parse(v || '[]'); } catch { toast('loras must be JSON', true); return undefined; } }
+  if ((f.type === 'int' || f.type === 'float') && Number.isNaN(v)) { toast(`${f.name} must be a number`, true); return undefined; }
+  return v;
+}
+/* The form's rows: every field but name; a label is lit when `lit(f)` says so. */
+function styleForm(fields, values, lit) {
+  return fields.filter(f => f.name !== 'name').map(f =>
+    `<label class="${lit(f) ? 'changed' : ''}" title="${esc(FIELD_HELP[f.name] || '')}">${esc(f.name)}</label>${fieldInput(f, values[f.name] ?? f.default ?? '')}`).join('');
+}
+/* Wire the form: each change goes through fieldValue into `values`, then `after()`. */
+function bindStyleForm(fields, values, after) {
+  document.querySelectorAll('[data-f]').forEach(el => el.onchange = () => {
+    const f = fields.find(x => x.name === el.dataset.f), v = fieldValue(f, el);
+    if (v === undefined) return;
+    values[f.name] = v; after(f);
+  });
+}
+/* A style block as a file would hold it: the prompt, every knob off its default, and the keys in
+   `keep` (what the file spelled out before), so saving never bloats a file nor loses a spelled-out default. */
+function slimStyle(fields, values, keep = []) {
+  const out = {};
+  for (const f of fields) {
+    if (f.name === 'name' || values[f.name] === undefined) continue;
+    if (f.name === 'prompt' || keep.includes(f.name) || JSON.stringify(values[f.name]) !== JSON.stringify(f.default)) out[f.name] = values[f.name];
+  }
+  return out;
+}
+
+/* --- new set (on the home page) --------------------------------------------------------------- */
+async function newSetForm() {
+  const box = $('#newset-form'); if (!box) return;
+  box.hidden = !box.hidden;
+  if (box.hidden) return;
+  const templates = await api('/api/styles').catch(() => []);
+  box.innerHTML = `<h2>new set</h2>
+    <div class="form">
+      <label>code</label><input type="text" id="ns-code" placeholder="SAT" style="width:8em" title="letters and digits; the file is sets/<code>.json and renders go to out/<code>/">
+      <label>name</label><input type="text" id="ns-name" placeholder="Satoru, forgot his ninjas at home">
+      <label>style</label><select id="ns-style"><option value="">none — add one later</option>${templates.map(t => `<option value="${esc(t.name)}">${esc(t.name)}${t.builtin ? ' (built-in)' : ''}${t.private ? ' (private)' : ''}</option>`).join('')}</select>
+      <label>private</label><span><input type="checkbox" id="ns-private"> <span class="muted">sets/private/, which git ignores</span></span>
+      <label>cards</label><textarea id="ns-deck" rows="8" placeholder="a decklist: '1 Card Name' per line, commander(s) after a blank line — or just names, one per line"></textarea>
+      <label></label><div class="row"><button class="primary" id="ns-go">create</button><button id="ns-cancel">cancel</button></div>
+    </div>`;
+  $('#ns-cancel').onclick = () => { box.hidden = true; };
+  $('#ns-go').onclick = () => {
+    const body = {code: $('#ns-code').value.trim(), name: $('#ns-name').value.trim(), style: $('#ns-style').value || null,
+                  private: $('#ns-private').checked, decklist: $('#ns-deck').value};
+    if (!body.code) { toast('a set needs a code', true); return; }
+    api('/api/sets', {method: 'POST', body}).then(d => { toast(`${d.code}: ${d.cards_detail.length} cards`); state.ws = null; location.hash = `#/set/${d.code}/edit`; })
+      .catch(e => toast(e.message, true));
+  };
+  $('#ns-code').focus();
+}
+
+/* --- set editor: the file's own fields, its style block, and the card list ------------------------ */
+function edit() {
+  const st = state.set, code = st.code, fields = state.ws.style_fields;
+  if (st.all) { location.hash = '#/all'; return; }
+  let E = state.edit;
+  if (!E || E.code !== code) E = state.edit = {code, knobs: false, values: null, styles: null};
+  if (!E.styles) api('/api/styles').then(l => { E.styles = l; if (route().view === 'edit') edit(); }).catch(() => { E.styles = []; });
+  const labels = styleLabels(st.cards_detail);
+  const baseOpts = ['crop', ...labels.map(([l]) => l), ...(st.base && st.base !== 'crop' && !labels.some(([l]) => l === st.base) ? [st.base] : [])];
+  const entryOf = c => c.entry || {};
+  const remixOpts = c => `<option value="">style's (${esc(st.style?.remix || 'restyle')})</option>` +
+    Object.keys(REMIX).map(m => `<option value="${m}" ${entryOf(c).remix === m ? 'selected' : ''}>${m}</option>`).join('');
+  $('#main').innerHTML = `
+    <div class="row"><h1>${esc(code)} <span class="muted">edit</span></h1>
+      <a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>
+      <span class="muted mono">${esc(st.path)}</span></div>
+    <div class="editor">
+      <div class="panel">
+        <h2>set</h2>
+        <div class="form meta">
+          <label title="the file keeps its name; renders move to out/<new code>/">code</label><input type="text" data-s="code" value="${esc(st.code)}" style="width:8em">
+          <label>name</label><input type="text" data-s="name" value="${esc(st.name)}">
+          <label title="how many cards the set is meant to have (informational)">size</label><input type="number" data-s="size" value="${st.size ?? ''}" style="width:6em">
+          <label title="what every restyle starts from unless a card says otherwise">base</label><select data-s="base">${baseOpts.map(b => `<option value="${b === 'crop' ? '' : esc(b)}" ${(st.base || 'crop') === b ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>
+          <label title="a CSS filter for --styled renders when no restyle exists, e.g. saturate(1.4)">art_filter</label><input type="text" data-s="art_filter" value="${esc(st.art_filter || '')}" placeholder="none">
+          <label>note</label><input type="text" data-s="note" value="${esc(st.note || '')}" placeholder="anything worth remembering about this set">
+        </div>
+      </div>
+      <div class="panel">
+        <h2>style ${st.style ? `<span class="muted mono" style="text-transform:none">${esc(st.style.name)}</span>` : '<span class="muted" style="text-transform:none">none</span>'}</h2>
+        <div class="toolbar">
+          ${st.style ? `<button id="knobs">${E.knobs ? 'hide knobs' : 'edit knobs'}</button>
+            <button id="savetpl" title="write this style block (and the set's css) to styles/ for other sets">save as template…</button>
+            <button id="dropstyle" title="remove the style block; the variants it made stay in the art cache">remove style</button><span class="sep"></span>` : ''}
+          <span class="muted">${st.style ? 'replace with' : 'start from'} template</span>
+          <select id="tpl">${(E.styles || []).map(t => `<option value="${esc(t.name)}" ${t.name === st.style?.name ? 'selected' : ''}>${esc(t.name)}${t.builtin ? ' (built-in)' : ''}${t.private ? ' (private)' : ''}${t.sets.length ? ' · ' + t.sets.join(' ') : ''}</option>`).join('')}</select>
+          <label title="the template's .css becomes the set's, replacing ${esc(code.toLowerCase())}.css"><input type="checkbox" id="tplcss" ${st.css ? '' : 'checked'}> its css too</label>
+          <button id="applytpl" ${E.styles?.length ? '' : 'disabled'}>apply</button>
+        </div>
+        ${st.style && E.knobs ? `<div class="form">${styleForm(fields, E.values, f => JSON.stringify(E.values[f.name] ?? f.default) !== JSON.stringify(st.style[f.name] ?? f.default))}
+          <label></label><div class="row"><button class="primary" id="saveknobs">save style</button><button id="resetknobs" class="small">reset</button>
+            <span class="muted">changed knobs are lit; saving gives every card a new recipe hash</span></div></div>` : ''}
+      </div>
+      <div class="panel">
+        <h2>cards <span class="muted" style="text-transform:none">${st.cards_detail.length}</span></h2>
+        <div class="tablewrap"><table class="cards">
+          <thead><tr><th title="collector number">#</th><th>card</th><th title="what the picture is of; goes ahead of the style prompt">subject</th><th title="replaces the printed flavor text">flavor</th>
+            <th title="your own image instead of Scryfall's: a path under the workspace">art</th><th title="per-card CSS filter for --styled">art_filter</th><th title="pin this card's seed">seed</th><th title="what a restyle keeps of the base">remix</th><th>printing · base</th><th></th></tr></thead>
+          <tbody>${st.cards_detail.map((c, i) => `<tr data-name="${esc(c.name)}">
+            <td><input type="number" class="num" data-k="number" value="${entryOf(c).number ?? ''}"></td>
+            <td class="who"><a href="#/set/${esc(code)}/card/${encodeURIComponent(c.name)}">${esc(c.name)}</a>${c.error ? `<small class="err">${esc(c.error)}</small>` : `<small class="muted">${esc(c.card?.type_line || '')}</small>`}</td>
+            <td><input type="text" data-k="subject" value="${esc(entryOf(c).subject || '')}"></td>
+            <td><input type="text" data-k="flavor" value="${esc(entryOf(c).flavor || '')}"></td>
+            <td><input type="text" data-k="art" value="${esc(entryOf(c).art || '')}"></td>
+            <td><input type="text" data-k="art_filter" value="${esc(entryOf(c).art_filter || '')}"></td>
+            <td><input type="number" class="num seed" data-k="seed" value="${entryOf(c).seed ?? ''}" placeholder="${c.recipe?.seed ?? ''}" title="pinned seed; the placeholder is the derived one"></td>
+            <td><select data-k="remix">${remixOpts(c)}</select></td>
+            <td class="picks">${entryOf(c).printing ? `<span class="badge accent">${esc(entryOf(c).printing)}</span>` : ''}${entryOf(c).base ? `<span class="badge accent">base ${esc(entryOf(c).base)}</span>` : ''}
+              ${!entryOf(c).printing && !entryOf(c).base ? `<a class="muted" href="#/set/${esc(code)}/card/${encodeURIComponent(c.name)}" title="the printing and the restyle base are picked in the card view">pick…</a>` : ''}</td>
+            <td class="acts"><button class="small" data-move="${i}|-1" title="move up" ${i ? '' : 'disabled'}>↑</button><button class="small" data-move="${i}|1" title="move down" ${i < st.cards_detail.length - 1 ? '' : 'disabled'}>↓</button>
+              <button class="small" data-rename="${esc(c.name)}" title="change which card this entry names, keeping its edits">rename</button><button class="small" data-remove="${esc(c.name)}" title="remove from the set">✕</button></td>
+          </tr>`).join('')}</tbody></table></div>
+        <div class="toolbar">
+          <button id="renumber" title="number the cards 1..n in this order">renumber</button>
+          <span class="muted">numbers follow the order above only after a renumber; ↑ ↓ change the order, not the number</span>
+        </div>
+        <div class="form">
+          <label>add cards</label><textarea id="addcards" rows="3" placeholder="a decklist or names, one per line; appended after the last number"></textarea>
+          <label></label><div class="row"><button class="primary" id="addgo">add</button></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>danger</h2>
+        <div class="toolbar"><button class="danger" id="delset">delete set ${esc(code)}</button>
+          <span class="muted">removes ${esc(st.path)} and its .css; renders in out/${esc(code.toLowerCase())}/ and the art cache stay</span></div>
+      </div>
+    </div>`;
+  // set fields: one PATCH per change; a new code moves the page to it
+  document.querySelectorAll('[data-s]').forEach(el => el.onchange = () => {
+    const k = el.dataset.s; let v = el.value;
+    if (k === 'size') v = v === '' ? null : parseInt(v, 10);
+    api(`/api/sets/${code}`, {method: 'PATCH', body: {[k]: v === '' ? null : v}})
+      .then(d => { state.set = d; state.setCode = d.code; toast(`${k} saved`); if (k === 'code') { state.ws = null; location.hash = `#/set/${d.code}/edit`; } else loadWorkspace().then(() => { if (k === 'base') edit(); }); })
+      .catch(e => { toast(e.message, true); edit(); });
+  });
+  // style block
+  if ($('#knobs')) $('#knobs').onclick = () => { E.knobs = !E.knobs; E.values = {...st.style}; edit(); };
+  if ($('#savetpl')) $('#savetpl').onclick = () => saveTemplateFromSet(st);
+  if ($('#dropstyle')) $('#dropstyle').onclick = () => {
+    if (!confirm(`Remove the style block from ${code}? Its restyle variants stay in the art cache; a template can bring it back.`)) return;
+    api(`/api/sets/${code}/style`, {method: 'PUT', body: {}}).then(() => { toast('style removed'); refresh(); }).catch(e => toast(e.message, true));
+  };
+  $('#applytpl').onclick = () => {
+    const t = $('#tpl').value;
+    if (st.style && !confirm(`Replace the style block of ${code} (${st.style.name}) with the template ${t}?`)) return;
+    api(`/api/sets/${code}/style/template`, {method: 'POST', body: {template: t, css: $('#tplcss').checked}})
+      .then(() => { toast(`${code} now styled as ${t}`); E.knobs = false; refresh(); }).catch(e => toast(e.message, true));
+  };
+  if (E.knobs && st.style) {
+    bindStyleForm(fields, E.values, () => edit());
+    $('#resetknobs').onclick = () => { E.values = {...st.style}; edit(); };
+    $('#saveknobs').onclick = () => {
+      const body = {name: st.style.name, ...slimStyle(fields, E.values, Object.keys(st.style))};
+      api(`/api/sets/${code}/style`, {method: 'PUT', body}).then(() => { toast('style saved'); E.knobs = false; refresh(); }).catch(e => toast(e.message, true));
+    };
+  }
+  // cards: a field change is one PUT and no re-render, so typing down a column keeps its focus
+  document.querySelectorAll('tr[data-name] [data-k]').forEach(el => el.onchange = () => {
+    const name = el.closest('tr').dataset.name, k = el.dataset.k; let v = el.value;
+    if (k === 'number' || k === 'seed') v = v === '' ? null : parseInt(v, 10);
+    else v = v || null;
+    api(`/api/sets/${code}/cards/${encodeURIComponent(name)}`, {method: 'PUT', body: {[k]: v}})
+      .then(d => { const i = st.cards_detail.findIndex(c => c.name === name); if (i >= 0) st.cards_detail[i] = d; toast(`${name}: ${k} saved`); })
+      .catch(e => toast(e.message, true));
+  });
+  const order = () => st.cards_detail.map(c => c.name);
+  const putCards = (body, msg) => api(`/api/sets/${code}/cards`, {method: 'PUT', body}).then(d => { state.set = d; toast(msg); edit(); }).catch(e => toast(e.message, true));
+  document.querySelectorAll('[data-move]').forEach(b => b.onclick = () => {
+    const [i, d] = b.dataset.move.split('|').map(Number), o = order(), j = i + d;
+    [o[i], o[j]] = [o[j], o[i]];
+    putCards({order: o}, 'order saved');
+  });
+  $('#renumber').onclick = () => putCards({order: order(), renumber: true}, 'renumbered');
+  document.querySelectorAll('[data-rename]').forEach(b => b.onclick = () => {
+    const name = b.dataset.rename, to = prompt(`Rename the entry ${name} to which card? Its edits and place are kept.`, name);
+    if (!to || to === name) return;
+    api(`/api/sets/${code}/cards/${encodeURIComponent(name)}/rename`, {method: 'POST', body: {name: to}}).then(d => { state.set = d; toast(`${name} → ${to}`); edit(); }).catch(e => toast(e.message, true));
+  });
+  document.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
+    const name = b.dataset.remove;
+    if (!confirm(`Remove ${name} from ${code}? Its entry (subject, seed, base…) is lost; variants and renders stay on disk.`)) return;
+    api(`/api/sets/${code}/cards/${encodeURIComponent(name)}`, {method: 'DELETE'}).then(d => { state.set = d; toast(`removed ${name}`); loadWorkspace().then(edit); }).catch(e => toast(e.message, true));
+  });
+  $('#addgo').onclick = () => {
+    const text = $('#addcards').value; if (!text.trim()) return;
+    const add = force => api(`/api/sets/${code}/cards`, {method: 'POST', body: {decklist: text, force}})
+      .then(d => { state.set = d; toast(`${d.added} card(s) added`); loadWorkspace().then(edit); })
+      .catch(e => { if (!force && e.message.startsWith('not in the card file') && confirm(`${e.message}\n\nAdd them anyway? They show as "not found" until the name is fixed or the card file has them.`)) add(true); else toast(e.message, true); });
+    add(false);
+  };
+  $('#delset').onclick = () => {
+    if (!confirm(`Delete the set ${code}? ${st.path} and its .css are removed. Renders in out/ and the art cache stay.`)) return;
+    api(`/api/sets/${code}`, {method: 'DELETE'}).then(() => { toast(`deleted ${code}`); state.set = null; state.setCode = null; state.ws = null; location.hash = '#/'; }).catch(e => toast(e.message, true));
+  };
+}
+/* Save a set's style block as a template, as `mint style save` does: asks for the name and the tier,
+   and offers to replace one that exists. */
+function saveTemplateFromSet(st) {
+  const name = prompt(`Save ${st.code}'s style as which template? (styles/<name>.json; letters, digits, - and _)`, st.style.name);
+  if (!name) return;
+  const priv = confirm('Private (styles/private/, which git ignores)?\n\nOK = private, Cancel = shared in styles/');
+  const save = force => api('/api/styles', {method: 'POST', body: {set: st.code, name, private: priv, force}})
+    .then(t => { toast(`saved ${t.path}`); if (state.styles) state.styles.list = null; if (state.edit) state.edit.styles = null; })
+    .catch(e => { if (!force && / exists|needs --force/.test(e.message) && confirm(`${e.message}\n\nReplace / share it anyway?`)) save(true); else toast(e.message, true); });
+  save(false);
+}
+
+/* --- styles: the templates in styles/, and a form to make or change one ---------------------------- */
+async function styles(r) {
+  const fields = state.ws.style_fields;
+  let T = state.styles;
+  if (!T) T = state.styles = {list: null, name: null, values: null, css: '', private: false, keep: [], draft: false};
+  if (!T.list) T.list = await api('/api/styles');
+  const cur = r.name ? T.list.find(t => t.name === r.name) : null;
+  if (r.name && !cur) { $('#main').innerHTML = `<div class="empty bad">no template ${esc(r.name)}</div>`; return; }
+  if (cur && T.name !== cur.name) {
+    T.name = cur.name; T.draft = false; T.values = {...cur.style}; T.css = cur.css || ''; T.private = cur.private; T.keep = Object.keys(cur.style);
+  }
+  if (!cur && !T.draft) T.name = null;
+  const editing = cur || T.draft;
+  const lit = f => JSON.stringify(T.values?.[f.name] ?? f.default) !== JSON.stringify(f.default);
+  const asFile = cur ? Object.fromEntries(Object.entries(cur.style).filter(([k]) => k !== 'name')) : null;
+  const dirty = cur && (JSON.stringify(slimStyle(fields, T.values, T.keep)) !== JSON.stringify(asFile) || T.css !== (cur.css || '') || T.private !== cur.private);
+  const sets = (state.ws.sets || []).filter(s => !s.error);
+  $('#main').innerHTML = `
+    <div class="row"><h1>Styles</h1><span class="muted">templates in styles/ — a set starts from one, or is saved as one</span>
+      ${STATIC ? '' : '<button id="newtpl" style="margin-left:auto">new template</button>'}</div>
+    <div class="styles">
+      <div class="tlist panel">
+        ${T.list.map(t => `<div class="t ${t.name === T.name && !T.draft ? 'on' : ''}" data-tpl="${esc(t.name)}"><b>${esc(t.name)}</b>
+          ${t.builtin ? '<span class="badge">built-in</span>' : ''}${t.private ? '<span class="badge" title="styles/private/, not in git">private</span>' : ''}${t.shadowed ? '<span class="badge warn" title="a private template of the same name is the one that is found">shadowed</span>' : ''}
+          <small>${esc((t.style.prompt || '').slice(0, 80))}${(t.style.prompt || '').length > 80 ? '…' : ''}</small>
+          ${t.sets.length ? `<small>used by ${t.sets.map(c => `<a href="#/set/${esc(c)}">${esc(c)}</a>`).join(' ')}</small>` : ''}</div>`).join('') || '<div class="empty">no templates yet</div>'}
+      </div>
+      <div class="panel">
+        ${!editing ? '<div class="empty">pick a template, or make a new one</div>' : `
+        <div class="row"><h2 style="margin:0">${T.draft ? 'new template' : esc(T.name)}</h2>
+          ${cur?.builtin ? '<span class="muted">a built-in recipe: saving writes styles/' + esc(T.name) + '.json, which then shadows it</span>' : ''}
+          ${cur?.path ? `<span class="muted mono">${esc(cur.path)}</span>` : ''}
+          ${dirty ? '<span class="badge warn">unsaved</span>' : ''}</div>
+        <div class="form">
+          ${T.draft ? '<label>name</label><input type="text" id="tname" value="' + esc(T.name || '') + '" placeholder="letters, digits, - and _">' : ''}
+          <label title="styles/private/ is git-ignored; a private template shadows a shared one of the same name">private</label><span><input type="checkbox" id="tprivate" ${T.private ? 'checked' : ''}></span>
+          ${styleForm(fields, T.values, lit)}
+          <label title="frame rules that go with the style; a set that starts from the template gets them as its css">css</label><textarea class="css" id="tcss" style="min-height:90px">${esc(T.css)}</textarea>
+          <label></label><div class="row">
+            <button class="primary" id="tsave">save</button>
+            <button id="tsaveas" title="a copy under another name">save as…</button>
+            ${cur && !cur.builtin ? '<button id="treset" class="small">reset</button>' : ''}
+            ${cur && !cur.builtin ? `<button id="tdelete" class="danger" ${cur.sets.length ? `title="used by ${cur.sets.join(', ')} — their style blocks are copies and stay"` : ''}>delete</button>` : ''}
+          </div>
+          ${cur ? `<label>apply to set</label><div class="row"><select id="tset">${sets.map(s => `<option value="${esc(s.code)}">${esc(s.code)}${s.style ? ' (' + esc(s.style) + ')' : ' (no style)'}</option>`).join('')}</select>
+            <label><input type="checkbox" id="tsetcss"> its css too</label><button id="tapply" ${sets.length ? '' : 'disabled'}>apply</button>
+            <span class="muted">replaces that set's style block with this template as saved</span></div>` : ''}
+        </div>
+        <p class="muted" style="font-size:.85em">Lit knobs are off their default. A file holds the prompt, every lit knob, and whatever it spelled out before; the rest fall back to the defaults in <code>sets.Style</code>. Keep prompts about medium, palette and mood — a content noun here becomes the picture of any card without a subject.</p>`}
+      </div>
+    </div>`;
+  document.querySelectorAll('[data-tpl]').forEach(el => el.onclick = e => { if (e.target.tagName !== 'A') location.hash = `#/styles/${encodeURIComponent(el.dataset.tpl)}`; });
+  if ($('#newtpl')) $('#newtpl').onclick = () => {
+    T.draft = true; T.name = ''; T.values = {}; fields.forEach(f => { if (f.name !== 'name' && f.default !== null) T.values[f.name] = f.default; });
+    T.values.prompt = ''; T.css = ''; T.private = false; T.keep = [];
+    if (location.hash !== '#/styles') location.hash = '#/styles'; else styles({view: 'styles'});
+  };
+  if (!editing) return;
+  bindStyleForm(fields, T.values, () => styles(r));
+  $('#tprivate').onchange = e => { T.private = e.target.checked; styles(r); };
+  $('#tcss').onchange = e => { T.css = e.target.value; };
+  if ($('#tname')) $('#tname').onchange = e => { T.name = e.target.value.trim(); };
+  const save = (name, then) => {
+    if (!name) { toast('a template needs a name', true); return; }
+    T.css = $('#tcss').value;
+    api(`/api/styles/${encodeURIComponent(name)}`, {method: 'PUT', body: {style: slimStyle(fields, T.values, T.keep), css: T.css, private: T.private}})
+      .then(t => { toast(`saved ${t.path}`); T.list = null; T.name = null; T.draft = false; if (state.edit) state.edit.styles = null; (then || (() => { location.hash = `#/styles/${encodeURIComponent(name)}`; if (r.name === name) styles({view: 'styles', name}); }))(); })
+      .catch(e => toast(e.message, true));
+  };
+  $('#tsave').onclick = () => save(T.draft ? T.name : cur.name);
+  $('#tsaveas').onclick = () => { const n = prompt('Save as which template?', (T.name || '') + '-2'); if (n) save(n.trim()); };
+  if ($('#treset')) $('#treset').onclick = () => { T.name = null; styles(r); };
+  if ($('#tdelete')) $('#tdelete').onclick = () => {
+    if (!confirm(`Delete the template ${cur.name} (${cur.path})?${cur.sets.length ? ` The sets ${cur.sets.join(', ')} keep their own copies.` : ''}`)) return;
+    api(`/api/styles/${encodeURIComponent(cur.name)}`, {method: 'DELETE'}).then(() => { toast(`deleted ${cur.name}`); T.list = null; T.name = null; if (state.edit) state.edit.styles = null; location.hash = '#/styles'; }).catch(e => toast(e.message, true));
+  };
+  if ($('#tapply')) $('#tapply').onclick = () => {
+    const code = $('#tset').value, s = sets.find(x => x.code === code);
+    if (s.style && !confirm(`Replace the style block of ${code} (${s.style}) with ${cur.name}?`)) return;
+    api(`/api/sets/${code}/style/template`, {method: 'POST', body: {template: cur.name, css: $('#tsetcss').checked}})
+      .then(async () => { toast(`${code} now styled as ${cur.name}`); T.list = null; state.set = null; await loadWorkspace(); styles(r); }).catch(e => toast(e.message, true));
+  };
 }
 
 /* --- jobs ----------------------------------------------------------------------------- */
