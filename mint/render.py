@@ -298,11 +298,19 @@ def main(argv=None):
             card = load_card(name)
             ov = cards.get(card["name"], {})
             number = ov.get("number", i)
-            art_filter = (ov.get("art_filter") or st.get("art_filter")) if a.styled else None
+            art_filter = None
+            if a.styled:
+                # a restyled image (mint restyle) wins; the CSS filter is the fallback
+                styled = ART / f"{card['illustration_id']}.{st.get('style', {}).get('name', '-')}.png"
+                if styled.exists() and not ov.get("art"):
+                    ov = {**ov, "art": str(styled)}
+                else:
+                    art_filter = ov.get("art_filter") or st.get("art_filter")
             for th in themes:
                 slug = re.sub(r"[^A-Za-z0-9]+", "_", card["name"]).strip("_")
                 tag = f".{th}" if a.compare else ""
-                out = os.path.join(a.out, f"{number:03d}_{slug}{'.styled' if a.styled else ''}{tag}.png")
+                prefix = f"{set_code}-" if a.set else ""
+                out = os.path.join(a.out, f"{prefix}{number:03d}_{slug}{'.styled' if a.styled else ''}{tag}.png")
                 render(page, build_html(card, th, table, number, set_code, set_size, ov, art_filter, set_css), out)
                 outs.append(out)
                 print(out)

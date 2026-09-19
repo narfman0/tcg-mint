@@ -1,0 +1,106 @@
+"""Start a set file from a plain decklist.
+
+    mint newset --code SAT --name "Satoru, ..." [--style neon] [--out sets/satoru.json] decklist.txt
+
+The decklist is `<count> <Card Name>` per line, mainboard first, then a blank
+line and the commander(s); anything from the first `#` header on is ignored
+(that is where Moxfield exports put sideboard/maybeboard sections). The
+commander becomes card 1 and the rest follow in list order. An existing set
+file is updated in place: new cards are appended, numbers and per-card edits
+(flavor, subject, art) are kept.
+
+--style seeds the set's `style` block from one of the built-in recipes
+(`neon`, `ink`, `glass`); edit it afterwards, it is just JSON.
+"""
+import argparse
+import json
+import os
+import re
+import sys
+
+STYLES = {
+    "neon": {
+        "name": "neon",
+        "prompt": "cyberpunk fantasy illustration, neon-lit rain-slick night city, holographic signage and glowing kanji, "
+                  "chrome and black lacquer, magenta and cyan rim light, volumetric haze, detailed digital painting, "
+                  "dramatic cinematic composition",
+        "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel, nude, nsfw",
+        "control": "canny", "control_strength": 0.75, "denoise": 0.85, "steps": 28, "cfg": 6, "seed": 7,
+    },
+    "ink": {
+        "name": "ink",
+        "prompt": "dark fantasy manga illustration, black ink on white paper, heavy cross-hatching, dense screentone, "
+                  "black-ink dominant with deep shadows, confident brush-pen linework, grotesque detail, "
+                  "monochrome, no colour",
+        "negative": "colour, color, blurry, low quality, text, watermark, signature, frame, border, soft shading, "
+                    "painterly, photographic, nude, nsfw",
+        "control": "lineart", "control_strength": 0.9, "denoise": 0.9, "steps": 30, "cfg": 6.5, "seed": 11,
+    },
+    "glass": {
+        "name": "glass",
+        "prompt": "stained glass window illustration, art nouveau, thick black leading between panes of jewel-toned "
+                  "glass, backlit, ornamental borders and flowing curves, gold and ruby and sapphire, "
+                  "art-nouveau decorative composition, cathedral window",
+        "negative": "blurry, low quality, text, watermark, signature, frame, photographic, realistic, 3d render, "
+                    "nude, nsfw, portrait of a woman",
+        "control": "canny", "control_strength": 0.7, "denoise": 0.88, "steps": 28, "cfg": 6, "seed": 23,
+    },
+}
+
+
+def read_decklist(path):
+    main, commanders = [], []
+    section = main
+    for line in open(path):
+        line = line.rstrip("\n")
+        if line.startswith("#"):
+            break
+        if not line.strip():
+            section = commanders
+            continue
+        m = re.match(r"(\d+)x?\s+(.+)", line.strip())
+        if m:
+            section.append(m.group(2).strip())
+    if not commanders:  # no blank line: whole list is the deck
+        return main
+    return commanders + main
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="mint newset", description=__doc__.split("\n\n")[0])
+    ap.add_argument("decklist")
+    ap.add_argument("--code", required=True, help="set code, e.g. SAT (the company code is added by the renderer)")
+    ap.add_argument("--name", required=True)
+    ap.add_argument("--style", choices=STYLES, help="seed the style block from a built-in recipe")
+    ap.add_argument("--out", help="set file (default sets/<code lowercased>.json)")
+    a = ap.parse_args(argv)
+    out = a.out or os.path.join("sets", a.code.lower() + ".json")
+
+    st = {"code": a.code, "name": a.name, "cards": {}}
+    if os.path.exists(out):
+        st = json.load(open(out))
+        st["code"], st["name"] = a.code, a.name
+    if a.style and "style" not in st:
+        st["style"] = STYLES[a.style]
+
+    names = read_decklist(a.decklist)
+    seen = set()
+    names = [n for n in names if not (n in seen or seen.add(n))]  # basic lands repeat
+    cards = st["cards"]
+    nxt = max((c.get("number", 0) for c in cards.values()), default=0) + 1
+    added = 0
+    for n in names:
+        if n not in cards:
+            cards[n] = {"number": nxt}
+            nxt += 1
+            added += 1
+    st["size"] = len(cards)
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    with open(out, "w") as fh:
+        json.dump(st, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    print(f"{out}: {len(cards)} cards ({added} new)" + (f", style {st['style']['name']}" if "style" in st else ""))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

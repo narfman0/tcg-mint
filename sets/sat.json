@@ -1,0 +1,267 @@
+{
+  "code": "SAT",
+  "name": "Satoru, forgot his ninjas at home",
+  "cards": {
+    "Satoru Umezawa": {
+      "number": 1
+    },
+    "Ancient Silver Dragon": {
+      "number": 2
+    },
+    "Arcane Signet": {
+      "number": 3
+    },
+    "Archpriest of Shadows": {
+      "number": 4
+    },
+    "Baleful Strix": {
+      "number": 5
+    },
+    "Blightsteel Colossus": {
+      "number": 6
+    },
+    "Brainstorm": {
+      "number": 7
+    },
+    "Changeling Outcast": {
+      "number": 8
+    },
+    "Choked Estuary": {
+      "number": 9
+    },
+    "Clearwater Pathway // Murkwater Pathway": {
+      "number": 10
+    },
+    "Command Tower": {
+      "number": 11
+    },
+    "Consecrated Sphinx": {
+      "number": 12
+    },
+    "Counterspell": {
+      "number": 13
+    },
+    "Creeping Tar Pit": {
+      "number": 14
+    },
+    "Cut Down": {
+      "number": 15
+    },
+    "Cyclonic Rift": {
+      "number": 16
+    },
+    "Dark Ritual": {
+      "number": 17
+    },
+    "Darkslick Shores": {
+      "number": 18
+    },
+    "Darkwater Catacombs": {
+      "number": 19
+    },
+    "Demonic Tutor": {
+      "number": 20
+    },
+    "Dimir Signet": {
+      "number": 21
+    },
+    "Drown in the Loch": {
+      "number": 22
+    },
+    "Drowned Catacomb": {
+      "number": 23
+    },
+    "Exotic Orchard": {
+      "number": 24
+    },
+    "Faerie Seer": {
+      "number": 25
+    },
+    "Fallen Shinobi": {
+      "number": 26
+    },
+    "Feed the Swarm": {
+      "number": 27
+    },
+    "Fellwar Stone": {
+      "number": 28
+    },
+    "Flusterstorm": {
+      "number": 29
+    },
+    "Gingerbrute": {
+      "number": 30
+    },
+    "Go for the Throat": {
+      "number": 31
+    },
+    "Grave Titan": {
+      "number": 32
+    },
+    "Grazilaxx, Illithid Scholar": {
+      "number": 33
+    },
+    "Gudul Lurker": {
+      "number": 34
+    },
+    "Higure, the Still Wind": {
+      "number": 35
+    },
+    "Imperial Seal": {
+      "number": 36
+    },
+    "Ingenious Infiltrator": {
+      "number": 37
+    },
+    "Ink-Eyes, Servant of Oni": {
+      "number": 38
+    },
+    "Island": {
+      "number": 39
+    },
+    "Jin-Gitaxias, Core Augur": {
+      "number": 40
+    },
+    "Kaito Shizuki": {
+      "number": 41
+    },
+    "Lightning Greaves": {
+      "number": 42
+    },
+    "Lotus Petal": {
+      "number": 43
+    },
+    "Mind Stone": {
+      "number": 44
+    },
+    "Mist-Cloaked Herald": {
+      "number": 45
+    },
+    "Mist-Syndicate Naga": {
+      "number": 46
+    },
+    "Moon-Circuit Hacker": {
+      "number": 47
+    },
+    "Morphic Pool": {
+      "number": 48
+    },
+    "Mystic Remora": {
+      "number": 49
+    },
+    "Nashi, Moon Sage's Scion": {
+      "number": 50
+    },
+    "Negate": {
+      "number": 51
+    },
+    "Ornithopter": {
+      "number": 52
+    },
+    "Pongify": {
+      "number": 53
+    },
+    "Preordain": {
+      "number": 54
+    },
+    "Razaketh, the Foulblooded": {
+      "number": 55
+    },
+    "Reanimate": {
+      "number": 56
+    },
+    "Reconnaissance Mission": {
+      "number": 57
+    },
+    "Rhystic Study": {
+      "number": 58
+    },
+    "Sakashima's Student": {
+      "number": 59
+    },
+    "Shizo, Death's Storehouse": {
+      "number": 60
+    },
+    "Silent-Blade Oni": {
+      "number": 61
+    },
+    "Silver-Fur Master": {
+      "number": 62
+    },
+    "Slither Blade": {
+      "number": 63
+    },
+    "Sol Ring": {
+      "number": 64
+    },
+    "Spectral Sailor": {
+      "number": 65
+    },
+    "Sunken Hollow": {
+      "number": 66
+    },
+    "Sunken Ruins": {
+      "number": 67
+    },
+    "Swamp": {
+      "number": 68
+    },
+    "Swiftfoot Boots": {
+      "number": 69
+    },
+    "Tainted Isle": {
+      "number": 70
+    },
+    "Talisman of Dominance": {
+      "number": 71
+    },
+    "Tetsuko Umezawa, Fugitive": {
+      "number": 72
+    },
+    "Thassa, God of the Sea": {
+      "number": 73
+    },
+    "Thousand-Faced Shadow": {
+      "number": 74
+    },
+    "Tormented Soul": {
+      "number": 75
+    },
+    "Toxic Deluge": {
+      "number": 76
+    },
+    "Toxrill, the Corrosive": {
+      "number": 77
+    },
+    "Triton Shorestalker": {
+      "number": 78
+    },
+    "Underground River": {
+      "number": 79
+    },
+    "Valgavoth, Terror Eater": {
+      "number": 80
+    },
+    "Vampiric Tutor": {
+      "number": 81
+    },
+    "Watery Grave": {
+      "number": 82
+    },
+    "Yuriko, the Tiger's Shadow": {
+      "number": 83
+    }
+  },
+  "style": {
+    "name": "neon",
+    "prompt": "cyberpunk fantasy illustration, neon-lit rain-slick night city, holographic signage and glowing kanji, chrome and black lacquer, magenta and cyan rim light, volumetric haze, detailed digital painting, dramatic cinematic composition",
+    "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel, nude, nsfw",
+    "control": "canny",
+    "control_strength": 0.75,
+    "denoise": 0.85,
+    "steps": 28,
+    "cfg": 6,
+    "seed": 7
+  },
+  "size": 83
+}

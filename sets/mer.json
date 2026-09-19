@@ -1,0 +1,295 @@
+{
+  "code": "MER",
+  "name": "Meren, a graveyard is a to-do list",
+  "cards": {
+    "Meren of Clan Nel Toth": {
+      "number": 1
+    },
+    "Abrupt Decay": {
+      "number": 2
+    },
+    "Accursed Marauder": {
+      "number": 3
+    },
+    "Agadeem's Awakening // Agadeem, the Undercrypt": {
+      "number": 4
+    },
+    "Ancient Tomb": {
+      "number": 5
+    },
+    "Animate Dead": {
+      "number": 6
+    },
+    "Apprentice Necromancer": {
+      "number": 7
+    },
+    "Archon of Cruelty": {
+      "number": 8
+    },
+    "Ashnod's Altar": {
+      "number": 9
+    },
+    "Assassin's Trophy": {
+      "number": 10
+    },
+    "Birds of Paradise": {
+      "number": 11
+    },
+    "Blood Artist": {
+      "number": 12
+    },
+    "Bone Shards": {
+      "number": 13
+    },
+    "Boseiju, Who Endures": {
+      "number": 14
+    },
+    "Braids, Arisen Nightmare": {
+      "number": 15
+    },
+    "Buried Alive": {
+      "number": 16
+    },
+    "Carrion Feeder": {
+      "number": 17
+    },
+    "Chthonian Nightmare": {
+      "number": 18
+    },
+    "Command Tower": {
+      "number": 19
+    },
+    "Culling the Weak": {
+      "number": 20
+    },
+    "Dark Ritual": {
+      "number": 21
+    },
+    "Dauthi Voidwalker": {
+      "number": 22
+    },
+    "Deathcap Glade": {
+      "number": 23
+    },
+    "Deathrite Shaman": {
+      "number": 24
+    },
+    "Demonic Tutor": {
+      "number": 25
+    },
+    "Diabolic Intent": {
+      "number": 26
+    },
+    "Dina's Guidance": {
+      "number": 27
+    },
+    "Disciple of the Vault": {
+      "number": 28
+    },
+    "Dryad Arbor": {
+      "number": 29
+    },
+    "Elves of Deep Shadow": {
+      "number": 30
+    },
+    "Elvish Mystic": {
+      "number": 31
+    },
+    "Endurance": {
+      "number": 32
+    },
+    "Entomb": {
+      "number": 33
+    },
+    "Eternal Witness": {
+      "number": 34
+    },
+    "Fiend Artisan": {
+      "number": 35
+    },
+    "Footsteps of the Goryo": {
+      "number": 36
+    },
+    "Force of Vigor": {
+      "number": 37
+    },
+    "Forest": {
+      "number": 38
+    },
+    "Fyndhorn Elves": {
+      "number": 39
+    },
+    "Green Sun's Zenith": {
+      "number": 40
+    },
+    "Grim Haruspex": {
+      "number": 41
+    },
+    "Growing Rites of Itlimoc // Itlimoc, Cradle of the Sun": {
+      "number": 42
+    },
+    "Haywire Mite": {
+      "number": 43
+    },
+    "High Market": {
+      "number": 44
+    },
+    "Imperial Seal": {
+      "number": 45
+    },
+    "Lesser Masticore": {
+      "number": 46
+    },
+    "Lightning Greaves": {
+      "number": 47
+    },
+    "Lively Dirge": {
+      "number": 48
+    },
+    "Llanowar Elves": {
+      "number": 49
+    },
+    "Llanowar Wastes": {
+      "number": 50
+    },
+    "Lotus Petal": {
+      "number": 51
+    },
+    "Marionette Apprentice": {
+      "number": 52
+    },
+    "Marsh Flats": {
+      "number": 53
+    },
+    "Melira, Sylvok Outcast": {
+      "number": 54
+    },
+    "Mikaeus, the Unhallowed": {
+      "number": 55
+    },
+    "Misty Rainforest": {
+      "number": 56
+    },
+    "Morbid Opportunist": {
+      "number": 57
+    },
+    "Natural Order": {
+      "number": 58
+    },
+    "Necromancy": {
+      "number": 59
+    },
+    "Nurturing Peatland": {
+      "number": 60
+    },
+    "Overgrown Tomb": {
+      "number": 61
+    },
+    "Phyrexian Altar": {
+      "number": 62
+    },
+    "Phyrexian Arena": {
+      "number": 63
+    },
+    "Phyrexian Delver": {
+      "number": 64
+    },
+    "Phyrexian Tower": {
+      "number": 65
+    },
+    "Protean Hulk": {
+      "number": 66
+    },
+    "Reanimate": {
+      "number": 67
+    },
+    "Sakura-Tribe Elder": {
+      "number": 68
+    },
+    "Shifting Woodland": {
+      "number": 69
+    },
+    "Skullclamp": {
+      "number": 70
+    },
+    "Snuff Out": {
+      "number": 71
+    },
+    "Sol Ring": {
+      "number": 72
+    },
+    "Spore Frog": {
+      "number": 73
+    },
+    "Survival of the Fittest": {
+      "number": 74
+    },
+    "Swamp": {
+      "number": 75
+    },
+    "Sylvan Safekeeper": {
+      "number": 76
+    },
+    "Takenuma, Abandoned Mire": {
+      "number": 77
+    },
+    "Toxic Deluge": {
+      "number": 78
+    },
+    "Undergrowth Stadium": {
+      "number": 79
+    },
+    "Unmarked Grave": {
+      "number": 80
+    },
+    "Urborg, Tomb of Yawgmoth": {
+      "number": 81
+    },
+    "Vampiric Tutor": {
+      "number": 82
+    },
+    "Verdant Catacombs": {
+      "number": 83
+    },
+    "Victimize": {
+      "number": 84
+    },
+    "Viscera Seer": {
+      "number": 85
+    },
+    "Walking Ballista": {
+      "number": 86
+    },
+    "Warren Soultrader": {
+      "number": 87
+    },
+    "Wastewood Verge": {
+      "number": 88
+    },
+    "Woodland Cemetery": {
+      "number": 89
+    },
+    "Yavimaya, Cradle of Growth": {
+      "number": 90
+    },
+    "Yawgmoth, Thran Physician": {
+      "number": 91,
+      "subject": "a gaunt long-haired man in black armour standing at a workbench of vials"
+    },
+    "Zulaport Cutthroat": {
+      "number": 92
+    }
+  },
+  "style": {
+    "name": "ink",
+    "prompt": "dark fantasy manga illustration, black ink on white paper, heavy cross-hatching, dense screentone, black-ink dominant with deep shadows, confident brush-pen linework, grotesque detail, monochrome, no colour",
+    "negative": "colour, color, blurry, low quality, text, watermark, signature, frame, border, soft shading, painterly, photographic, nude, nsfw",
+    "control": "lineart",
+    "control_strength": 0.9,
+    "denoise": 0.9,
+    "steps": 30,
+    "cfg": 6.5,
+    "seed": 11
+  },
+  "size": 92
+}

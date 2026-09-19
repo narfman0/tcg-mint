@@ -69,7 +69,9 @@ A set is a JSON file (see `sets/bls1.json`):
 
 | command | what |
 |---|---|
+| `mint newset` | start a set file from a decklist (commander first); `--style neon|ink|glass` seeds a style block |
 | `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet |
+| `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
 | `mint upscale` | 4× ESRGAN the art through a local ComfyUI; renders pick the result up automatically |
 | `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
@@ -162,7 +164,23 @@ The style block lives in the set JSON:
 Results are cached as `art/<illustration_id>.<style name>.png`; `mint render
 --styled` uses them, falling back to the CSS `art_filter` for cards that
 haven't been restyled yet. Because everything is in the set file, a set's look
-is reproducible and committed — same seed, same prompt, same models.
+is reproducible and committed — same seed, same prompt, same models. Each
+card's seed is derived from the set's, so cards differ but reruns don't.
+
+A card entry can add `"subject": "a red dragon with a blue-finned crest,
+wings spread"` — prepended to the prompt so the style can't drift a character
+into someone else (without it, the stained-glass Niv-Mizzet came out as an
+art-nouveau woman). Commanders and named characters want one.
+
+```sh
+mint newset --code SAT --name "Satoru, ..." --style neon decks/satoru.txt   # sets/sat.json
+mint restyle --set sets/sat.json                                             # ~13 s a card
+mint render  --set sets/sat.json --styled --out proofs
+```
+
+Three recipes ship in `mint newset`: `neon` (canny control), `ink`
+(lineart control, monochrome), `glass` (canny). They are starting points;
+the block in the set file is the source of truth once created.
 
 ### Models
 

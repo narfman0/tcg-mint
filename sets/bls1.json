@@ -4,6 +4,13 @@
   "size": 18,
   "note": "Test set: the priciest cards across satoru, niv and meren, numbered by price rank. Custom 'flavor' entries are placeholders to rewrite; delete a card's 'flavor' key to keep the printed one.",
   "art_filter": "saturate(1.55) contrast(1.18) hue-rotate(-8deg)",
+  "style": {
+    "name": "neon",
+    "prompt": "cyberpunk fantasy illustration, neon-lit rain-slick night city, holographic signage and glowing kanji, chrome and black lacquer, magenta and cyan rim light, volumetric haze, detailed digital painting, dramatic cinematic composition",
+    "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel",
+    "control": "canny", "control_strength": 0.75,
+    "denoise": 0.85, "steps": 28, "cfg": 6, "seed": 7
+  },
   "cards": {
     "Imperial Seal":            {"number": 1, "flavor": "The seal is small. What it opens is not."},
     "Ancient Tomb":             {"number": 2, "flavor": "Every step down costs a little of you. Every step down is worth it."},
