@@ -2,8 +2,10 @@
 
     mint fonts
 
-Font files are not distributed with tcg-mint (they are not ours to
-redistribute); see fonts/README.md for where each one is published.
+Wizards' font files are not distributed with tcg-mint (they are not ours to
+redistribute); see fonts/README.md for where each one is published. The open
+fallbacks (Almendra, Liberation Serif) ship in the package and are listed as
+such rather than as extras.
 """
 import sys
 
@@ -32,12 +34,17 @@ def main(argv=None):
     print(f"fonts dir: {ws.fonts}")
     for family, role in WANT.items():
         if family in have:
-            print(f"  ok       {family:12} {', '.join(have[family])}")
+            print(f"  ok       {family:16} {', '.join(have[family])}")
         else:
-            print(f"  missing  {family:12} {role}")
+            print(f"  missing  {family:16} {role}")
     for family in have:
-        if family not in WANT:
-            print(f"  extra    {family:12} {', '.join(have[family])}")
+        if family not in WANT and family not in frame.PACKAGED_FAMILIES:
+            print(f"  extra    {family:16} {', '.join(have[family])}")
+    packaged, _ = report(frame.FONTS)
+    for family, role in frame.PACKAGED_FAMILIES.items():
+        src = have.get(family) or packaged.get(family) or []
+        where = "yours" if family in have else "packaged"
+        print(f"  fallback {family:16} {role}: {', '.join(src)} ({where})")
     if missing:
-        print("\nmissing faces fall back to Google Fonts substitutes; see fonts/README.md")
+        print("\nmissing faces use the packaged open fallbacks; see fonts/README.md for the real ones")
     return 1 if missing else 0

@@ -68,6 +68,39 @@ def test_recipe_hash_changes_with_any_knob():
     assert sets.recipe_hash(st.recipe(alpha)) != h
 
 
+def test_save_then_load_is_equal_and_picks_up_css(tmp_path):
+    st = sets.from_dict({"code": "TST", "name": "n", "size": 2, "note": "hi", "art_filter": "sepia(1)",
+                         "cards": {"Alpha": {"number": 1, "flavor": "f", "art": "a.png", "printing": "rvr:40"},
+                                   "Beta": None}})
+    fn = tmp_path / "sets" / "tst.json"   # the directory is created
+    sets.save(fn, st)
+    assert st.path == fn and not fn.with_suffix(".json.part").exists()
+    (tmp_path / "sets" / "tst.css").write_text(".name { color: red }")
+    back = sets.load(fn)
+    assert back == st and back.path == fn and back.css == ".name { color: red }"
+    assert back.cards["Beta"] == sets.CardEntry() and back.to_dict() == st.to_dict()
+    # a plain dict saves too
+    sets.save(fn, {"code": "X"})
+    assert sets.load(fn).code == "X"
+
+
+def test_from_dict_rejects_bad_shapes():
+    with pytest.raises(SetError, match="cards must be an object"):
+        sets.from_dict({"code": "T", "cards": [{"number": 1}]})
+    with pytest.raises(SetError, match="needs a code"):
+        sets.from_dict({"name": "no code"})
+    with pytest.raises(SetError, match="expected an object"):
+        sets.from_dict({"code": "T", "cards": {"Alpha": 1}})
+
+
+def test_load_errors_name_the_file(tmp_path):
+    with pytest.raises(SetError, match="no set file"):
+        sets.load(tmp_path / "missing.json")
+    (tmp_path / "bad.json").write_text("{")
+    with pytest.raises(SetError, match="not valid JSON"):
+        sets.load(tmp_path / "bad.json")
+
+
 def test_card_lookup_by_face_or_full_name():
     st = sets.from_dict({"code": "T", "cards": {"Front // Back": {"number": 3}}})
     assert st.card({"name": "Front", "full_name": "Front // Back"}).number == 3

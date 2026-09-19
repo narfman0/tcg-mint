@@ -13,7 +13,10 @@ directory). They are picked up by filename: `Beleren-Bold.ttf`,
 
 These are Wizards of the Coast / Monotype / Emigre property; use them for
 personal proxies only. Without them the `wizards` theme substitutes the
-closest open faces from Google Fonts (Almendra, Liberation Serif / Tinos).
+closest open faces, which ship with the package under `mint/fonts/`
+(Almendra Bold for titles, Liberation Serif for rules text; both SIL OFL),
+so a render never needs the network for fonts. A face you put here always
+wins over the packaged one of the same family.
 
 ## If Chromium refuses a font
 

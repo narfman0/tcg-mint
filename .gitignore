@@ -11,6 +11,7 @@ symbols/
 out/
 *.png
 !docs/*.png
+!tests/golden/*.png
 
 # fonts are not ours to redistribute; fonts/README.md says where they live
 fonts/*

@@ -31,7 +31,7 @@ Repository = "https://github.com/narfman0/tcg-mint"
 packages = ["mint"]
 
 [tool.setuptools.package-data]
-mint = ["*.html", "web/static/*"]
+mint = ["*.html", "fonts/*", "web/static/*"]
 
 [tool.ruff]
 line-length = 130
@@ -43,4 +43,5 @@ ignore = ["E731", "B905"]  # named lambdas and plain zip() are used deliberately
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # tests import tests.conftest helpers
 markers = ["render: needs a Playwright Chromium"]

@@ -1,4 +1,6 @@
 """Pure functions of the frame: no browser, no network, no card file."""
+import re
+
 from mint import frame
 from tests.conftest import synthetic_card
 
@@ -36,15 +38,91 @@ def test_esc():
 
 def test_font_link_is_empty_when_all_local():
     assert frame.font_link(["Beleren", "MPlantin"]) == ""
-    assert "fonts.googleapis.com" in frame.font_link(["Beleren", "Almendra"])
+    assert frame.font_link(["Almendra", "Liberation Serif"]) == ""
+    link = frame.font_link(["Beleren", "Cinzel", "EB Garamond", "Cinzel"])
+    assert "fonts.googleapis.com" in link and "Beleren" not in link and link.count("Cinzel") == 1
+
+
+def test_wizards_theme_never_links_google_fonts(card, art):
+    title, body = frame.THEMES["wizards"]
+    assert set(title + body) <= frame.LOCAL_FAMILIES
+    html = frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, fonts_css=frame.local_fonts("/nowhere"))
+    assert "fonts.googleapis.com" not in html and "Almendra-Bold.ttf" in html
+    assert "fonts.googleapis.com" in frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, theme="cinzel")
 
 
 def test_font_files_parse_names(tmp_path):
-    for fn in ["Beleren-Bold.ttf", "Mplantin.ttf", "Mplantin-Italic.ttf", "Matrix-Bold.ttf", "notes.txt"]:
+    for fn in ["Beleren-Bold.ttf", "Mplantin.ttf", "Mplantin-Italic.ttf", "Matrix-Bold.ttf", "notes.txt",
+               "Almendra-Bold.ttf", "LiberationSerif-Regular.ttf", "LiberationSerif-Italic.ttf", "Tinos-Italic.ttf"]:
         (tmp_path / fn).write_bytes(b"")
     got = {(f, w, s) for f, w, s, _ in frame.font_files(tmp_path)}
     assert got == {("Beleren", 700, "normal"), ("MPlantin", 400, "normal"), ("MPlantin", 400, "italic"),
-                   ("Matrix Bold", 700, "normal")}
+                   ("Matrix Bold", 700, "normal"), ("Almendra", 700, "normal"),
+                   ("Liberation Serif", 400, "normal"), ("Liberation Serif", 400, "italic"), ("Tinos", 400, "italic")}
+
+
+def test_packaged_fonts_are_present_with_licenses():
+    faces = {(f, w, s): fn for f, w, s, fn in frame.font_files(frame.FONTS)}
+    assert set(faces) == {("Almendra", 700, "normal"), ("Liberation Serif", 400, "normal"),
+                          ("Liberation Serif", 400, "italic")}
+    assert all(fn.stat().st_size > 10_000 and fn.read_bytes()[:4] == b"\x00\x01\x00\x00" for fn in faces.values())
+    assert {f for f, *_ in faces} == set(frame.PACKAGED_FAMILIES) <= frame.LOCAL_FAMILIES
+    assert (frame.FONTS / "Almendra-OFL.txt").exists() and (frame.FONTS / "LiberationSerif-LICENSE.txt").exists()
+    assert sum(fn.stat().st_size for fn in frame.FONTS.iterdir()) < 1_500_000
+
+
+def test_local_fonts_workspace_first_then_packaged(tmp_path):
+    (tmp_path / "Beleren-Bold.ttf").write_bytes(b"")
+    (tmp_path / "Almendra-Bold.ttf").write_bytes(b"")
+    rules = frame.local_fonts(tmp_path).split("\n")
+    fams = [re.search(r"font-family: '(.*?)'", r).group(1) for r in rules]
+    assert fams == ["Almendra", "Beleren", "Liberation Serif", "Liberation Serif"]
+    assert f"file://{tmp_path}/Almendra-Bold.ttf" in rules[0]  # yours, not the packaged one
+    assert all(str(frame.FONTS) in r for r in rules[2:])
+    assert "format('truetype'); font-weight: 400; font-style: italic;" in "\n".join(rules[2:])
+    assert frame.local_fonts(tmp_path / "missing").count("@font-face") == 3
+
+
+class FakeSymbols:
+    """frame.Symbols without Scryfall: {T} -> data:sym/T."""
+    def data_uri(self, sym):
+        return "data:sym/" + sym.strip("{}")
+
+
+def test_render_text_symbols_and_nowrap():
+    html = frame.render_text(synthetic_card(type_line="Land — Fixture", oracle_text="{T}: Add {G}{G}.", flavor_text=None),
+                             FakeSymbols())
+    assert html == ('<p><span class="nowrap"><img class="sym" src="data:sym/T">:</span> Add '
+                    '<span class="nowrap"><img class="sym" src="data:sym/G"><img class="sym" src="data:sym/G">.</span></p>')
+
+
+def test_render_text_basic_land_gets_the_big_symbol():
+    text = "({T}: Add {G}.)"
+    basic = synthetic_card(type_line="Basic Land — Forest", oracle_text=text)
+    assert frame.render_text(basic, FakeSymbols()) == '<p class="big-sym"><span class="pip"><img src="data:sym/G"></span></p>'
+    # the same line on a non-basic land is ordinary reminder text
+    html = frame.render_text(synthetic_card(type_line="Land — Fixture", oracle_text=text, flavor_text=None), FakeSymbols())
+    assert html.startswith('<p><span class="reminder">(<span class="nowrap"><img class="sym" src="data:sym/T">:</span>')
+    assert "big-sym" not in html
+
+
+def test_render_text_reminder_inside_a_line_with_symbols():
+    card = synthetic_card(oracle_text="Equip {2} ({2}: Fasten this to a creature you control.)", flavor_text=None)
+    html = frame.render_text(card, FakeSymbols())
+    assert html == ('<p>Equip <span class="nowrap"><img class="sym" src="data:sym/2"></span> '
+                    '<span class="reminder">(<span class="nowrap"><img class="sym" src="data:sym/2">:</span> '
+                    'Fasten this to a creature you control.)</span></p>')
+
+
+def test_render_text_flavor_only():
+    html = frame.render_text(synthetic_card(oracle_text="", flavor_text="Just *this*."), FakeSymbols())
+    assert html == '<p class="flavor">Just <span class="upright">this</span>.</p>'
+    assert frame.render_text(synthetic_card(oracle_text=None, flavor_text=None), FakeSymbols()) == ""
+
+
+def test_render_text_escapes_markup():
+    html = frame.render_text(synthetic_card(oracle_text="<b> & {T}", flavor_text="a < b"), FakeSymbols())
+    assert "&lt;b&gt; &amp; " in html and '<p class="flavor">a &lt; b</p>' in html
 
 
 def test_build_html_substitutes_everything(card, art):

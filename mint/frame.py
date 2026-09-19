@@ -7,8 +7,11 @@ no card file, and no network except the mana-symbol SVGs, which are fetched
 into symbols/ once and inlined as data URIs.
 
 Fonts: drop Wizards' faces into fonts/ (Beleren-Bold.ttf, Mplantin.ttf,
-Matrix-Bold.ttf ...) and the "wizards" theme picks them up by filename; the
-fallbacks are the closest open faces from Google Fonts.
+Matrix-Bold.ttf ...) and the "wizards" theme picks them up by filename. The
+closest open faces -- Almendra Bold for titles, Liberation Serif for rules
+text, both OFL -- ship in the package (mint/fonts/), so the "wizards" theme
+renders the same everywhere, offline, with no Google Fonts request. The other
+themes still link Google Fonts.
 """
 import base64
 import json
@@ -21,10 +24,10 @@ from . import PKG, scryfall
 
 # Font stacks: (title, body). Local families first, then Google Fonts fallbacks.
 # The "wizards" stack is Beleren (M15 title face) -> Matrix Bold (the 2003-2014
-# title face) -> Almendra; MPlantin (rules text) -> Liberation Serif (Times,
-# which descends from Plantin) -> Tinos.
+# title face) -> Almendra (packaged); MPlantin (rules text) -> Liberation Serif
+# (packaged; Times, which descends from Plantin). Every face in it is local.
 THEMES = {
-    "wizards":   (["Beleren", "Matrix Bold", "Almendra"], ["MPlantin", "Liberation Serif", "Tinos"]),
+    "wizards":   (["Beleren", "Matrix Bold", "Almendra"], ["MPlantin", "Liberation Serif"]),
     "cinzel":    (["Cinzel"], ["EB Garamond"]),
     "cormorant": (["Cormorant SC"], ["Crimson Pro"]),
     "alegreya":  (["Alegreya SC"], ["Alegreya"]),
@@ -32,7 +35,10 @@ THEMES = {
     "marcellus": (["Marcellus"], ["Libre Baskerville"]),
     "spectral":  (["Spectral SC"], ["Spectral"]),
 }
-LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", "Liberation Serif"}  # never ask Google for these
+# the open fallbacks that ship with the package (mint/fonts/), by family
+FONTS = PKG / "fonts"
+PACKAGED_FAMILIES = {"Almendra": "title fallback", "Liberation Serif": "rules text fallback"}
+LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", *PACKAGED_FAMILIES}  # never ask Google for these
 
 # M15 frame palette: (frame, frame-dark, bar, bar-edge, text box)
 FRAMES = {
@@ -99,7 +105,8 @@ class Symbols:
 def font_files(fonts_dir):
     """(family, weight, style, path) for every font file in fonts/, keyed off
     the filename: Beleren-Bold.ttf -> Beleren 700; Mplantin-Italic.ttf -> MPlantin italic."""
-    known = {"beleren": "Beleren", "matrix": "Matrix Bold", "mplantin": "MPlantin"}
+    known = {"beleren": "Beleren", "matrix": "Matrix Bold", "mplantin": "MPlantin",
+             "almendra": "Almendra", "liberationserif": "Liberation Serif", "tinos": "Tinos"}
     out = []
     fonts_dir = Path(fonts_dir)
     if not fonts_dir.is_dir():
@@ -117,12 +124,17 @@ def font_files(fonts_dir):
 
 
 def local_fonts(fonts_dir):
-    """@font-face rules for whatever is in fonts/."""
+    """@font-face rules for whatever is in fonts/, then for the packaged fallbacks.
+    A family the workspace provides is not repeated from the package, so your
+    copy of a face always wins over ours."""
     fmt = {".ttf": "truetype", ".otf": "opentype", ".woff": "woff", ".woff2": "woff2"}
+    faces = font_files(fonts_dir)
+    mine = {family for family, _, _, _ in faces}
+    faces += [f for f in font_files(FONTS) if f[0] not in mine]
     return "\n".join(
         f"@font-face {{ font-family: '{family}'; src: url('file://{fn}') format('{fmt[fn.suffix.lower()]}'); "
         f"font-weight: {weight}; font-style: {style}; }}"
-        for family, weight, style, fn in font_files(fonts_dir))
+        for family, weight, style, fn in faces)
 
 
 def font_link(families):
@@ -196,7 +208,7 @@ def render_text(card, symbols, flavor=None):
     if card["type_line"].startswith("Basic") and m:
         return f'<p class="big-sym"><span class="pip"><img src="{symbols.data_uri(m.group(1))}"></span></p>'
     paras = []
-    for p in text.split("\n"):
+    for p in text.split("\n") if text else []:  # a vanilla card has no rules paragraph, only its flavor
         p = ability_word(syms(p))
         p = re.sub(r"\(([^)]*)\)", r'<span class="reminder">(\1)</span>', p)
         # a run of symbols plus any trailing punctuation wraps as one unit
