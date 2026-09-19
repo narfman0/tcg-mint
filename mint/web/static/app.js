@@ -225,7 +225,7 @@ function board() {
   const filters = ['no restyle', ...(state.style !== 'current' ? [`no ${state.style}`] : []), 'not rendered', 'text shrunk', 'UB art', 'own art'];
   $('#main').innerHTML = `
     <div class="row"><h1>${esc(code)} <span class="muted">${esc(st.name)}</span></h1>
-      ${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>`}
+<button class="pill" id="gallery" title="flip through the cards full-screen">gallery</button>${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>`}
       <span class="muted">${st.cards_detail.length} cards${all ? ` across ${st.sets.length} sets` : ''}${st.style && !all ? ` · style ${esc(st.style.name)}` : ''}${st.base && !all ? ` · from <b>${esc(st.base)}</b>` : ''}${all ? '' : ` · <span class="mono">${esc(st.path)}</span>`}</span></div>
     <div class="toolbar">
       <span class="seg">${['plain', 'styled'].map(m => `<button data-mode="${m}" class="${state.mode === m ? 'on' : ''}">${m}</button>`).join('')}</span>
@@ -251,11 +251,12 @@ function board() {
       t.onclick = e => {
         const name = t.dataset.name;
         if (e.shiftKey || e.ctrlKey || e.metaKey) { sel.has(name) ? sel.delete(name) : sel.add(name); board(); }
-        else { V.fromPage = true; location.hash = viewHash(t.dataset.set, name); }
+        else location.hash = `#/set/${t.dataset.set}/card/${encodeURIComponent(name)}`;
       };
     });
   };
   grid();
+  $('#gallery').onclick = () => { const cs = boardCards(); if (!cs.length) return toast('nothing to show'); V.fromPage = true; location.hash = viewHash(setOf(cs[0]), cs[0].name); };
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; board(); });
   document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { state.show = b.dataset.show; board(); });
   if ($('#style')) $('#style').onchange = e => { state.style = e.target.value; board(); };
