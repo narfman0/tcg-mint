@@ -77,10 +77,11 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   border: 1.2px solid #000; border-radius: 4px; box-shadow: inset 0 0 0 0.8px var(--bar-edge);
   font-family: var(--title-font); font-size: 12px; font-weight: 700; text-align: center; }
 .pt span { position: relative; top: var(--pt-dy); display: block; line-height: 19.5px; }
-/* one thin line on the bottom border, below the P/T box (which ends at 335) */
+/* collector info: two rows on the left (number, then set/language/artist); the mint credit
+   only on the bottom row, on the right, so it stays below the P/T box (which ends at 335) */
 .footer { position: absolute; left: 12px; right: 12px; bottom: 4px; color: rgba(255,255,255,.72);
-  font-family: var(--body-font); font-size: 5px; line-height: 1; white-space: nowrap;
-  display: flex; justify-content: space-between; letter-spacing: .02em; }
+  font-family: var(--body-font); font-size: 5px; line-height: 1.25; white-space: nowrap;
+  display: flex; justify-content: space-between; align-items: flex-end; letter-spacing: .02em; }
 .footer b { font-weight: 700; color: rgba(255,255,255,.85); }
 .footer .brush { font-family: var(--title-font); }
 </style>
@@ -97,7 +98,7 @@ $set_css
   <div class="textbox $text_class" id="text">$text</div>
   $pt
   <div class="footer">
-    <span><b>$number/$set_size $rarity</b> · $set_code · EN · <span class="brush">✎</span> $artist</span>
+    <span><b>$number/$set_size $rarity</b><br>$set_code · EN · <span class="brush">✎</span> $artist</span>
     <span><b>$maker_code</b> · $maker · $date · $orig_set #$orig_number</span>
   </div>
 </div>

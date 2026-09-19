@@ -268,7 +268,7 @@ def build_html(card, theme, table, number, set_code, set_size, override, art_fil
     )
 
 
-def render(page, html, out):
+def render(page, html, out, fit=True):
     # Chromium needs a file:// page for the file:// art and font references to resolve
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
         f.write(html)
@@ -277,7 +277,8 @@ def render(page, html, out):
         # network to go quiet, then for the font set to settle, *then* fit text
         page.goto("file://" + f.name, wait_until="networkidle")
         page.evaluate("document.fonts.ready")
-        page.evaluate("fit()")
+        if fit:
+            page.evaluate("fit()")
         page.screenshot(path=out, clip={"x": 0, "y": 0, **PAGE})
     finally:
         os.unlink(f.name)

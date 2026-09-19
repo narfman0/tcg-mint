@@ -11,6 +11,7 @@ COMMANDS = {
     "upscale":   ("4x-upscale card art through a local ComfyUI", "upscale"),
     "restyle":   ("regenerate card art in the set's style through ComfyUI", "restyle"),
     "fonts":     ("report which frame fonts are present", "fonts"),
+    "back":      ("render the BLS card back", "back"),
     "impose":    ("lay rendered PNGs out 3x3 on a printable PDF", "impose"),
     "print":     ("send a PDF to the printer at true 100%", "printing"),
 }
