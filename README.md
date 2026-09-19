@@ -136,7 +136,7 @@ A local page over the workspace, for comparing and deciding:
   through the board in its current order, wheel / pinch / drag zoom and pan,
   `s` `p` `a` switch styled / plain / art, `c` opens compare, `f` fullscreen.
 - **Card** (`c`, or click a tile) — type, printing and subject up top, then
-  three parts in pipeline order. *Generate*: one mode (restyle, repose, new)
+  three parts in pipeline order. *Generate*: one mode (restyle, repose, new, inspire)
   and only that mode's inputs — the look, what the picture starts from or
   takes its pose from, the seed, how many takes — all of them this card's
   own overrides, with a reset back to the set's. *Images*: the Scryfall crop,
@@ -147,7 +147,7 @@ A local page over the workspace, for comparing and deciding:
   uses — with the renders and their buttons.
   A restyled variant offers *keep* — it becomes the card's styled art (the
   entry's `pick`), whatever the recipe says — and *enhance*; a menu on every
-  image holds *restyle from this*, *repose from this*, *pin its seed*,
+  image holds *restyle / inspire from this*, *repose from this*, *pin its seed*,
   *make the set style from this* and *delete*.
 - **Edit** — the set file as a form: its own fields (code, name, size, note,
   art filter, restyle base), the style block (edit the knobs, replace it
@@ -271,7 +271,7 @@ never changes another's; sets migrated from before this carry
 `"seed_rule": "position"` so their existing images stay current.
 
 `"remix"` in the style block (or per card) is what a restyle keeps of the
-picture it starts with — three modes: **`restyle`** redraws it in the style
+picture it starts with — four modes: **`restyle`** redraws it in the style
 (img2img + ControlNet, the default); **`repose`** is a fresh picture that
 holds only an OpenPose skeleton — read from the card's `"pose"` image (a
 variant hash, or a path to any picture), else its base — at
@@ -280,7 +280,16 @@ clothes, hair and background are new, and a different pose image moves
 the joints (a canny / lineart / depth map *is* the pose, whatever the
 strength, which is why a restyle never moves a figure); **`new`** is a new scene from the prompt alone,
 with the card's `subject` line (else its name and type line) as the only
-thread back to the original. `"refine": 0.4` adds a second sampling pass at
+thread back to the original; **`inspire`** is a new scene with the base as
+an IP-Adapter reference — its look, palette and character carry over as if
+they were part of the prompt, nothing holds its layout, and the words
+decide the pose and the scene — at `inspire_weight` (0.7) until
+`inspire_end` (0.8) of the steps, `inspire_type` `standard`, `prompt first`
+(the words settle the composition before the image weighs in) or `style`
+(the look without the subject). inspire needs the ComfyUI_IPAdapter_plus
+node pack with `ip-adapter-plus_sdxl_vit-h.safetensors` in
+`models/ipadapter` and `CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors` in
+`models/clip_vision`. `"refine": 0.4` adds a second sampling pass at
 1.5× the size for detail, and `"clip_skip": 2` is what Pony-family
 checkpoints want.
 

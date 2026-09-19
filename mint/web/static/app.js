@@ -10,7 +10,9 @@ const snapW = w => STATIC ? [320, 640, 1280].filter(x => x <= Math.max(320, STAT
 const img = (path, w = 320) => STATIC ? (STATIC.thumbs[`${path}|${snapW(w)}`] || STATIC.thumbs[`${path}|320`] || '') : `/img?path=${encodeURIComponent(path)}&w=${w}`;
 const file = path => STATIC ? img(path, 1280) : `/file?path=${encodeURIComponent(path)}`;
 const short = h => h ? h.slice(0, 8) : '';
-const REMIX = {restyle: 'same picture, redrawn', repose: 'new picture in the pose image\'s pose', new: 'from the prompt alone'};
+const REMIX = {restyle: 'same picture, redrawn', repose: 'new picture in the pose image\'s pose', new: 'from the prompt alone',
+               inspire: 'new picture inspired by the base: its look and character, the words decide the pose and scene'};
+const REMIX_BADGE = {repose: 'repose', new: 'new scene', inspire: 'inspired'};
 
 /* mode: plain or styled art on a board tile; show: the art alone or the whole rendered card (when
    there is one); style: which restyle label a styled tile shows ('current' = the set's own recipe,
@@ -201,7 +203,7 @@ function badges(c) {
   if (c.base_missing) b.push(['warn', `no ${c.base_missing} to start from`]);
   if (c.entry.seed != null) b.push(['accent', 'seed pinned']);
   const remix = c.entry.remix || styleOf(c)?.remix || 'restyle';
-  if (remix !== 'restyle') b.push(['accent', remix === 'repose' ? 'repose' : 'new scene']);
+  if (remix !== 'restyle') b.push(['accent', REMIX_BADGE[remix] || remix]);
   if (!c.renders?.plain && !c.renders?.styled) b.push(['', 'not rendered']);
   return b.map(([k, t]) => `<span class="badge ${k}">${esc(t)}</span>`).join('');
 }
@@ -608,13 +610,13 @@ function columnHtml(x, c) {
   if (x.kind === 'restyle') acts = `
       <button class="small ${x.picked ? 'on' : ''}" data-act="${x.picked ? 'unpick' : 'keep'}" data-arg="${x.key}" title="${x.picked ? 'back to whatever the recipe makes' : 'make this the card\'s styled art, whatever the recipe says'}">${x.picked ? 'kept ✓' : 'keep'}</button>
       ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="${x.key}">enhance</button>`}
-      ${menu([['base', x.key, 'restyle from this'], ['pose', x.key, 'repose from this'],
+      ${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this'],
               ...(x.recipe?.seed != null && c.entry.seed !== x.recipe.seed ? [['pin', x.recipe.seed, `pin its seed ${x.recipe.seed}`]] : []),
               ['promote', x.key, 'make the set style from this'], ['delete', x.key, 'delete']])}`;
   else if (x.kind === 'crop') acts = `
       ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="crop">enhance</button>`}
-      ${menu([['base', 'crop', 'restyle from this'], ['pose', 'crop', 'repose from this']])}`;
-  else if (x.kind === 'enhance') acts = menu([['base', x.key, 'restyle from this'], ['pose', x.key, 'repose from this'], ['delete', x.key, 'delete']]);
+      ${menu([['base', 'crop', 'restyle / inspire from this'], ['pose', 'crop', 'repose from this']])}`;
+  else if (x.kind === 'enhance') acts = menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this'], ['delete', x.key, 'delete']]);
   else acts = `<button class="small" data-act="render-${x.which}" data-arg="">re-render</button><button class="small" data-act="delete-render" data-arg="${esc(x.file)}">delete</button>`;
   return `
       <div class="col ${x.styled ? 'styled' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
@@ -642,9 +644,13 @@ function generatePanel(c, cols) {
     : `<span class="muted">fresh each run, so every click is another take</span> <button class="small" id="pinseed" title="pin the derived seed ${c.recipe?.seed ?? ''}, the one a batch restyle from the board uses">pin the set's</button>`;
   const hint = tpl === null ? `<span class="warn">${esc(lookTitle(style))}</span>`
     : takes === 1 && e.seed != null && tpl === undefined ? (c.current ? `<span class="muted">already made: <span class="mono">${c.current.hash}</span></span>` : `<span class="muted">makes <span class="mono">${c.style_hash}</span></span>`) : '';
-  const rows = mode === 'restyle' ? `
-        <span title="the image the restyle redraws">from</span><span class="row"><select id="from">${imgOpts(e.base || '', ['', `set's: ${setBase}`])}</select>
-          ${c.base_missing ? `<span class="warn">no ${esc(c.base_missing)} variant on this card yet</span>` : ''}</span>`
+  const ipa = !!state.ws?.comfy?.ipadapter;
+  const fromRow = title => `
+        <span title="${title}">from</span><span class="row"><select id="from">${imgOpts(e.base || '', ['', `set's: ${setBase}`])}</select>
+          ${c.base_missing ? `<span class="warn">no ${esc(c.base_missing)} variant on this card yet</span>` : ''}</span>`;
+  const rows = mode === 'restyle' ? fromRow('the image the restyle redraws')
+    : mode === 'inspire' ? fromRow('the image the new picture is inspired by: its look, palette and character, not its layout') + (ipa ? '' : `
+        <span></span><span class="warn">ComfyUI has no IP-Adapter nodes: install ComfyUI_IPAdapter_plus, the SDXL ip-adapter-plus vit-h weights and the CLIP ViT-H image encoder, then restart it</span>`)
     : mode === 'repose' ? `
         <span title="the image whose OpenPose skeleton the new picture takes; only the joints are kept">pose</span><span class="row"><select id="posesel">${imgOpts(isPath(e.pose) ? 'path' : e.pose || '', ['', `the from image: ${from}`])}<option value="path" ${isPath(e.pose) ? 'selected' : ''}>an image file…</option></select>
           <input type="text" id="posepath" value="${isPath(e.pose) ? esc(e.pose) : ''}" placeholder="path to any image" style="width:20em" ${isPath(e.pose) ? '' : 'hidden'}></span>`
@@ -654,11 +660,11 @@ function generatePanel(c, cols) {
     <details class="sect gen" id="gen" ${state.genOpen ? 'open' : ''}>
       <summary><h2>generate</h2><span class="muted">${esc(mode)} as ${esc(lookName || '?')}${overrides.length ? ` · this card's own ${overrides.join(', ')}` : ''}</span></summary>
       <div class="kv">
-        <span>mode</span><span class="row"><span class="seg">${Object.keys(REMIX).map(m => `<button data-mode="${m}" class="${mode === m ? 'on' : ''}" title="${esc(REMIX[m])}${m === (style?.remix || 'restyle') ? ' (the style\'s default)' : ''}">${m}</button>`).join('')}</span><span class="muted">${esc(REMIX[mode])}</span></span>
+        <span>mode</span><span class="row"><span class="seg">${Object.keys(REMIX).map(m => `<button data-mode="${m}" class="${mode === m ? 'on' : ''}" ${m === 'inspire' && !ipa && mode !== m ? 'disabled' : ''} title="${esc(REMIX[m])}${m === (style?.remix || 'restyle') ? ' (the style\'s default)' : ''}${m === 'inspire' && !ipa ? ' -- needs the IP-Adapter nodes in ComfyUI' : ''}">${m}</button>`).join('')}</span><span class="muted">${esc(REMIX[mode])}</span></span>
         <span>look</span><span class="row">${lookPicker('style', st.cards_detail, style)}</span>${rows}
         <span>seed</span><span class="row">${seedRow}</span>
         <span>takes</span><span class="row">${takesPicker()}${takes > 1 ? `<label title="drafts skip the ESRGAN pass, a large share of a take's time; enhance the one you keep"><input type="checkbox" id="upscale" ${state.upscale ? 'checked' : ''}> ESRGAN pass</label>` : ''}</span>
-        <span></span><span class="row"><button class="primary" data-cjob="restyle" ${tpl === null ? 'disabled' : ''}>${esc(mode)} as ${esc(lookName || '?')}${takes > 1 ? ` ×${takes}` : ''}</button>${hint}
+        <span></span><span class="row"><button class="primary" data-cjob="restyle" ${tpl === null || (mode === 'inspire' && !ipa) ? 'disabled' : ''}>${esc(mode)} as ${esc(lookName || '?')}${takes > 1 ? ` ×${takes}` : ''}</button>${hint}
           ${overrides.length ? `<button class="small" id="resetentry" title="clear this card's own ${overrides.join(', ')}">reset to the set's</button>` : ''}</span>
       </div>
     </details>`;
@@ -899,7 +905,7 @@ function lab() {
     api(`/api/sets/${code}/promote`, {method: 'POST', body: {name, hash}}).then(() => { toast('set style updated'); refresh(); }).catch(e => toast(e.message, true));
   });
 }
-const KNOBS = ['control', 'control_strength', 'control_end', 'repose_strength', 'repose_end', 'remix', 'denoise', 'steps', 'cfg', 'sampler', 'scheduler', 'checkpoint', 'controlnet', 'loras', 'width', 'height', 'grayscale_source', 'negative'];
+const KNOBS = ['control', 'control_strength', 'control_end', 'repose_strength', 'repose_end', 'inspire_weight', 'inspire_end', 'inspire_type', 'remix', 'denoise', 'steps', 'cfg', 'sampler', 'scheduler', 'checkpoint', 'controlnet', 'loras', 'width', 'height', 'grayscale_source', 'negative'];
 function sameKnobs(a, b) { return KNOBS.every(k => JSON.stringify(a?.[k]) === JSON.stringify(b?.[k])) && stripSubject(a?.prompt) === stripSubject(b?.prompt); }
 function stripSubject(p) { return (p || '').split(', ').slice(-1)[0]; }
 function labSummary(recipe, st) {
@@ -962,8 +968,10 @@ const FIELD_HELP = {
   controlnet: 'the ControlNet model file', upscaler: 'the ESRGAN model file', loras: 'JSON: [{"name": "x.safetensors", "strength": 0.7}]',
   width: 'generation width', height: 'generation height', grayscale_source: 'desaturate the base first (for ink styles)',
   refine: 'a second pass at refine_scale x the size with this denoise; 0 = off', refine_scale: '1-3',
-  clip_skip: '1 = the checkpoint\'s CLIP; 2 for Pony-family checkpoints', remix: 'restyle: redraw the base; repose: a new picture holding only the pose image\'s skeleton; new: from the prompt alone',
+  clip_skip: '1 = the checkpoint\'s CLIP; 2 for Pony-family checkpoints', remix: 'restyle: redraw the base; repose: a new picture holding only the pose image\'s skeleton; new: from the prompt alone; inspire: a new picture with the base as an IP-Adapter reference',
   repose_strength: 'repose only: how hard the OpenPose skeleton is held (0-1)', repose_end: 'repose only: the fraction of the steps the skeleton is held for',
+  inspire_weight: 'inspire only: the reference image\'s weight against the words (0-2; 0.7 is a start)', inspire_end: 'inspire only: the fraction of the steps the image is read for',
+  inspire_type: 'inspire only: standard; prompt first (the words settle the composition before the image weighs in); style (its look, not its subject)',
 };
 function fieldInput(f, v) {
   if (f.choices) return `<select data-f="${f.name}">${f.choices.map(c => `<option ${v === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;

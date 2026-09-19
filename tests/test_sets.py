@@ -248,3 +248,34 @@ def test_pick_names_the_styled_art_over_the_recipe(tmp_path):
     assert nostyle.styled_hash(alpha) == "deadbeef" and nostyle.styled_hash({"name": "Beta"}) is None
     with pytest.raises(SetError, match="pick should be a variant hash"):
         sets.from_dict({"code": "N", "name": "n", "cards": {"Alpha": {"pick": "spore"}}})
+
+
+def test_inspire_reads_the_base_through_an_ip_adapter_and_no_controlnet():
+    """inspire: an empty latent, the words, and the base as an image prompt. Its knobs are in
+    its recipe alone, and the ControlNet / img2img knobs are out of it, so no other mode's hash moves."""
+    from mint import restyle
+    alpha = {"name": "Alpha", "illustration_id": "a", "type_line": "Creature — Test"}
+    plain = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p"}})
+    r0 = plain.recipe(alpha)
+    assert not any(k.startswith("inspire_") for k in r0)
+    st = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "remix": "inspire"}})
+    r = st.recipe(alpha)
+    assert r["remix"] == "inspire" and r["base"] == "crop" and r["prompt"] == "a dog, p"
+    assert (r["inspire_weight"], r["inspire_end"], r["inspire_type"]) == (0.7, 0.8, "standard")
+    assert not any(k in r for k in ("control", "control_strength", "control_end", "controlnet", "denoise"))
+    beta = {"name": "Beta", "illustration_id": "b", "type_line": "Creature — Test"}
+    assert st.recipe(beta)["prompt"] == "Beta, Creature — Test, p"  # no subject: the card itself sets the scene
+    w = restyle.workflow("x.png", r, "p")
+    assert w["1"]["inputs"]["image"] == "x.png" and "3" not in w and "11" not in w  # read, not preprocessed
+    assert w["30"]["class_type"] == "IPAdapterUnifiedLoader" and w["31"]["inputs"]["image"] == ["2", 0]
+    assert (w["31"]["inputs"]["weight"], w["31"]["inputs"]["end_at"], w["31"]["inputs"]["weight_type"]) == (0.7, 0.8, "standard")
+    assert w["13"]["inputs"]["model"] == ["31", 0] and w["13"]["inputs"]["positive"] == ["7", 0]
+    assert w["12"]["class_type"] == "EmptyLatentImage" and w["13"]["inputs"]["denoise"] == 1.0
+    st2 = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "remix": "inspire", "inspire_type": "prompt first", "refine": 0.4}})
+    w2 = restyle.workflow("x.png", st2.recipe(alpha), "p")
+    assert w2["31"]["inputs"]["weight_type"] == "prompt is more important" and w2["22"]["inputs"]["model"] == ["31", 0]
+    assert sets.recipe_hash(st2.recipe(alpha)) != sets.recipe_hash(r)
+    with pytest.raises(SetError, match="inspire_type"):
+        sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "inspire_type": "vibes"}})
+    with pytest.raises(SetError, match="inspire_weight"):
+        sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "inspire_weight": 3}})

@@ -44,6 +44,15 @@ the old ones stay for comparison.
     new      an empty latent and the prompt alone -- no base image at all.
              The card's subject line is the only thread back to the original;
              without one the card's name and type line stand in for it.
+    inspire  an empty latent, the prompt, and the base as an IP-Adapter
+             reference at inspire_weight until inspire_end of the steps: the
+             picture's look, palette and character carry over as if they were
+             part of the prompt, and nothing holds its layout, so the words
+             (the subject line: who, the pose, the scene) decide the rest.
+             inspire_type "prompt first" lets the words settle the composition
+             before the image weighs in; "style" takes the look and not the
+             subject. Needs the ComfyUI_IPAdapter_plus nodes, the SDXL
+             ip-adapter-plus vit-h weights and the CLIP ViT-H image encoder.
 
 Output is 2x the generation size (a 4x ESRGAN pass halved), ~1130 DPI on the
 card. `mint render --styled` picks these up automatically.
@@ -80,16 +89,21 @@ def preprocessor(control, src):
     raise SetError(f"unknown control {control!r}")
 
 
+INSPIRE_TYPE = {"standard": "standard", "prompt first": "prompt is more important", "style": "style transfer"}
+
+
 def workflow(image_name, s, prefix, upscale=True):
     remix = s.get("remix", "restyle")
+    controlled = remix in ("restyle", "repose")  # the modes that read the base through a ControlNet
     w = {"4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": s["checkpoint"]}}}
     if remix != "new":
         w.update({
             "1": {"class_type": "LoadImage", "inputs": {"image": image_name}},
             "2": {"class_type": "ImageScale", "inputs": {"image": ["1", 0], "upscale_method": "lanczos",
                                                          "width": s["width"], "height": s["height"], "crop": "center"}},
-            "3": preprocessor(s["control"], ["2", 0]),
         })
+    if controlled:
+        w["3"] = preprocessor(s["control"], ["2", 0])
     model, clip = ["4", 0], ["4", 1]
     for i, lora in enumerate(s["loras"]):
         nid = f"lora{i}"
@@ -100,12 +114,20 @@ def workflow(image_name, s, prefix, upscale=True):
     if s.get("clip_skip", 1) > 1:
         w["5"] = {"class_type": "CLIPSetLastLayer", "inputs": {"clip": clip, "stop_at_clip_layer": -s["clip_skip"]}}
         clip = ["5", 0]
+    if remix == "inspire":
+        # the base as an image prompt: the unified loader finds the SDXL plus adapter and the ViT-H
+        # encoder by name; the patched model goes to every sampler (the refine pass too)
+        w["30"] = {"class_type": "IPAdapterUnifiedLoader", "inputs": {"model": model, "preset": "PLUS (high strength)"}}
+        w["31"] = {"class_type": "IPAdapter", "inputs": {
+            "model": ["30", 0], "ipadapter": ["30", 1], "image": ["2", 0], "weight": s["inspire_weight"],
+            "start_at": 0.0, "end_at": s["inspire_end"], "weight_type": INSPIRE_TYPE[s["inspire_type"]]}}
+        model = ["31", 0]
     w.update({
         "7": {"class_type": "CLIPTextEncode", "inputs": {"clip": clip, "text": s["prompt"]}},
         "8": {"class_type": "CLIPTextEncode", "inputs": {"clip": clip, "text": s["negative"]}},
     })
     positive, negative = ["7", 0], ["8", 0]
-    if remix != "new":
+    if controlled:
         # repose holds the layout lightly and lets go early (recipes from before the knobs fall back)
         strength, end = ((s.get("repose_strength", s["control_strength"]), s.get("repose_end", s["control_end"]))
                          if remix == "repose" else (s["control_strength"], s["control_end"]))
@@ -120,7 +142,7 @@ def workflow(image_name, s, prefix, upscale=True):
     if remix == "restyle":
         w["12"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["2", 0], "vae": ["4", 2]}}
         denoise = s["denoise"]
-    else:  # a fresh picture: nothing of the base's pixels survives, only (repose) its structure
+    else:  # a fresh picture: nothing of the base's pixels survives, only (repose) its structure or (inspire) its look
         w["12"] = {"class_type": "EmptyLatentImage", "inputs": {"width": s["width"], "height": s["height"], "batch_size": 1}}
         denoise = 1.0
     w.update({

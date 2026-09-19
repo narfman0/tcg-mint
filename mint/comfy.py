@@ -34,6 +34,13 @@ class Comfy:
         except (urllib.error.URLError, TimeoutError):
             return False
 
+    def nodes(self):
+        """The node class types this ComfyUI has (custom packs included), or an empty set when it is down."""
+        try:
+            return set(self._json("/object_info"))
+        except (urllib.error.URLError, TimeoutError):
+            return set()
+
     def require(self):
         if not self.alive():
             raise ComfyError(f"no ComfyUI at {self.url}; start it with: python main.py --listen 127.0.0.1 --port 8188")

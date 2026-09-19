@@ -48,7 +48,10 @@ SEED_RULES = ("stable", "position")
 #   repose:  a fresh picture in the pose of an image (the card's `pose`, else its base): an OpenPose
 #            skeleton is all that is held, so a different pose image moves the joints
 #   new:     a fresh picture from the prompt alone -- the subject line is all that links it to the card
-REMIX = ("restyle", "repose", "new")
+#   inspire: a fresh picture with the base as an IP-Adapter reference: its look, palette and character
+#            carry over, the words decide the pose, action and scene
+REMIX = ("restyle", "repose", "new", "inspire")
+INSPIRE_TYPES = ("standard", "prompt first", "style")  # the IP-Adapter weight types, in plain words
 
 
 @dataclass
@@ -88,6 +91,12 @@ class Style:
     # in the lab. Ignored (and kept out of the recipe) in the other modes.
     repose_strength: float = 0.5
     repose_end: float = 0.3
+    # inspire only: how much the reference image weighs against the words, for what fraction of
+    # the steps, and how -- standard: all of it; prompt first: the words settle the composition
+    # before the image comes in; style: the image's look without its layout
+    inspire_weight: float = 0.7
+    inspire_end: float = 0.8
+    inspire_type: str = "standard"
     # keys the file spelled out, so saving keeps them even at their default value
     explicit: set = field(default_factory=set, compare=False, repr=False)
 
@@ -96,7 +105,11 @@ class Style:
             raise SetError(f"{where}: control must be one of {', '.join(CONTROLS)}, not {self.control!r}")
         if self.seed_rule not in SEED_RULES:
             raise SetError(f"{where}: seed_rule must be one of {', '.join(SEED_RULES)}")
-        for k in ("denoise", "control_strength", "control_end", "repose_strength", "repose_end"):
+        if self.inspire_type not in INSPIRE_TYPES:
+            raise SetError(f"{where}: inspire_type must be one of {', '.join(INSPIRE_TYPES)}, not {self.inspire_type!r}")
+        if not 0 <= self.inspire_weight <= 2:
+            raise SetError(f"{where}: inspire_weight must be 0-2")
+        for k in ("denoise", "control_strength", "control_end", "repose_strength", "repose_end", "inspire_end"):
             v = getattr(self, k)
             if not 0 <= v <= 1:
                 raise SetError(f"{where}: {k} must be between 0 and 1, not {v}")
@@ -186,8 +199,14 @@ class SetFile:
             r["remix"] = remix
         if remix != "repose":  # the repose knobs only matter there; other modes' hashes stay
             del r["repose_strength"], r["repose_end"]
+        if remix != "inspire":  # likewise the inspire knobs
+            del r["inspire_weight"], r["inspire_end"], r["inspire_type"]
+        else:  # and inspire runs no ControlNet and no img2img, so those knobs are not in its name
+            for k in ("control", "control_strength", "control_end", "controlnet", "denoise"):
+                del r[k]
         # a new picture has nothing but words to tie it to the card: the subject, else the card itself
-        subject = entry.subject or (f"{record['name']}, {record.get('type_line', '')}".rstrip(", ") if remix == "new" else None)
+        # (inspire has the reference image too, but the words still set the scene)
+        subject = entry.subject or (f"{record['name']}, {record.get('type_line', '')}".rstrip(", ") if remix in ("new", "inspire") else None)
         if subject:
             r["prompt"] = f"{subject}, {r['prompt']}"
         r["seed"] = seed if seed is not None else self.card_seed(record["name"], record.get("illustration_id", ""), style)

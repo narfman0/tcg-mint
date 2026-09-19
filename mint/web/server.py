@@ -27,6 +27,7 @@ class State:
         self.jobs = Jobs()
         self.art = Art(ws.art)
         self._comfy = (0.0, False)
+        self._nodes = (0.0, set())
         self.lock = threading.Lock()  # around set-file writes
 
     def cards(self):
@@ -41,6 +42,14 @@ class State:
             alive = self.comfy().alive()
             self._comfy = (time.time(), alive)
         return alive
+
+    def comfy_nodes(self):
+        """The node types ComfyUI has, asked at most once a minute (the listing is large); empty when down."""
+        t, nodes = self._nodes
+        if time.time() - t > 60:
+            nodes = self.comfy().nodes() if self.comfy_alive() else set()
+            self._nodes = (time.time(), nodes)
+        return nodes
 
     def set_paths(self):
         return self.ws.set_files()
@@ -140,7 +149,9 @@ def create_app(ws):
         except MintError:
             count = 0
         return {"home": str(ws.home), "maker": ws.maker, "maker_code": ws.maker_code,
-                "comfy": {"url": ws.comfy_url, "alive": S.comfy_alive()},
+                "comfy": {"url": ws.comfy_url, "alive": S.comfy_alive(),
+                          # what the inspire mode needs: the ComfyUI_IPAdapter_plus node pack
+                          "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes()},
                 "cards": {"path": str(ws.cards_file), "count": count},
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
                 "style_fields": style_fields(), "current_job": S.jobs.current.to_dict() if S.jobs.current else None}
@@ -539,7 +550,8 @@ def style_fields():
         out.append({"name": f.name, "type": t, "default": default,
                     "choices": list(sets.CONTROLS) if f.name == "control" else
                     list(sets.SEED_RULES) if f.name == "seed_rule" else
-                    list(sets.REMIX) if f.name == "remix" else None})
+                    list(sets.REMIX) if f.name == "remix" else
+                    list(sets.INSPIRE_TYPES) if f.name == "inspire_type" else None})
     return out
 
 
