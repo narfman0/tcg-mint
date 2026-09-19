@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from . import frame, sets, workspace
 from .art import Art, ArtSource
 from .browser import Browser
-from .cards import Cards
+from .cards import Cards, faces
 from .cards import warnings as card_warnings
 from .errors import MintError
 from .manifest import Manifest, frame_hash
@@ -50,15 +50,14 @@ def slug(name):
 
 
 def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",), dpi=1200, out_dir=".",
-                 compare=False, year=None, on_rendered=None):
+                 compare=False, year=None, on_rendered=None, back_faces=False):
     """Render `names` (or the whole set when empty) into out_dir. Returns a list of
-    Rendered; `on_rendered` is called with each one as it finishes."""
+    Rendered; `on_rendered` is called with each one as it finishes. With back_faces,
+    a double-faced card's back is rendered too, as its own card numbered "<n>b"."""
     st = sets.load(set_path) if set_path else sets.SetFile(code=ws.maker_code + "1")
     names = list(names) or st.names()
     if not names:
         raise MintError("give card names or a --set with cards")
-    set_code = st.code
-    set_size = st.size or len(st.cards) or 100
     year = year or dt.date.today().strftime("%Y")
     fhash = frame_hash(st.css)
 
@@ -71,31 +70,45 @@ def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",),
     results = []
     with Browser(dpi) as browser:
         for i, name in enumerate(names, 1):
-            card = cards.find(name, st.card({"name": name}).printing)
-            entry = st.card(card)
-            number = entry.number or i
-            style_hash = sets.recipe_hash(st.recipe(card)) if styled and st.style else None
-            source = art.resolve(card, override=entry.art, style_hash=style_hash)
-            # a restyled image wins; the CSS filter is the fallback for --styled
-            art_filter = None
-            if styled and source.kind != "styled":
-                art_filter = entry.art_filter or st.art_filter
-            for th in themes:
-                tag = f".{th}" if compare else ""
-                prefix = f"{set_code}-" if set_path else ""
-                out = os.path.join(out_dir, f"{prefix}{number:03d}_{slug(card['name'])}{'.styled' if styled else ''}{tag}.png")
-                html = frame.build_html(
-                    card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
-                    number=number, set_code=set_code, set_size=set_size, flavor=entry.flavor,
-                    art_filter=art_filter, set_css=st.css, maker=ws.maker, maker_code=ws.maker_code, year=year)
-                sizes = browser.render(html, out)
-                r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
-                results.append(r)
-                manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash)
-                manifest.save()
-                if on_rendered:
-                    on_rendered(r)
+            found = cards.find(name, st.card({"name": name}).printing)
+            for card in (faces(found) if back_faces else faces(found)[:1]):
+                for r in render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year, fhash,
+                                    symbols, art, fonts_css, manifest, dpi, set_path):
+                    results.append(r)
+                    if on_rendered:
+                        on_rendered(r)
     return results
+
+
+def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year, fhash, symbols, art, fonts_css,
+       manifest, dpi, set_path):
+    """Render one face of one card in each theme, yielding a Rendered per file."""
+    set_code = st.code
+    set_size = st.size or len(st.cards) or 100
+    back = card.get("face_index", 0) > 0  # a back face gets the front's number plus "b" and never its art override
+    entry = st.card(card)
+    number = entry.number or i
+    style_hash = sets.recipe_hash(st.recipe(card)) if styled and st.style else None
+    source = art.resolve(card, override=entry.art if not back else None, style_hash=style_hash)
+    # a restyled image wins; the CSS filter is the fallback for --styled
+    art_filter = None
+    if styled and source.kind != "styled":
+        art_filter = entry.art_filter or st.art_filter
+    for th in themes:
+        tag = f".{th}" if compare else ""
+        prefix = f"{set_code}-" if set_path else ""
+        num = f"{number:03d}" + ("b" if back else "")
+        out = os.path.join(out_dir, f"{prefix}{num}_{slug(card['name'])}{'.styled' if styled else ''}{tag}.png")
+        html = frame.build_html(
+            card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
+            number=number, set_code=set_code, set_size=set_size, flavor=entry.flavor,
+            art_filter=art_filter, set_css=st.css, maker=ws.maker, maker_code=ws.maker_code, year=year)
+        sizes = browser.render(html, out)
+        r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
+        manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash, dpi=dpi)
+        manifest.save()
+        yield r
+
 
 
 def contact_sheet(results, themes, out_dir):
@@ -121,6 +134,7 @@ def main(argv=None):
     ap.add_argument("--compare", action="store_true", help="render every theme into a contact sheet")
     ap.add_argument("--dpi", type=int, default=1200)
     ap.add_argument("--out", default=".", help="directory for the PNGs (default: current directory)")
+    ap.add_argument("--faces", action="store_true", help="also render the back face of double-faced cards")
     a = ap.parse_args(argv)
     themes = list(frame.THEMES) if a.compare else [a.theme]
 
@@ -132,7 +146,7 @@ def main(argv=None):
 
     try:
         results = render_cards(workspace.default(), a.names, set_path=a.set, styled=a.styled, themes=themes,
-                               dpi=a.dpi, out_dir=a.out, compare=a.compare, on_rendered=report)
+                               dpi=a.dpi, out_dir=a.out, compare=a.compare, on_rendered=report, back_faces=a.faces)
     except MintError as e:
         sys.exit(str(e))
     if a.compare:

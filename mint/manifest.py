@@ -39,7 +39,7 @@ class Manifest:
     def entries(self):
         return self.data["entries"]
 
-    def add(self, rendered, *, set_code=None, styled=False, fhash=""):
+    def add(self, rendered, *, set_code=None, styled=False, fhash="", dpi=None):
         src = rendered.source
         self.entries[os.path.basename(rendered.out)] = {
             "card": rendered.name, "number": rendered.number, "theme": rendered.theme,
@@ -47,7 +47,7 @@ class Manifest:
             "source": {"kind": src.kind, "path": str(src.path), "hash": src.hash,
                        "label": src.variant.label if src.variant else None},
             "art_filter": rendered.art_filter, "sizes": rendered.sizes, "warnings": rendered.warnings,
-            "shrunk": rendered.shrunk, "frame": fhash,
+            "shrunk": rendered.shrunk, "frame": fhash, "dpi": dpi,
             "rendered_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         }
 

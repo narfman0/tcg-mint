@@ -31,6 +31,19 @@ def front_face(card):
     return card
 
 
+def faces(card):
+    """Every face of a card as its own renderable record: [front] for a normal card,
+    [front, back] for transform / modal DFCs. Each carries face_index and full_name."""
+    fs = card.get("card_faces")
+    if not fs or "image_uris" not in fs[0]:  # split / adventure faces share one image: one card
+        return [dict(card, face_index=0)]
+    out = []
+    for i, f in enumerate(fs):
+        out.append({**card, **{k: v for k, v in f.items() if k != "object"},
+                    "full_name": card.get("full_name", card["name"]), "face_index": i})
+    return out
+
+
 def is_universes_beyond(card):
     return card.get("security_stamp") == "triangle" and card.get("set") not in UB_EXEMPT
 

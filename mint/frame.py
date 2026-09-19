@@ -166,6 +166,27 @@ def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+# ability words: italic on the printed card, followed by an em dash (CR 207.2c)
+ABILITY_WORDS = {
+    "adamant", "addendum", "alliance", "battalion", "bloodrush", "celebration", "channel", "chroma", "cohort",
+    "constellation", "converge", "corrupted", "council's dilemma", "coven", "delirium", "descend 4", "descend 8",
+    "domain", "eerie", "eminence", "enrage", "fateful hour", "fathomless descent", "ferocious", "flurry", "formidable",
+    "grandeur", "hellbent", "heroic", "imprint", "inspired", "join forces", "kinship", "landfall", "lieutenant",
+    "magecraft", "max speed", "metalcraft", "morbid", "pack tactics", "paradox", "parley", "radiance", "raid", "rally",
+    "renew", "revolt", "secret council", "spell mastery", "strive", "survival", "sweep", "tempting offer", "threshold",
+    "undergrowth", "valiant", "void", "will of the council", "will of the planeswalkers",
+}
+ABILITY_WORD_RE = re.compile(r"^([A-Z][A-Za-z' 0-9]{2,30}?) — ")
+
+
+def ability_word(p):
+    """Wrap a leading ability word ("Landfall — ...") in an italic span."""
+    m = ABILITY_WORD_RE.match(p)
+    if m and m.group(1).lower() in ABILITY_WORDS:
+        return f'<span class="ability">{m.group(1)}</span> — ' + p[m.end():]
+    return p
+
+
 def render_text(card, symbols, flavor=None):
     def syms(s):
         return re.sub(r"\{[^}]+\}", lambda m: f'<img class="sym" src="{symbols.data_uri(m.group(0))}">', esc(s))
@@ -176,7 +197,7 @@ def render_text(card, symbols, flavor=None):
         return f'<p class="big-sym"><span class="pip"><img src="{symbols.data_uri(m.group(1))}"></span></p>'
     paras = []
     for p in text.split("\n"):
-        p = syms(p)
+        p = ability_word(syms(p))
         p = re.sub(r"\(([^)]*)\)", r'<span class="reminder">(\1)</span>', p)
         # a run of symbols plus any trailing punctuation wraps as one unit
         p = re.sub(r'((?:<img class="sym"[^>]*>)+[.,;:]?)', r'<span class="nowrap">\1</span>', p)

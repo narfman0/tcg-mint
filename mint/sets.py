@@ -111,13 +111,15 @@ class SetFile:
     def position(self, name):
         return list(self.cards).index(name) if name in self.cards else 0
 
-    def card_seed(self, name, illustration_id):
+    def card_seed(self, name, illustration_id, style=None):
+        """This card's seed: pinned in its entry, else derived from the style's seed by its rule."""
+        style = style or self.style
         entry = self.cards.get(name) or CardEntry()
         if entry.seed is not None:
             return entry.seed
-        if self.style.seed_rule == "position":
-            return self.style.seed * 1000 + self.position(name)
-        return self.style.seed * 1000 + zlib.crc32(illustration_id.encode()) % 1000
+        if style.seed_rule == "position":
+            return style.seed * 1000 + self.position(name)
+        return style.seed * 1000 + zlib.crc32(illustration_id.encode()) % 1000
 
     def recipe(self, record, style=None):
         """The effective restyle recipe for one card, as a plain dict, or None without a style."""
@@ -128,10 +130,23 @@ class SetFile:
         r = {k: v for k, v in dataclasses.asdict(style).items() if k not in ("name", "seed_rule", "explicit")}
         if entry.subject:
             r["prompt"] = f"{entry.subject}, {r['prompt']}"
-        r["seed"] = self.card_seed(record["name"], record.get("illustration_id", "")) if style is self.style \
-            else style.seed
+        r["seed"] = self.card_seed(record["name"], record.get("illustration_id", ""), style)
         r["base"] = entry.base or "crop"
         return r
+
+    def promote(self, recipe, record):
+        """The Style a variant's recipe implies for the whole set: the set's style with the
+        variant's knobs, the card's subject prefix removed from the prompt, and no per-card
+        seed or base. Rendering with this style makes that variant the card's current one
+        (its seed is re-derived; if the variant's seed was pinned, pin it in the entry too)."""
+        entry = self.card(record)
+        knobs = {k: v for k, v in recipe.items() if k in {f.name for f in fields(Style)} and k not in ("name", "seed")}
+        if entry.subject and knobs.get("prompt", "").startswith(entry.subject + ", "):
+            knobs["prompt"] = knobs["prompt"][len(entry.subject) + 2:]
+        base = self.style or Style(name="style", prompt="")
+        new = dataclasses.replace(base, **knobs)
+        new.explicit = set(base.explicit) | set(knobs)
+        return new
 
     # --- (de)serialisation --------------------------------------------------
     def to_dict(self):

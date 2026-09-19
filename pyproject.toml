@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 fonts = ["fonttools>=4.40"]
 dev = ["pytest>=8", "ruff>=0.5"]
+web = ["fastapi>=0.110", "uvicorn>=0.27"]
 
 [project.scripts]
 mint = "mint.__main__:main"
@@ -30,7 +31,7 @@ Repository = "https://github.com/narfman0/tcg-mint"
 packages = ["mint"]
 
 [tool.setuptools.package-data]
-mint = ["*.html"]
+mint = ["*.html", "web/static/*"]
 
 [tool.ruff]
 line-length = 130

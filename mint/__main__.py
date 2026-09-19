@@ -15,6 +15,8 @@ COMMANDS = {
     "fonts":     ("report which frame fonts are present", "fonts"),
     "back":      ("render the BLS card back", "back"),
     "impose":    ("lay rendered PNGs out 3x3 on a printable PDF", "impose"),
+    "serve":     ("the workbench: compare art and recipes in a browser", "serve"),
+    "gallery":   ("export a set as a static read-only gallery page", "gallery"),
     "print":     ("send a PDF to the printer at true 100%", "printing"),
 }
 

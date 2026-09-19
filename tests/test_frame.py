@@ -52,3 +52,27 @@ def test_build_html_substitutes_everything(card, art):
                             maker="me", maker_code="ME", year="2026")
     assert "${" not in html and "$name" not in html
     assert "Test Subject" in html and "007/12 R" in html and "2/3" in html and "ME · me · 2026" in html
+
+
+def test_ability_words_are_italic():
+    assert frame.ability_word("Landfall — Whenever a land enters, draw.") == \
+        '<span class="ability">Landfall</span> — Whenever a land enters, draw.'
+    assert frame.ability_word("Choose one — Do a thing.") == "Choose one — Do a thing."
+    council = frame.ability_word("Will of the council — Starting with you.")
+    assert council.startswith('<span class="ability">Will of the council</span>')
+    html = frame.render_text(synthetic_card(oracle_text="Threshold — Get big."), NoSymbols())
+    assert '<p><span class="ability">Threshold</span> — Get big.</p>' in html
+
+
+def test_faces():
+    from mint.cards import faces, front_face
+    assert [f["face_index"] for f in faces(synthetic_card())] == [0]
+    dfc = {"name": "A // B", "layout": "transform", "set": "x", "collector_number": "1",
+           "card_faces": [{"object": "card_face", "name": "A", "illustration_id": "a", "image_uris": {}},
+                          {"object": "card_face", "name": "B", "illustration_id": "b", "image_uris": {}}]}
+    for record in (dfc, front_face(dfc)):  # raw, or already flattened by Cards.find
+        fs = faces(record)
+        assert [(f["name"], f["illustration_id"], f["face_index"], f["full_name"]) for f in fs] == \
+            [("A", "a", 0, "A // B"), ("B", "b", 1, "A // B")]
+    split = {"name": "A // B", "layout": "split", "image_uris": {}, "card_faces": [{"name": "A"}, {"name": "B"}]}
+    assert len(faces(split)) == 1
