@@ -85,6 +85,10 @@ NOISE = base64.b64encode(
 # the template is 100 CSS px per inch; the card is 2.5x3.5in plus 0.11in bleed
 PAGE = {"width": 272, "height": 372}
 
+# Universes Beyond printings (Scryfall: security_stamp == "triangle") are not
+# wanted as art, except these: Lord of the Rings fits Magic well enough.
+UB_EXEMPT = {"ltr", "ltc"}
+
 
 def load_card(name):
     if not CARDS.exists():
@@ -96,7 +100,7 @@ def load_card(name):
             if c["layout"] == "art_series":  # same name, no rules text or art id
                 continue
             if c["name"].lower() == want or c["name"].lower().startswith(want + " //"):
-                if c.get("security_stamp") == "triangle":
+                if c.get("security_stamp") == "triangle" and c["set"] not in UB_EXEMPT:
                     # Universes Beyond: crossover art is never wanted, and this
                     # printing is the only one in oracle_cards -- say so, loudly
                     print(f"warning: {c['name']}: art source is a Universes Beyond printing ({c['set'].upper()})",

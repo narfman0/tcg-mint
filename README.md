@@ -219,13 +219,15 @@ in the footer either way: the composition is still theirs.
 
 ## Universes Beyond
 
-Crossover printings (Marvel, TMNT, Lord of the Rings, …) are never wanted as
-an art source here. Scryfall stamps every one of them `security_stamp:
+Crossover printings (Marvel, Spider-Man, TMNT, Fortnite, …) are not wanted
+as an art source here. Scryfall stamps every one of them `security_stamp:
 "triangle"`, and the renderer warns whenever the printing it is about to use
-carries it. Today the oracle-cards file gives one printing per card, so the
-warning is all it can do; picking a non-crossover printing automatically is
-part of the `default_cards` work below. Cards that only exist in a crossover
-set (The One Ring) will always warn — that's a deck decision, not a render one.
+carries it — except for sets in `UB_EXEMPT` (Lord of the Rings, which fits
+Magic well enough). Today the oracle-cards file gives one printing per card,
+so the warning is all it can do; picking a non-crossover printing
+automatically is part of the `default_cards` work below. Cards that only
+exist in a non-exempt crossover set will always warn — that's a deck
+decision, not a render one.
 
 ## What's not here yet
 
