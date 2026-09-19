@@ -51,7 +51,9 @@ THEMES = {
     "marcellus": (["Marcellus"], ["Libre Baskerville"]),
     "spectral":  (["Spectral SC"], ["Spectral"]),
 }
-LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", "Liberation Serif"}  # never ask Google for these
+LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", "Liberation Serif", "Cantarell", "Liberation Sans"}  # never ask Google for these
+# collector line: a light geometric sans, as printed (Gotham on the real cards)
+FOOTER = ["Inter", "Cantarell", "Liberation Sans"]
 
 # M15 frame palette: (frame, frame-dark, bar, bar-edge, text box)
 FRAMES = {
@@ -196,7 +198,7 @@ def local_fonts():
 
 def font_link(families):
     web = [f for f in families if f not in LOCAL_FAMILIES]
-    fams = "&".join("family=" + f.replace(" ", "+") + ":ital,wght@0,400;0,700;1,400" for f in dict.fromkeys(web))
+    fams = "&".join("family=" + f.replace(" ", "+") + ":ital,wght@0,300;0,400;0,700;1,400" for f in dict.fromkeys(web))
     return f"https://fonts.googleapis.com/css2?{fams}&display=swap" if fams else "data:text/css,"
 
 
@@ -253,8 +255,8 @@ def build_html(card, theme, table, number, set_code, set_size, override, art_fil
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
     tpl = string.Template((PKG / "template.html").read_text())
     return tpl.substitute(
-        font_link=font_link(title + body), local_fonts=local_fonts(),
-        title_font=stack(title), body_font=stack(body),
+        font_link=font_link(title + body + FOOTER), local_fonts=local_fonts(),
+        title_font=stack(title), body_font=stack(body), footer_font=stack(FOOTER).replace(", serif", ", sans-serif"),
         frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box,
         noise="data:image/svg+xml;base64," + NOISE, set_css=set_css,
         crown='<div class="crown-o"></div><div class="crown"></div>' if legendary else "",
