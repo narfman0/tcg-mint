@@ -17,7 +17,7 @@ const REMIX = {restyle: 'same picture, redrawn', repose: 'new picture in the pos
    else any label the art cache holds); q: the board's search text. */
 const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
-               takes: 1, upscale: false, dpi: 1200, genOpen: true};
+               takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false};
 
 async function api(path, opts = {}) {
   if (STATIC) {
@@ -251,12 +251,35 @@ function tileHtml(c) {
 }
 function board() {
   const st = state.set, code = st.code, all = !!st.all;
-  const sel = state.sel, n = sel.size, names = [...sel];
+  const sel = state.sel, n = sel.size;
   const filt = state.filter || '';
   const labels = styleLabels(st.cards_detail);
   if (state.style !== 'current' && !labels.some(([l]) => l === state.style) && !templates(() => go()).some(t => t.name === state.style)) state.style = 'current';
   const cards = boardCards();
   const filters = ['no restyle', ...(state.style !== 'current' ? [`no ${state.style}`] : []), 'not rendered', 'text shrunk', 'UB art', 'own art'];
+  // the two job stages. "restyle" makes art in the look picked; "render styled" composes cards from the art
+  // each card's styled render uses (its pick, else the set recipe's variant), so it follows the look
+  // only when that look is the set's recipe -- viewing another look, it is off rather than a surprise
+  const lookName = state.style !== 'current' ? state.style : all ? "each set's recipe" : st.style?.name || '?';
+  const lookIsRecipe = state.style === 'current' || (!all && state.style === st.style?.name);
+  const target = n ? st.cards_detail.filter(c => sel.has(c.name)) : st.cards_detail;
+  const hasStyled = c => !!(c.entry.pick ? c.picked : c.current);
+  const cover = {have: target.filter(hasStyled).length, total: target.length};
+  const anyStyle = all ? st.sets.some(x => x.style) : !!st.style;
+  const styledOk = anyStyle && lookIsRecipe;
+  // "only what's missing": each job narrows to the cards without its product
+  const lacks = {
+    'enhance': c => !c.plain || c.plain.kind === 'crop',
+    'restyle': c => lookIsRecipe ? !hasStyled(c) : !variantFor(c, state.style),
+    'render-plain': c => !c.renders?.plain,
+    'render-styled': c => !c.renders?.styled,
+  };
+  const targets = job => state.missing ? target.filter(lacks[job]) : target;
+  const count = job => state.missing ? ` <small>${targets(job).length}</small>` : '';
+  const styledTitle = !anyStyle ? 'no style block: nothing styled to render'
+    : !lookIsRecipe ? `renders each card's pick, else the set's recipe${all ? '' : ` (${st.style.name})`}, not ${state.style}. Make ${state.style} the set style (promote a take on a card page), or keep a ${state.style} take on each card, then render in the set's recipe`
+    : cover.have < cover.total ? `${cover.total - cover.have} of ${cover.total} have no styled art yet: the set's art_filter over the crop stands in for those. Filter "no restyle" to see them`
+    : 'each card with its styled art: its pick, else the recipe\'s variant';
   $('#main').innerHTML = `
     <div class="row"><h1>${esc(code)} <span class="muted">${esc(st.name)}</span></h1>
 <button class="pill" id="gallery" title="flip through the cards full-screen">gallery</button>${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>`}
@@ -268,13 +291,20 @@ function board() {
       <span class="sep"></span>
       <input type="text" id="q" placeholder="search name, type, artist${all ? ', set' : ''}" value="${esc(state.q || '')}">
       <select id="filter"><option value="">all cards</option>${filters.map(f => `<option ${filt === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
-      <span class="sep"></span>
+      ${filt || state.q ? `<button id="selshown" class="small" title="select the ${cards.length} card(s) shown, so the jobs below run on just them">select shown</button>` : ''}
+    </div>
+    <div class="toolbar jobs">
       <span class="muted">${n ? `${n} selected` : 'all cards'}:</span>
-      <button data-job="render-plain">render plain</button>
-      <button data-job="render-styled" ${st.style ? '' : 'disabled'}>render styled</button>
-      <button data-job="enhance">enhance</button>
-      <button data-job="restyle" ${all ? (st.sets.some(x => x.style) || lookTemplate(null) ? '' : 'disabled') : lookTemplate(st.style) === null ? 'disabled' : ''} title="${esc(all ? 'each set in the look picked' : lookTitle(st.style))}">restyle</button>${takesPicker()}
-      <select id="dpi"><option>300</option><option>600</option><option selected>1200</option></select><span class="muted">dpi</span>
+      <span class="stage" title="art jobs write variants to the art cache; nothing is rendered"><span class="lbl">art</span>
+        <button data-job="enhance" title="an ESRGAN pass on each card's crop, the plain art; the plain render picks it up">enhance crop${count('enhance')}</button>
+        <button data-job="restyle" ${all ? (st.sets.some(x => x.style) || lookTemplate(null) ? '' : 'disabled') : lookTemplate(st.style) === null ? 'disabled' : ''} title="${esc(all ? 'each set in the look picked' : lookTitle(st.style))}">restyle as ${esc(lookName)}${count('restyle')}</button>${takesPicker()}
+      </span>
+      <span class="stage" title="card jobs compose the frame, text and art into out/; they use the art that exists and make none"><span class="lbl">cards</span>
+        <button data-job="render-plain" title="each card with its plain art: the crop, or its enhance">render plain${count('render-plain')}</button>
+        <button data-job="render-styled" ${styledOk ? '' : 'disabled'} title="${esc(styledTitle)}">render styled${state.missing ? count('render-styled') : styledOk && cover.have < cover.total ? ` <small>${cover.have}/${cover.total}</small>` : ''}</button>
+        <select id="dpi">${[300, 600, 1200].map(d => `<option ${state.dpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span>
+      </span>
+      <label class="missing" title="each job skips the cards that already have its product: an enhance of the crop, art in the look, a plain or styled render. The count is what it would make"><input type="checkbox" id="missing" ${state.missing ? 'checked' : ''}> only what's missing</label>
       ${n ? '<button id="clearsel" class="small">clear selection</button>' : ''}
     </div>
     <div class="grid"></div>`;
@@ -297,12 +327,19 @@ function board() {
   $('#filter').onchange = e => { state.filter = e.target.value; board(); };
   $('#q').oninput = e => { state.q = e.target.value; grid(); };  // the grid alone, so typing keeps its focus
   if ($('#clearsel')) $('#clearsel').onclick = () => { sel.clear(); board(); };
+  if ($('#selshown')) $('#selshown').onclick = () => { boardCards().forEach(c => sel.add(c.name)); board(); };
+  $('#missing').onchange = e => { state.missing = e.target.checked; board(); };
+  $('#dpi').onchange = e => { state.dpi = +e.target.value; };
   document.querySelectorAll('[data-job]').forEach(b => b.onclick = () => {
-    const dpi = +$('#dpi').value;
-    // on the ALL board a job is one submission per set: the selected cards of that set, else all of them
+    const dpi = +$('#dpi').value, job = b.dataset.job;
+    const cs = targets(job);
+    if (!cs.length) return toast(state.missing ? 'nothing missing: every card has it' : 'no cards');
+    // on the ALL board a job is one submission per set. The names go explicitly unless the job is
+    // the whole set (no selection, not narrowed to the missing), which null says
+    const whole = !n && !state.missing;
     const groups = all
-      ? [...new Set((n ? cards.filter(c => sel.has(c.name)) : st.cards_detail).map(setOf))].map(s => [s, n ? names.filter(nm => cards.some(c => c.name === nm && setOf(c) === s)) : null])
-      : [[code, n ? names : null]];
+      ? [...new Set(cs.map(setOf))].map(s => [s, whole ? null : cs.filter(c => setOf(c) === s).map(c => c.name)])
+      : [[code, whole ? null : cs.map(c => c.name)]];
     groups.forEach(([s, list]) => {
       const styled = all ? st.sets.find(x => x.code === s)?.style : st.style;
       const jobs = {
@@ -311,7 +348,7 @@ function board() {
         'enhance': {kind: 'enhance', set: s, names: list, base: 'crop'},
         'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
       };
-      if (jobs[b.dataset.job]) submit(jobs[b.dataset.job]);
+      if (jobs[job]) submit(jobs[job]);
     });
   });
 }
