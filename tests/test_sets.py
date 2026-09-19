@@ -206,3 +206,28 @@ def test_one_off_seed_overrides_without_pinning():
     assert st.recipe(alpha)["seed"] == 55                  # a pinned seed is used when no override
     assert st.recipe(alpha, seed=999)["seed"] == 999       # an override still wins for its one run
     assert sets.recipe_hash(st.recipe(alpha, seed=1)) != sets.recipe_hash(st.recipe(alpha, seed=2))
+
+
+def test_repose_has_its_own_control_hold():
+    """The repose knobs are in a repose recipe and in no other, so restyle hashes never move."""
+    alpha = {"name": "Alpha", "illustration_id": "aaaa"}
+    st = sets.from_dict(BASE)
+    r = st.recipe(alpha)
+    assert "repose_strength" not in r and "repose_end" not in r
+    st2 = sets.from_dict({**BASE, "style": {**BASE["style"], "remix": "repose"}})
+    r2 = st2.recipe(alpha)
+    assert (r2["repose_strength"], r2["repose_end"]) == (0.5, 0.3) and r2["remix"] == "repose"
+    st3 = sets.from_dict({**BASE, "style": {**BASE["style"], "remix": "repose", "repose_end": 0.2}})
+    assert sets.recipe_hash(st3.recipe(alpha)) != sets.recipe_hash(r2)
+    with pytest.raises(SetError, match="repose_end"):
+        sets.from_dict({**BASE, "style": {**BASE["style"], "repose_end": 2}})
+    # the workflow feeds the ControlNet the repose hold in repose mode, the restyle hold otherwise
+    from mint import restyle
+    hold = lambda rec: (lambda n: (n["strength"], n["end_percent"]))(restyle.workflow("x.png", rec, "p")["11"]["inputs"])  # noqa: E731
+    assert hold(r2) == (0.5, 0.3) and hold(r) == (0.8, 0.9)
+    # repose reads one image -- the card's pose, else its base -- and only its OpenPose skeleton
+    assert r2["control"] == "openpose" and r2["base"] == "crop" and r["control"] == "canny"
+    st4 = sets.from_dict({**BASE, "style": {**BASE["style"], "remix": "repose"},
+                          "cards": {"Alpha": {"base": "deadbeef", "pose": "art/other.png"}}})
+    r4 = st4.recipe(alpha)
+    assert r4["base"] == "art/other.png" and restyle.workflow("x.png", r4, "p")["3"]["class_type"] == "DWPreprocessor"

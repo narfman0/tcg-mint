@@ -10,12 +10,13 @@ block, so a set's look is reproducible:
     "style": {
       "name": "neon",                       -> art/<illustration_id>/neon-<recipe hash>.png
       "prompt": "...", "negative": "...",
-      "control": "canny",                   canny | lineart | depth
+      "control": "canny",                   canny | lineart | depth | openpose
       "control_strength": 0.8,
       "denoise": 0.85, "steps": 28, "cfg": 6, "seed": 7,
       "checkpoint": "juggernautXL_v9.safetensors",
       "clip_skip": 2,                       Pony-family checkpoints want 2; default 1
       "remix": "restyle",                   restyle | repose | new (below); a card entry can override
+      "repose_strength": 0.5, "repose_end": 0.3,   repose's own control hold (below)
       "refine": 0.4, "refine_scale": 1.5,   second pass at 1.5x size, denoise 0.4: detail; default off
       "loras": [{"name": "x.safetensors", "strength": 0.7}],
       "width": 1248, "height": 912          generation size (art window is 1.42:1)
@@ -33,9 +34,13 @@ the old ones stay for comparison.
 `remix` is what the result keeps of the picture it starts from -- three modes:
 
     restyle  img2img from the base with the ControlNet: same picture, redrawn
-    repose   an empty latent, the ControlNet from the base until control_end,
-             the prompt from there on: same layout, a new picture (freer
-             pose the lower control_end and control_strength are)
+    repose   an empty latent and an OpenPose skeleton (DWPose) read from the
+             card's `pose` image -- else its base -- held at repose_strength
+             until repose_end of the steps; the prompt and subject line are
+             the rest. Only the joints are kept: body, clothes, hair and
+             background are new, and a different pose image moves the joints.
+             (A canny / lineart / depth map *is* the pose, whatever the
+             strength, which is why restyle never moves her.)
     new      an empty latent and the prompt alone -- no base image at all.
              The card's subject line is the only thread back to the original;
              without one the card's name and type line stand in for it.
@@ -54,7 +59,8 @@ from .cards import Cards
 from .errors import MintError, SetError
 
 # ControlNet Union (promax) wants to be told which control it is being fed
-UNION_TYPE = {"canny": "canny/lineart/anime_lineart/mlsd", "lineart": "canny/lineart/anime_lineart/mlsd", "depth": "depth"}
+UNION_TYPE = {"canny": "canny/lineart/anime_lineart/mlsd", "lineart": "canny/lineart/anime_lineart/mlsd", "depth": "depth",
+              "openpose": "openpose"}
 
 
 def preprocessor(control, src):
@@ -66,6 +72,11 @@ def preprocessor(control, src):
     if control == "depth":
         return {"class_type": "DepthAnythingV2Preprocessor",
                 "inputs": {"image": src, "ckpt_name": "depth_anything_v2_vitl.pth", "resolution": 1024}}
+    if control == "openpose":  # body, hands and face keypoints; the pack fetches its models on first use
+        return {"class_type": "DWPreprocessor",
+                "inputs": {"image": src, "detect_hand": "enable", "detect_body": "enable", "detect_face": "enable",
+                           "resolution": 1024, "bbox_detector": "yolox_l.onnx",
+                           "pose_estimator": "dw-ll_ucoco_384_bs5.torchscript.pt"}}
     raise SetError(f"unknown control {control!r}")
 
 
@@ -95,12 +106,15 @@ def workflow(image_name, s, prefix, upscale=True):
     })
     positive, negative = ["7", 0], ["8", 0]
     if remix != "new":
+        # repose holds the layout lightly and lets go early (recipes from before the knobs fall back)
+        strength, end = ((s.get("repose_strength", s["control_strength"]), s.get("repose_end", s["control_end"]))
+                         if remix == "repose" else (s["control_strength"], s["control_end"]))
         w.update({
             "9": {"class_type": "ControlNetLoader", "inputs": {"control_net_name": s["controlnet"]}},
             "10": {"class_type": "SetUnionControlNetType", "inputs": {"control_net": ["9", 0], "type": UNION_TYPE[s["control"]]}},
             "11": {"class_type": "ControlNetApplyAdvanced", "inputs": {
                 "positive": ["7", 0], "negative": ["8", 0], "control_net": ["10", 0], "image": ["3", 0],
-                "strength": s["control_strength"], "start_percent": 0.0, "end_percent": s["control_end"], "vae": ["4", 2]}},
+                "strength": strength, "start_percent": 0.0, "end_percent": end, "vae": ["4", 2]}},
         })
         positive, negative = ["11", 0], ["11", 1]
     if remix == "restyle":

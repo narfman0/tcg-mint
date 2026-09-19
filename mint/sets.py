@@ -9,7 +9,7 @@
       "cards": {
         "Card Name": {"number": 1, "flavor": "...", "art": "path.png", "art_filter": "...",
                       "subject": "what the picture is of", "printing": "rvr:40",
-                      "base": "<variant hash>", "seed": 123}
+                      "base": "<variant hash>", "pose": "<variant hash>", "seed": 123}
       }
     }
 
@@ -35,11 +35,12 @@ from pathlib import Path
 
 from .errors import SetError
 
-CONTROLS = ("canny", "lineart", "depth")
+CONTROLS = ("canny", "lineart", "depth", "openpose")
 SEED_RULES = ("stable", "position")
 # what a restyle keeps of the picture it starts from (restyle.py) -- three modes, not a scale:
 #   restyle: the base's pixels and structure, redrawn in the style
-#   repose:  a fresh picture laid out by the base's structure (control only, until control_end)
+#   repose:  a fresh picture in the pose of an image (the card's `pose`, else its base): an OpenPose
+#            skeleton is all that is held, so a different pose image moves the joints
 #   new:     a fresh picture from the prompt alone -- the subject line is all that links it to the card
 REMIX = ("restyle", "repose", "new")
 
@@ -75,6 +76,12 @@ class Style:
     # 1 = the checkpoint's own CLIP; 2 = CLIP skip 2, which Pony-family checkpoints are trained for
     clip_skip: int = 1
     remix: str = "restyle"  # REMIX above; a card entry can override it
+    # repose only: how hard, and for what fraction of the steps, the control holds the base's
+    # layout. Composition is settled in the first third of the sampling, so the control has to
+    # let go early and lightly or the pose is pinned exactly as in restyle. Starting points; tune
+    # in the lab. Ignored (and kept out of the recipe) in the other modes.
+    repose_strength: float = 0.5
+    repose_end: float = 0.3
     # keys the file spelled out, so saving keeps them even at their default value
     explicit: set = field(default_factory=set, compare=False, repr=False)
 
@@ -83,7 +90,7 @@ class Style:
             raise SetError(f"{where}: control must be one of {', '.join(CONTROLS)}, not {self.control!r}")
         if self.seed_rule not in SEED_RULES:
             raise SetError(f"{where}: seed_rule must be one of {', '.join(SEED_RULES)}")
-        for k in ("denoise", "control_strength", "control_end"):
+        for k in ("denoise", "control_strength", "control_end", "repose_strength", "repose_end"):
             v = getattr(self, k)
             if not 0 <= v <= 1:
                 raise SetError(f"{where}: {k} must be between 0 and 1, not {v}")
@@ -109,6 +116,7 @@ class CardEntry:
     subject: str | None = None       # what the picture is of; prepended to the style prompt
     printing: str | None = None      # "set:number" to render a specific printing
     base: str | None = None          # the image a restyle starts from: a variant hash or label, else the set's
+    pose: str | None = None          # repose: the image whose pose to take: a hash, label, "crop" or a file path; else the base
     seed: int | None = None          # this card's seed, instead of the derived one
     remix: str | None = None         # this card's remix mode (REMIX), instead of the style's
 
@@ -169,12 +177,17 @@ class SetFile:
             del r["remix"]
         else:
             r["remix"] = remix
+        if remix != "repose":  # the repose knobs only matter there; other modes' hashes stay
+            del r["repose_strength"], r["repose_end"]
         # a new picture has nothing but words to tie it to the card: the subject, else the card itself
         subject = entry.subject or (f"{record['name']}, {record.get('type_line', '')}".rstrip(", ") if remix == "new" else None)
         if subject:
             r["prompt"] = f"{subject}, {r['prompt']}"
         r["seed"] = seed if seed is not None else self.card_seed(record["name"], record.get("illustration_id", ""), style)
         base = entry.base or self.base or "crop"
+        if remix == "repose":  # the one image read is the pose source, and only its skeleton
+            base = entry.pose or base
+            r["control"] = "openpose"
         if art is not None and is_label(base):
             v = art.latest(record, base)
             base = v.hash if v else base

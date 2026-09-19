@@ -148,9 +148,15 @@ class Art:
         return next((v for v in self.variants(card) if v.kind == "enhance" and v.base == of), None)
 
     def base_path(self, card, base="crop"):
-        """The file a base reference points at."""
+        """The file a base (or pose) reference points at: the crop, one of the card's variants by
+        hash, or -- for a pose taken from anywhere -- a path to an image file."""
         if not base or base == "crop":
             return self.crop(card)
+        if "/" in base or base.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            p = Path(base)
+            if not p.is_file():
+                raise MintError(f"{card['name']}: no image file {base}")
+            return p
         v = self.variant(card, base)
         if not v:
             have = ", ".join(f"{x.label}-{x.hash}" for x in self.variants(card)) or "none"
