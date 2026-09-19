@@ -4,17 +4,25 @@
   "size": 92,
   "style": {
     "name": "ink",
-    "prompt": "manga page, pen and ink drawing, pure black ink on white paper, bold confident brush-pen linework, dense cross-hatching for shadow, screentone, high contrast, no gray wash, dark fantasy, grotesque detail",
-    "negative": "grayscale painting, soft gradients, photograph, photorealistic, blurry, low quality, text, watermark, signature, frame, border, colour, color, nude, nsfw",
-    "control": "lineart",
-    "control_strength": 0.8,
-    "control_end": 0.8,
-    "denoise": 0.95,
+    "prompt": "dark painterly fantasy illustration, bioluminescence as the only light source, deep swamp greens and black, luminous teal and sickly yellow-green glow, damp overgrowth, volumetric mist, detailed oil-painting brushwork, moody cinematic",
+    "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, nude, nsfw, daylight, bright sky, pastel, anime, flat colors, cheerful, neon city",
+    "control": "depth",
+    "control_strength": 0.6,
+    "control_end": 0.85,
+    "denoise": 0.85,
     "steps": 30,
-    "cfg": 7.5,
+    "cfg": 6,
     "seed": 11,
     "seed_rule": "position",
-    "grayscale_source": true
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "checkpoint": "juggernautXL_v9.safetensors",
+    "controlnet": "controlnet-union-sdxl-promax.safetensors",
+    "upscaler": "4x-UltraSharp.pth",
+    "loras": [],
+    "width": 1248,
+    "height": 912,
+    "grayscale_source": false
   },
   "cards": {
     "Meren of Clan Nel Toth": {
@@ -163,7 +171,10 @@
     },
     "Llanowar Elves": {
       "number": 49,
-      "printing": "plst:GNT-46"
+      "subject": "detailed verdant forest background",
+      "printing": "plst:GNT-46",
+      "base": "353b429c",
+      "seed": 1317919832
     },
     "Llanowar Wastes": {
       "number": 50
