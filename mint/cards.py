@@ -71,7 +71,7 @@ class Cards:
         db = db or sqlite3.connect(self.index_path)
         db.executescript("""
             DROP TABLE IF EXISTS cards;
-            CREATE TABLE cards (name TEXT, lname TEXT, set_code TEXT, number TEXT, illustration_id TEXT,
+            CREATE TABLE cards (name TEXT, lname TEXT, lfull TEXT, set_code TEXT, number TEXT, illustration_id TEXT,
                                 layout TEXT, stamp TEXT, released TEXT, offset INTEGER, length INTEGER);
             CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
         """)
@@ -82,12 +82,14 @@ class Cards:
                 n = len(line)
                 if n > 1:
                     c = front_face(json.loads(line))
-                    rows.append((c["name"], c["name"].lower(), c.get("set"), c.get("collector_number"),
+                    rows.append((c["name"], c["name"].lower(), c.get("full_name", c["name"]).lower(),
+                                 c.get("set"), c.get("collector_number"),
                                  c.get("illustration_id"), c.get("layout"), c.get("security_stamp"),
                                  c.get("released_at"), offset, n))
                 offset += n
-        db.executemany("INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
+        db.executemany("INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
         db.execute("CREATE INDEX cards_lname ON cards(lname)")
+        db.execute("CREATE INDEX cards_lfull ON cards(lfull)")
         db.execute("CREATE INDEX cards_illustration ON cards(illustration_id)")
         db.execute("INSERT OR REPLACE INTO meta VALUES ('sig', ?)", (self._signature(),))
         db.execute("INSERT OR REPLACE INTO meta VALUES ('count', ?)", (str(len(rows)),))
@@ -101,13 +103,12 @@ class Cards:
 
     # --- lookup --------------------------------------------------------------
     def printings(self, name):
-        """Every record for this name (exact, or the front face of an 'A // B' card),
+        """Every record for this name (the full 'A // B' name or its front face),
         newest first. Art-series cards (same name, no rules text) are excluded."""
         want = name.lower()
-        like = want.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + " //%"
         rows = self.db().execute(
-            "SELECT offset, length FROM cards WHERE (lname = ? OR lname LIKE ? ESCAPE '\\') "
-            "AND (layout IS NULL OR layout != 'art_series') ORDER BY released DESC, set_code", (want, like)).fetchall()
+            "SELECT offset, length FROM cards WHERE (lname = ? OR lfull = ?) "
+            "AND (layout IS NULL OR layout != 'art_series') ORDER BY released DESC, set_code", (want, want)).fetchall()
         return [front_face(self._read(o, n)) for o, n in rows]
 
     def find(self, name, printing=None):

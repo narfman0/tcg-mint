@@ -25,6 +25,7 @@ from .browser import Browser
 from .cards import Cards
 from .cards import warnings as card_warnings
 from .errors import MintError
+from .manifest import Manifest, frame_hash
 
 
 @dataclass
@@ -52,42 +53,46 @@ def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",),
                  compare=False, year=None, on_rendered=None):
     """Render `names` (or the whole set when empty) into out_dir. Returns a list of
     Rendered; `on_rendered` is called with each one as it finishes."""
-    st, set_css = sets.load(set_path) if set_path else ({}, "")
-    names = list(names) or list(st.get("cards", {}))
+    st = sets.load(set_path) if set_path else sets.SetFile(code=ws.maker_code + "1")
+    names = list(names) or st.names()
     if not names:
         raise MintError("give card names or a --set with cards")
-    set_code = st.get("code", ws.maker_code + "1")
-    set_size = st.get("size", len(st.get("cards", {})) or 100)
-    style_name = st.get("style", {}).get("name") if styled else None
+    set_code = st.code
+    set_size = st.size or len(st.cards) or 100
     year = year or dt.date.today().strftime("%Y")
+    fhash = frame_hash(st.css)
 
     cards = Cards(ws.cards_file)
     art = Art(ws.art)
     symbols = frame.Symbols(ws.symbols)
     fonts_css = frame.local_fonts(ws.fonts)
     os.makedirs(out_dir, exist_ok=True)
+    manifest = Manifest(out_dir)
     results = []
     with Browser(dpi) as browser:
         for i, name in enumerate(names, 1):
-            card = cards.find(name, sets.overrides(st, {"name": name}).get("printing"))
-            ov = sets.overrides(st, card)
-            number = ov.get("number", i)
-            source = art.resolve(card, override=ov.get("art"), style_name=style_name)
+            card = cards.find(name, st.card({"name": name}).printing)
+            entry = st.card(card)
+            number = entry.number or i
+            style_hash = sets.recipe_hash(st.recipe(card)) if styled and st.style else None
+            source = art.resolve(card, override=entry.art, style_hash=style_hash)
             # a restyled image wins; the CSS filter is the fallback for --styled
             art_filter = None
             if styled and source.kind != "styled":
-                art_filter = ov.get("art_filter") or st.get("art_filter")
+                art_filter = entry.art_filter or st.art_filter
             for th in themes:
                 tag = f".{th}" if compare else ""
                 prefix = f"{set_code}-" if set_path else ""
                 out = os.path.join(out_dir, f"{prefix}{number:03d}_{slug(card['name'])}{'.styled' if styled else ''}{tag}.png")
                 html = frame.build_html(
                     card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
-                    number=number, set_code=set_code, set_size=set_size, flavor=ov.get("flavor"),
-                    art_filter=art_filter, set_css=set_css, maker=ws.maker, maker_code=ws.maker_code, year=year)
+                    number=number, set_code=set_code, set_size=set_size, flavor=entry.flavor,
+                    art_filter=art_filter, set_css=st.css, maker=ws.maker, maker_code=ws.maker_code, year=year)
                 sizes = browser.render(html, out)
                 r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
                 results.append(r)
+                manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash)
+                manifest.save()
                 if on_rendered:
                     on_rendered(r)
     return results

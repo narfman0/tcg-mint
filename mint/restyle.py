@@ -8,7 +8,7 @@ LoRAs -- decide how it's drawn. The whole recipe is the set file's `style`
 block, so a set's look is reproducible:
 
     "style": {
-      "name": "neon",                       -> art/<illustration_id>.neon.png
+      "name": "neon",                       -> art/<illustration_id>/neon-<recipe hash>.png
       "prompt": "...", "negative": "...",
       "control": "canny",                   canny | lineart | depth
       "control_strength": 0.8,
@@ -19,7 +19,11 @@ block, so a set's look is reproducible:
     }
 
 A card entry may add `"subject": "..."` -- what the picture is of -- which is
-prepended to the prompt so the style can't drift a character into someone else.
+prepended to the prompt so the style can't drift a character into someone else,
+and `"base": "<variant hash>"` to start from an enhanced or earlier restyled
+image instead of Scryfall's crop. The effective recipe (sets.SetFile.recipe)
+is hashed into the output name, so every change to it is a new variant and
+the old ones stay for comparison.
 
 Output is 2x the generation size (a 4x ESRGAN pass halved), ~1130 DPI on the
 card. `mint render --styled` picks these up automatically.
@@ -33,17 +37,6 @@ from . import comfy, sets, workspace
 from .art import Art
 from .cards import Cards
 from .errors import MintError, SetError
-
-DEFAULTS = {
-    "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed",
-    "control": "canny", "control_strength": 0.8, "control_end": 0.9,
-    "denoise": 0.85, "steps": 28, "cfg": 6.0, "seed": 7,
-    "sampler": "dpmpp_2m", "scheduler": "karras",
-    "checkpoint": "juggernautXL_v9.safetensors",
-    "controlnet": "controlnet-union-sdxl-promax.safetensors",
-    "upscaler": "4x-UltraSharp.pth",
-    "loras": [], "width": 1248, "height": 912,
-}
 
 # ControlNet Union (promax) wants to be told which control it is being fed
 UNION_TYPE = {"canny": "canny/lineart/anime_lineart/mlsd", "lineart": "canny/lineart/anime_lineart/mlsd", "depth": "depth"}
@@ -101,10 +94,10 @@ def workflow(image_name, s, prefix, upscale=True):
     return w
 
 
-def restyle_file(server, src, dest, style, prefix="tcg-mint/restyle", upscale=True):
-    """Run the style workflow on any image file into dest."""
+def restyle_file(server, src, dest, recipe, prefix="tcg-mint/restyle", upscale=True):
+    """Run the style workflow with an effective recipe (sets.SetFile.recipe) on any image file into dest."""
     src = str(src)
-    if style.get("grayscale_source"):
+    if recipe.get("grayscale_source"):
         # monochrome styles: the starting latent keeps (1 - denoise) of the source,
         # and that residue is where stray colour comes from -- remove it at the source
         from PIL import Image
@@ -112,35 +105,26 @@ def restyle_file(server, src, dest, style, prefix="tcg-mint/restyle", upscale=Tr
         Image.open(src).convert("L").convert("RGB").save(gray)
         src = gray
     name = server.upload(src)
-    return server.run_to_file(workflow(name, style, prefix, upscale), str(dest), timeout=900)
+    os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+    return server.run_to_file(workflow(name, recipe, prefix, upscale), str(dest), timeout=900)
 
 
-def restyle(server, art, card, style, force=False, upscale=True):
-    dest = art.styled(card, style["name"])
-    if dest.exists() and not force:
-        return dest, False
-    restyle_file(server, art.crop(card), dest, style, "tcg-mint/" + card["illustration_id"] + "." + style["name"], upscale)
-    return dest, True
-
-
-def load_style(st):
-    if "style" not in st:
-        raise SetError("this set has no `style` block")
-    s = {**DEFAULTS, **st["style"]}
-    for k in ("name", "prompt"):
-        if k not in s:
-            raise SetError(f"style block needs a `{k}`")
-    return s
-
-
-def card_style(style, ov, i):
-    """The effective recipe for one card: its own seed off the set's, and its `subject`
-    ("a gaunt long-haired man in black armour at a workbench") ahead of the prompt so
-    the style can't drift it into something else."""
-    s = {**style, "seed": style["seed"] * 1000 + i}
-    if ov.get("subject"):
-        s["prompt"] = f"{ov['subject']}, {s['prompt']}"
-    return s
+def restyle(server, art, card, st, style=None, force=False, upscale=True):
+    """Make (or find) the variant of `card` for the set's style (or `style`, a sets.Style,
+    to try a recipe that is not the set's). Returns (Variant, made)."""
+    style = style or st.style
+    if style is None:
+        raise SetError(f"{st.path or st.code} has no `style` block")
+    recipe = st.recipe(card, style)
+    h = sets.recipe_hash(recipe)
+    if not force:
+        v = art.variant(card, h)
+        if v:
+            return v, False
+    v = art.new_variant(card, style.name, "restyle", recipe, recipe["base"], h)
+    restyle_file(server, art.base_path(card, recipe["base"]), v.path, recipe,
+                 "tcg-mint/" + card["illustration_id"] + "." + style.name, upscale)
+    return art.record(v), True
 
 
 def main(argv=None):
@@ -152,19 +136,19 @@ def main(argv=None):
     a = ap.parse_args(argv)
     ws = workspace.default()
     try:
-        st, _ = sets.load(a.set)
-        style = load_style(st)
-        names = a.names or list(st.get("cards", {}))
+        st = sets.load(a.set)
+        if st.style is None:
+            raise SetError(f"{a.set} has no `style` block")
+        names = a.names or st.names()
         if not names:
             ap.error("the set has no cards")
         server = comfy.Comfy(ws.comfy_url)
         server.require()
         cards, art = Cards(ws.cards_file), Art(ws.art)
-        for i, name in enumerate(names):
-            ov = sets.overrides(st, {"name": name})
-            card = cards.find(name, ov.get("printing"))
-            dest, did = restyle(server, art, card, card_style(style, ov, i), a.force, not a.no_upscale)
-            print(f"{'restyled' if did else 'cached  '} {card['name']} -> {os.path.relpath(dest)}")
+        for name in names:
+            card = cards.find(name, st.card({"name": name}).printing)
+            v, made = restyle(server, art, card, st, force=a.force, upscale=not a.no_upscale)
+            print(f"{'restyled' if made else 'cached  '} {card['name']} -> {os.path.relpath(v.path)}")
     except MintError as e:
         sys.exit(str(e))
 

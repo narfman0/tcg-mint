@@ -13,7 +13,6 @@ file is updated in place: new cards are appended, numbers and per-card edits
 (`neon`, `ink`, `glass`); edit it afterwards, it is just JSON.
 """
 import argparse
-import json
 import os
 import re
 import sys
@@ -81,27 +80,25 @@ def main(argv=None):
     a = ap.parse_args(argv)
     out = a.out or str(workspace.default().sets / (a.code.lower() + ".json"))
 
-    st = {"code": a.code, "name": a.name, "cards": {}}
-    if os.path.exists(out):
-        st = json.load(open(out))
-        st["code"], st["name"] = a.code, a.name
-    if a.style and "style" not in st:
-        st["style"] = STYLES[a.style]
+    st = sets.load(out) if os.path.exists(out) else sets.SetFile(code=a.code, name=a.name)
+    st.code, st.name = a.code, a.name
+    if a.style and st.style is None:
+        st.style = sets.from_dict({"code": "x", "style": STYLES[a.style]}).style
 
     names = read_decklist(a.decklist)
     seen = set()
     names = [n for n in names if not (n in seen or seen.add(n))]  # basic lands repeat
-    cards = st["cards"]
-    nxt = max((c.get("number", 0) for c in cards.values()), default=0) + 1
+    cards = st.cards
+    nxt = max((c.number or 0 for c in cards.values()), default=0) + 1
     added = 0
     for n in names:
         if n not in cards:
-            cards[n] = {"number": nxt}
+            cards[n] = sets.CardEntry(number=nxt)
             nxt += 1
             added += 1
-    st["size"] = len(cards)
+    st.size = len(cards)
     sets.save(out, st)
-    print(f"{out}: {len(cards)} cards ({added} new)" + (f", style {st['style']['name']}" if "style" in st else ""))
+    print(f"{out}: {len(cards)} cards ({added} new)" + (f", style {st.style.name}" if st.style else ""))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,19 @@
 {
   "code": "SAT",
   "name": "Satoru, forgot his ninjas at home",
+  "size": 83,
+  "style": {
+    "name": "neon",
+    "prompt": "cyberpunk fantasy illustration, neon-lit rain-slick night city, holographic signage and glowing kanji, chrome and black lacquer, magenta and cyan rim light, volumetric haze, detailed digital painting, dramatic cinematic composition",
+    "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel, nude, nsfw",
+    "control": "canny",
+    "control_strength": 0.75,
+    "denoise": 0.85,
+    "steps": 28,
+    "cfg": 6,
+    "seed": 7,
+    "seed_rule": "position"
+  },
   "cards": {
     "Satoru Umezawa": {
       "number": 1
@@ -251,17 +264,5 @@
     "Yuriko, the Tiger's Shadow": {
       "number": 83
     }
-  },
-  "style": {
-    "name": "neon",
-    "prompt": "cyberpunk fantasy illustration, neon-lit rain-slick night city, holographic signage and glowing kanji, chrome and black lacquer, magenta and cyan rim light, volumetric haze, detailed digital painting, dramatic cinematic composition",
-    "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel, nude, nsfw",
-    "control": "canny",
-    "control_strength": 0.75,
-    "denoise": 0.85,
-    "steps": 28,
-    "cfg": 6,
-    "seed": 7
-  },
-  "size": 83
+  }
 }

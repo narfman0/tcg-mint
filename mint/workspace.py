@@ -8,6 +8,14 @@ library explicitly; the CLI builds one from the environment.
     MINT_HOME    the workspace directory
     MINT_CARDS   the Scryfall bulk file, to share one ~200 MB copy between projects
     COMFY_URL    a ComfyUI server other than http://127.0.0.1:8188
+
+A mint.toml in the workspace sets the rest -- who you are on the cards, and
+the printer -- and the environment overrides it:
+
+    maker = "narfman0"          # collector line
+    maker_code = "BLS"          # studio code; set codes default to <code>1
+    comfy_url = "http://127.0.0.1:8188"
+    printer = "EPSON_ET_8500"   # CUPS queue for `mint print`
 """
 import os
 from dataclasses import dataclass
@@ -21,12 +29,19 @@ class Workspace:
     maker: str = "narfman0"      # printed on every card's collector line
     maker_code: str = "BLS"      # the studio code; set codes default to <code>1
     comfy_url: str = "http://127.0.0.1:8188"
+    printer: str = "EPSON_ET_8500"
+
+    CONFIG = "mint.toml"
+    KEYS = ("maker", "maker_code", "comfy_url", "printer")
 
     @classmethod
     def from_env(cls, home=None):
         home = Path(home or os.environ.get("MINT_HOME") or os.getcwd()).resolve()
         cards = Path(os.environ.get("MINT_CARDS") or home / "oracle-cards.jsonl")
-        return cls(home, cards, comfy_url=os.environ.get("COMFY_URL", cls.comfy_url))
+        conf = {k: v for k, v in read_config(home / cls.CONFIG).items() if k in cls.KEYS}
+        if os.environ.get("COMFY_URL"):
+            conf["comfy_url"] = os.environ["COMFY_URL"]
+        return cls(home, cards, **conf)
 
     @property
     def art(self):
@@ -50,6 +65,17 @@ class Workspace:
 
     def path(self, *parts):
         return self.home.joinpath(*parts)
+
+
+def read_config(path):
+    if not Path(path).exists():
+        return {}
+    try:
+        import tomllib
+    except ModuleNotFoundError:  # 3.10
+        import tomli as tomllib
+    with open(path, "rb") as f:
+        return tomllib.load(f)
 
 
 _default = None

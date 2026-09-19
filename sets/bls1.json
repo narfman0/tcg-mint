@@ -8,27 +8,74 @@
     "name": "neon",
     "prompt": "cyberpunk fantasy illustration, neon-lit rain-slick night city, holographic signage and glowing kanji, chrome and black lacquer, magenta and cyan rim light, volumetric haze, detailed digital painting, dramatic cinematic composition",
     "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel",
-    "control": "canny", "control_strength": 0.75,
-    "denoise": 0.85, "steps": 28, "cfg": 6, "seed": 7
+    "control": "canny",
+    "control_strength": 0.75,
+    "denoise": 0.85,
+    "steps": 28,
+    "cfg": 6,
+    "seed": 7,
+    "seed_rule": "position"
   },
   "cards": {
-    "Imperial Seal":            {"number": 1, "flavor": "The seal is small. What it opens is not."},
-    "Ancient Tomb":             {"number": 2, "flavor": "Every step down costs a little of you. Every step down is worth it."},
-    "The One Ring":             {"number": 3},
-    "Deflecting Swat":          {"number": 4, "flavor": "Not today. Not you. Not here."},
-    "Rhystic Study":            {"number": 5, "flavor": "Are you paying? No? Then I'll take the lesson."},
-    "Demonic Tutor":            {"number": 6},
-    "Fierce Guardianship":      {"number": 7},
-    "Phyrexian Altar":          {"number": 8},
-    "Urborg, Tomb of Yawgmoth": {"number": 9},
-    "Mana Drain":               {"number": 10, "flavor": "It wasn't countered. It was collected."},
-    "Ancient Silver Dragon":    {"number": 11},
-    "Vampiric Tutor":           {"number": 12},
-    "Boseiju, Who Endures":     {"number": 13},
-    "Cyclonic Rift":            {"number": 14, "flavor": "Everyone back to where you started. Except me."},
-    "Blightsteel Colossus":     {"number": 15},
-    "Scalding Tarn":            {"number": 16},
-    "Consecrated Sphinx":       {"number": 17},
-    "Yawgmoth, Thran Physician": {"number": 18}
+    "Imperial Seal": {
+      "number": 1,
+      "flavor": "The seal is small. What it opens is not."
+    },
+    "Ancient Tomb": {
+      "number": 2,
+      "flavor": "Every step down costs a little of you. Every step down is worth it."
+    },
+    "The One Ring": {
+      "number": 3
+    },
+    "Deflecting Swat": {
+      "number": 4,
+      "flavor": "Not today. Not you. Not here."
+    },
+    "Rhystic Study": {
+      "number": 5,
+      "flavor": "Are you paying? No? Then I'll take the lesson."
+    },
+    "Demonic Tutor": {
+      "number": 6
+    },
+    "Fierce Guardianship": {
+      "number": 7
+    },
+    "Phyrexian Altar": {
+      "number": 8
+    },
+    "Urborg, Tomb of Yawgmoth": {
+      "number": 9
+    },
+    "Mana Drain": {
+      "number": 10,
+      "flavor": "It wasn't countered. It was collected."
+    },
+    "Ancient Silver Dragon": {
+      "number": 11
+    },
+    "Vampiric Tutor": {
+      "number": 12
+    },
+    "Boseiju, Who Endures": {
+      "number": 13
+    },
+    "Cyclonic Rift": {
+      "number": 14,
+      "flavor": "Everyone back to where you started. Except me."
+    },
+    "Blightsteel Colossus": {
+      "number": 15
+    },
+    "Scalding Tarn": {
+      "number": 16
+    },
+    "Consecrated Sphinx": {
+      "number": 17
+    },
+    "Yawgmoth, Thran Physician": {
+      "number": 18
+    }
   }
 }

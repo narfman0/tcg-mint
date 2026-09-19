@@ -1,6 +1,21 @@
 {
   "code": "MER",
   "name": "Meren, a graveyard is a to-do list",
+  "size": 92,
+  "style": {
+    "name": "ink",
+    "prompt": "manga page, pen and ink drawing, pure black ink on white paper, bold confident brush-pen linework, dense cross-hatching for shadow, screentone, high contrast, no gray wash, dark fantasy, grotesque detail",
+    "negative": "grayscale painting, soft gradients, photograph, photorealistic, blurry, low quality, text, watermark, signature, frame, border, colour, color, nude, nsfw",
+    "control": "lineart",
+    "control_strength": 0.8,
+    "control_end": 0.8,
+    "denoise": 0.95,
+    "steps": 30,
+    "cfg": 7.5,
+    "seed": 11,
+    "seed_rule": "position",
+    "grayscale_source": true
+  },
   "cards": {
     "Meren of Clan Nel Toth": {
       "number": 1
@@ -279,19 +294,5 @@
     "Zulaport Cutthroat": {
       "number": 92
     }
-  },
-  "style": {
-    "name": "ink",
-    "prompt": "manga page, pen and ink drawing, pure black ink on white paper, bold confident brush-pen linework, dense cross-hatching for shadow, screentone, high contrast, no gray wash, dark fantasy, grotesque detail",
-    "negative": "grayscale painting, soft gradients, photograph, photorealistic, blurry, low quality, text, watermark, signature, frame, border, colour, color, nude, nsfw",
-    "control": "lineart",
-    "control_strength": 0.8,
-    "control_end": 0.8,
-    "denoise": 0.95,
-    "steps": 30,
-    "cfg": 7.5,
-    "seed": 11,
-    "grayscale_source": true
-  },
-  "size": 92
+  }
 }

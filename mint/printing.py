@@ -144,7 +144,8 @@ def build_options(args, avail):
 def main(argv=None):
     p = argparse.ArgumentParser(prog="mint print", description=__doc__.split("\n\n")[0])
     p.add_argument("pdf", nargs="?", help="PDF to print")
-    p.add_argument("-P", "--printer", default=PRINTER)
+    from . import workspace
+    p.add_argument("-P", "--printer", default=workspace.default().printer)
     p.add_argument("-p", "--stock", choices=sorted(STOCKS),
                    help="what is loaded in the tray; required, no default")
     p.add_argument("-n", "--copies", type=int, default=1)

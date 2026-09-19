@@ -66,11 +66,26 @@ A set is a JSON file (see `sets/bls1.json`):
   records the original printing (`RVR 40`) so the mapping runs both ways.
 - `flavor` replaces the printed flavor text; omit the key to keep the original.
 - `art` points at your own image; otherwise Scryfall's art crop is used.
+- `printing` (`"rvr:40"`) renders a specific printing when the card file holds
+  several (`mint cards --kind default_cards`); without it the newest
+  non-crossover printing is used.
+- `subject`, `base` and `seed` steer `mint restyle` for that card (below).
 - `art_filter` (set-wide or per card) is a CSS filter applied with
   `--styled` — the set's "flair" variant next to the faithful one.
 - A `.css` file with the same name (`sets/bls1.css`) is injected after the
   base frame rules, so each set can carry its own frame identity: colours,
   textures, bar shapes, anything.
+
+Unknown keys are errors (`mint check` finds them), so a typo in a recipe never
+passes silently. Who you are on the cards, the ComfyUI address and the
+printer live in `mint.toml` in the workspace:
+
+```toml
+maker = "narfman0"
+maker_code = "BLS"
+comfy_url = "http://127.0.0.1:8188"
+printer = "EPSON_ET_8500"
+```
 
 ## Commands
 
@@ -79,7 +94,9 @@ A set is a JSON file (see `sets/bls1.json`):
 | `mint newset` | start a set file from a decklist (commander first); `--style neon|ink|glass` seeds a style block |
 | `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet |
 | `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
-| `mint upscale` | 4× ESRGAN the art through a local ComfyUI; renders pick the result up automatically |
+| `mint upscale` | 4× ESRGAN the art (or any variant, `--base HASH`) through a local ComfyUI; renders pick the result up automatically |
+| `mint check` | validate set files and say which image each card renders with, plain and styled |
+| `mint migrate` | move a pre-variant art cache (`art/<id>.<style>.png`) into `art/<id>/` with recipe sidecars |
 | `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
 | `mint fonts` | report which frame fonts are present |
@@ -107,9 +124,10 @@ Without them the closest open faces are substituted automatically.
 
 Scryfall's art crops are ~626×457 — about 300 DPI on the card, visibly soft
 next to a vector frame. `mint upscale` sends them through a local
-[ComfyUI](https://github.com/comfyanonymous/ComfyUI) server and caches the
-4× result (`art/<illustration_id>.x4.png`, ~1130 DPI); `mint render` uses it
-whenever it exists.
+[ComfyUI](https://github.com/comfyanonymous/ComfyUI) server and keeps the
+4× result as an *enhance* variant (`art/<illustration_id>/enhance-<hash>.png`,
+~1130 DPI); `mint render` uses it whenever it exists. `--base HASH` enhances
+a restyled variant instead, and styled renders then pick that up.
 
 ```sh
 # in your ComfyUI checkout, once: an upscale model in models/upscale_models/
@@ -168,11 +186,22 @@ The style block lives in the set JSON:
 }
 ```
 
-Results are cached as `art/<illustration_id>.<style name>.png`; `mint render
---styled` uses them, falling back to the CSS `art_filter` for cards that
-haven't been restyled yet. Because everything is in the set file, a set's look
-is reproducible and committed — same seed, same prompt, same models. Each
-card's seed is derived from the set's, so cards differ but reruns don't.
+Every result is a *variant*: `art/<illustration_id>/<style>-<hash>.png` with a
+`.json` sidecar holding the exact recipe and the image it started from. The
+hash is the recipe's, so changing a knob makes a new file beside the old one
+instead of overwriting it, and every attempt stays available to compare.
+`mint render --styled` uses the variant matching the set's *current* recipe,
+falling back to the CSS `art_filter` for cards that don't have one yet
+(`mint check` lists which). Because everything is in the set file, a set's
+look is reproducible and committed — same seed, same prompt, same models.
+Each card's seed comes from the set's seed and its illustration id
+(`"seed_rule": "stable"`), so cards differ, reruns don't, and adding a card
+never changes another's; sets migrated from before this carry
+`"seed_rule": "position"` so their existing images stay current.
+
+Per card, `"base": "<variant hash>"` starts the restyle from an enhanced or
+earlier restyled image instead of the crop, and `"seed": 123` pins a seed you
+liked.
 
 A card entry can add `"subject": "a red dragon with a blue-finned crest,
 wings spread"` — prepended to the prompt so the style can't drift a character
@@ -230,19 +259,16 @@ Crossover printings (Marvel, Spider-Man, TMNT, Fortnite, …) are not wanted
 as an art source here. Scryfall stamps every one of them `security_stamp:
 "triangle"`, and the renderer warns whenever the printing it is about to use
 carries it — except for sets in `UB_EXEMPT` (Lord of the Rings, which fits
-Magic well enough). Today the oracle-cards file gives one printing per card,
-so the warning is all it can do; picking a non-crossover printing
-automatically is part of the `default_cards` work below. Cards that only
-exist in a non-exempt crossover set will always warn — that's a deck
-decision, not a render one.
+Magic well enough). With the oracle-cards file there is one printing per card,
+so the warning is all it can do; with `mint cards --kind default_cards` the
+renderer picks the newest non-crossover printing by itself, and a card's
+`printing` key picks one by hand. Cards that only exist in a non-exempt
+crossover set will always warn — that's a deck decision, not a render one.
 
 ## What's not here yet
 
 - IP-Adapter style anchoring for set-wide consistency
-- prefer a non-Universes-Beyond printing for art (needs `default_cards`)
 - layouts beyond `normal`: split, MDFC, planeswalker, saga
-- picking art from a specific printing (`mint cards --kind default_cards`
-  fetches the data; the render still uses the oracle default)
 
 ## Legal
 
