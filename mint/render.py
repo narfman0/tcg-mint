@@ -88,7 +88,7 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
     back = card.get("face_index", 0) > 0  # a back face gets the front's number plus "b" and never its art override
     entry = st.card(card)
     number = entry.number or i
-    style_hash = sets.recipe_hash(st.recipe(card, art=art)) if styled and st.style else None
+    style_hash = st.styled_hash(card, art=art) if styled else None
     source = art.resolve(card, override=entry.art if not back else None, style_hash=style_hash)
     # a restyled image wins; the CSS filter is the fallback for --styled
     art_filter = None

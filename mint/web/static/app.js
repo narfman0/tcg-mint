@@ -16,7 +16,8 @@ const REMIX = {restyle: 'same picture, redrawn', repose: 'new picture in the pos
    there is one); style: which restyle label a styled tile shows ('current' = the set's own recipe,
    else any label the art cache holds); q: the board's search text. */
 const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
-               ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {}, takes: 1};
+               ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
+               takes: 1, upscale: false, dpi: 1200, genOpen: true};
 
 async function api(path, opts = {}) {
   if (STATIC) {
@@ -189,7 +190,8 @@ function badges(c) {
   const b = [];
   if (c.error) b.push(['bad', 'not found']);
   (c.warnings || []).forEach(w => b.push(['warn', w.includes('Universes Beyond') ? 'UB art' : w]));
-  if (styleOf(c) && !c.current) b.push(['', 'no restyle']);
+  if (styleOf(c) && !c.current && !c.picked) b.push(['', 'no restyle']);
+  if (c.entry.pick) b.push([c.picked ? 'accent' : 'bad', c.picked ? 'picked' : 'pick gone']);
   if (c.renders?.plain?.shrunk || c.renders?.styled?.shrunk) b.push(['warn', 'text shrunk']);
   if (c.entry.art) b.push(['accent', 'own art']);
   if (c.entry.printing) b.push(['accent', c.entry.printing]);
@@ -208,10 +210,10 @@ function styleLabels(cards) {
   cards.forEach(c => (c.variants || []).forEach(v => { if (v.kind === 'restyle') (m.get(v.label) || m.set(v.label, new Set()).get(v.label)).add(c.name); }));
   return [...m].map(([l, s]) => [l, s.size]).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
-/* A card's variant for a label: the one the set's recipe names if it has that label, else the newest. */
+/* A card's variant for a label: its pick or the one the set's recipe names if that has the label, else the newest. */
 function variantFor(c, label) {
   const vs = (c.variants || []).filter(v => v.kind === 'restyle' && v.label === label);
-  return vs.find(v => v.hash === c.style_hash) || vs.sort((a, b) => (b.created || '').localeCompare(a.created || ''))[0] || null;
+  return vs.find(v => v.hash === c.entry.pick) || vs.find(v => v.hash === c.style_hash) || vs.sort((a, b) => (b.created || '').localeCompare(a.created || ''))[0] || null;
 }
 /* The image a card shows for the current mode / show / style: {path, card: bool, what} or {none: why}.
    "card" wants the render; without one the art stands in (the tile's shape says which). */
@@ -236,7 +238,7 @@ function tilePic(c) {
 function boardCards() {
   const st = state.set, filt = state.filter || '', q = (state.q || '').toLowerCase();
   const hit = c => !q || [c.name, c.card?.type_line, c.inSet, c.card?.artist, String(c.number ?? '')].some(v => (v || '').toLowerCase().includes(q));
-  return st.cards_detail.filter(c => hit(c) && (!filt || badges(c).includes(`>${filt}<`) || (filt === 'no restyle' && !c.current)
+  return st.cards_detail.filter(c => hit(c) && (!filt || badges(c).includes(`>${filt}<`) || (filt === 'no restyle' && !c.current && !c.picked)
     || (filt === `no ${state.style}` && !variantFor(c, state.style))));
 }
 function tileHtml(c) {
@@ -337,10 +339,10 @@ function boardSlides() {
 }
 function columnSlides(c) {
   const code = state.set.code;
-  return columns(c).map(x => ({key: x.key, path: x.path, card: x.kind === 'card', what: x.sub, c,
-                              title: `${c.name} · ${x.title}`, sub: '', recipe: x.recipe,
-                              badges: (x.current ? '<span class="badge accent">current</span>' : '') + (x.isBase ? '<span class="badge accent">base</span>' : ''),
-                              hash: colHash(code, c.name, x.key)}));
+  return allColumns(c).map(x => ({key: x.key, path: x.path, card: x.kind === 'card', what: x.sub, c,
+                                 title: `${c.name} · ${x.title}`, sub: '', recipe: x.recipe,
+                                 badges: (x.styled ? '<span class="badge accent">styled art</span>' : '') + (x.key === (c.entry.base || state.set.base) ? '<span class="badge accent">from</span>' : ''),
+                                 hash: colHash(code, c.name, x.key)}));
 }
 function openViewer(kind, slides, i) {
   V.kind = kind; V.slides = slides; V.i = Math.max(0, i);
@@ -488,36 +490,135 @@ function recipeDiff(recipe, ref) {
     return `<div>${esc(k)}: ${same ? esc(val) : `<i>${esc(val)}</i>`}</div>`;
   }).join('');
 }
+/* --- card detail ---------------------------------------------------------------------- */
+/* The page has three parts, for the three things done here. The card: what it is and what it
+   prints as -- its styled art (the pick, else what the recipe hashes to) and its renders. The
+   generate panel: one mode, and only that mode's inputs, all of them the card's own recipe
+   overrides. The images: every picture the card has, grouped by look, to compare, keep, enhance,
+   or start the next generate from. */
+const newest = (a, b) => (b.created || '').localeCompare(a.created || '');
+const isPath = s => !!s && (s.includes('/') || /\.(png|jpe?g|webp)$/i.test(s));
+/* The card's images as compare columns, in groups: source (the crop and its enhance), one group per
+   look label (its restyles newest first, each enhance right after the restyle it was made from),
+   and the renders. `styled` marks the one the styled render uses. */
 function columns(c) {
-  const cols = [];
-  const cur = c.current?.hash;
-  if (c.crop) cols.push({key: 'crop', title: 'crop', sub: `${c.card.set.toUpperCase()} ${c.card.collector_number} · ${c.card.artist}`,
-                         path: c.crop, kind: 'crop', acts: [['enhance', 'crop'], ['base', 'crop'], ['pose', 'crop']]});
-  const vs = [...(c.variants || [])].sort((a, b) => (a.kind === 'enhance' ? 0 : 1) - (b.kind === 'enhance' ? 0 : 1) || a.label.localeCompare(b.label) || (b.created > a.created ? 1 : -1));
-  for (const v of vs) {
-    const acts = v.kind === 'restyle' ? [['promote', v.hash], ['enhance', v.hash], ['base', v.hash], ['pose', v.hash], ['delete', v.hash]]
-                                      : [['base', v.hash], ['pose', v.hash], ['delete', v.hash]];
-    const base = c.entry.base || state.set.base || 'crop';
-    cols.push({key: v.hash, title: v.label, sub: v.hash + (v.hash === cur ? ' · current' : '') + (v.base !== 'crop' ? ` · from ${v.base}` : ''),
-               path: v.path, kind: v.kind, recipe: v.recipe, current: v.hash === cur, acts,
-               isPose: c.entry.pose === v.hash, isBase: base === v.hash || (base === v.label && v === c.variants.filter(x => x.kind === 'restyle' && x.label === v.label).sort((a, b) => (b.created || '').localeCompare(a.created || ''))[0])});
+  const vs = c.variants || [], cur = c.current?.hash, pick = c.entry.pick, styled = pick || cur;
+  const enhOf = h => vs.filter(v => v.kind === 'enhance' && v.base === h).sort(newest);
+  const col = (v, extra) => ({key: v.hash, title: v.label, sub: v.hash, path: v.path, kind: v.kind, recipe: v.recipe, v,
+                              styled: v.hash === styled, ...extra});
+  const groups = [], src = [];
+  if (c.crop) src.push({key: 'crop', title: 'crop', sub: `${c.card.set.toUpperCase()} ${c.card.collector_number} · ${c.card.artist}`,
+                        path: c.crop, kind: 'crop', enhanced: enhOf('crop')});
+  enhOf('crop').forEach(e => src.push(col(e, {title: 'enhance', sub: `${e.hash} · of the crop`})));
+  groups.push({title: 'source', cols: src});
+  const labels = [...new Set(vs.filter(v => v.kind === 'restyle').map(v => v.label))].sort();
+  for (const l of labels) {
+    const cols = [];
+    for (const v of vs.filter(x => x.kind === 'restyle' && x.label === l).sort(newest)) {
+      cols.push(col(v, {current: v.hash === cur, picked: v.hash === pick, enhanced: enhOf(v.hash),
+                        sub: v.hash + (v.base !== 'crop' ? ` · from ${isPath(v.base) ? v.base.split('/').pop() : v.base}` : '')}));
+      enhOf(v.hash).forEach(e => cols.push(col(e, {title: 'enhance', sub: `${e.hash} · of ${v.hash}`})));
+    }
+    groups.push({title: l, cols});
   }
+  const orphans = vs.filter(v => v.kind === 'enhance' && v.base !== 'crop' && !vs.some(x => x.hash === v.base));
+  if (orphans.length) groups.push({title: 'enhance · source deleted', cols: orphans.map(e => col(e, {title: 'enhance', sub: `${e.hash} · of ${e.base}`}))});
+  const renders = [];
   for (const k of ['plain', 'styled']) {
     const r = c.renders?.[k];
-    if (r) cols.push({key: 'render-' + k, title: `render · ${k}`, sub: `${r.dpi || '?'} dpi · text ${r.sizes?.text}px${r.shrunk ? ' (shrunk)' : ''}`,
-                      path: r.path, kind: 'card', acts: [[k === 'plain' ? 'render-plain' : 'render-styled', ''], ['delete-render', r.file]]});
+    if (r) renders.push({key: 'render-' + k, title: `render · ${k}`, sub: `${r.dpi || '?'} dpi · text ${r.sizes?.text}px${r.shrunk ? ' (shrunk)' : ''}`,
+                         path: r.path, kind: 'card', which: k, file: r.file});
   }
-  return cols;
+  groups.push({title: 'renders', cols: renders, renders: true});
+  return groups;
+}
+const allColumns = c => columns(c).flatMap(g => g.cols);
+function columnHtml(x, c) {
+  const ab = state.ab, tags = [];
+  if (x.styled) tags.push(['accent', x.picked ? 'styled art · picked' : 'styled art']);
+  else if (x.current) tags.push(['', "the recipe's"]);
+  if (x.key === (c.entry.base || state.set.base)) tags.push(['accent', 'from']);
+  if (x.key === c.entry.pose) tags.push(['accent', 'pose']);
+  if (x.enhanced?.length) tags.push(['good', 'enhanced']);
+  const menu = items => items.length ? `<details class="menu"><summary>…</summary><div>${items.map(([a, arg, t]) => `<button data-act="${a}" data-arg="${esc(arg)}">${t}</button>`).join('')}</div></details>` : '';
+  let acts = '';
+  if (x.kind === 'restyle') acts = `
+      <button class="small ${x.picked ? 'on' : ''}" data-act="${x.picked ? 'unpick' : 'keep'}" data-arg="${x.key}" title="${x.picked ? 'back to whatever the recipe makes' : 'make this the card\'s styled art, whatever the recipe says'}">${x.picked ? 'kept ✓' : 'keep'}</button>
+      ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="${x.key}">enhance</button>`}
+      ${menu([['base', x.key, 'restyle from this'], ['pose', x.key, 'repose from this'],
+              ...(x.recipe?.seed != null && c.entry.seed !== x.recipe.seed ? [['pin', x.recipe.seed, `pin its seed ${x.recipe.seed}`]] : []),
+              ['promote', x.key, 'make the set style from this'], ['delete', x.key, 'delete']])}`;
+  else if (x.kind === 'crop') acts = `
+      ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="crop">enhance</button>`}
+      ${menu([['base', 'crop', 'restyle from this'], ['pose', 'crop', 'repose from this']])}`;
+  else if (x.kind === 'enhance') acts = menu([['base', x.key, 'restyle from this'], ['pose', x.key, 'repose from this'], ['delete', x.key, 'delete']]);
+  else acts = `<button class="small" data-act="render-${x.which}" data-arg="">re-render</button><button class="small" data-act="delete-render" data-arg="${esc(x.file)}">delete</button>`;
+  return `
+      <div class="col ${x.styled ? 'styled' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
+        <div class="pic ${x.kind === 'card' ? 'card' : ''}" data-open="${esc(x.path)}"><img loading="lazy" src="${img(x.path, 640)}">
+          <div class="ab"><b data-ab="a">A</b><b data-ab="b">B</b></div></div>
+        <div class="title"><span>${esc(x.title)} ${tags.map(([k, t]) => `<span class="badge ${k}">${esc(t)}</span>`).join(' ')}</span><small>${esc(x.sub)}</small></div>
+        ${x.recipe ? `<div class="recipe">${recipeDiff(x.recipe, c.recipe)}</div>` : ''}
+        <div class="acts">${acts}</div>
+      </div>`;
+}
+/* The generate panel's inputs: the card's remix mode and, for it, what the picture starts from. */
+function generatePanel(c, cols) {
+  const st = state.set, e = c.entry, style = st.style;
+  const mode = e.remix || style?.remix || 'restyle';
+  const setBase = st.base || 'crop', from = e.base || setBase;
+  const labels = styleLabels([c]).map(([l]) => l);
+  const imgOpts = (val, first) => [first, ['crop', 'crop'], ...labels.map(l => [l, `${l} · newest`]),
+    ...cols.filter(x => x.v).map(x => [x.key, `${x.title}-${x.key}`])]
+    .map(([v, t]) => `<option value="${esc(v)}" ${val === v ? 'selected' : ''}>${esc(t)}</option>`).join('');
+  const tpl = lookTemplate(style), lookName = tpl || style?.name || '';
+  const overrides = ['base', 'pose', 'seed', 'remix'].filter(k => e[k] != null);
+  const takes = state.takes;
+  const seedRow = e.seed != null
+    ? `<input type="number" id="seed" value="${e.seed}" style="width:9em"> <button class="small" id="unpin">unpin</button> <span class="muted">pinned: the same picture every run</span>`
+    : `<span class="muted">fresh each run, so every click is another take</span> <button class="small" id="pinseed" title="pin the derived seed ${c.recipe?.seed ?? ''}, the one a batch restyle from the board uses">pin the set's</button>`;
+  const hint = tpl === null ? `<span class="warn">${esc(lookTitle(style))}</span>`
+    : takes === 1 && e.seed != null && tpl === undefined ? (c.current ? `<span class="muted">already made: <span class="mono">${c.current.hash}</span></span>` : `<span class="muted">makes <span class="mono">${c.style_hash}</span></span>`) : '';
+  const rows = mode === 'restyle' ? `
+        <span title="the image the restyle redraws">from</span><span class="row"><select id="from">${imgOpts(e.base || '', ['', `set's: ${setBase}`])}</select>
+          ${c.base_missing ? `<span class="warn">no ${esc(c.base_missing)} variant on this card yet</span>` : ''}</span>`
+    : mode === 'repose' ? `
+        <span title="the image whose OpenPose skeleton the new picture takes; only the joints are kept">pose</span><span class="row"><select id="posesel">${imgOpts(isPath(e.pose) ? 'path' : e.pose || '', ['', `the from image: ${from}`])}<option value="path" ${isPath(e.pose) ? 'selected' : ''}>an image file…</option></select>
+          <input type="text" id="posepath" value="${isPath(e.pose) ? esc(e.pose) : ''}" placeholder="path to any image" style="width:20em" ${isPath(e.pose) ? '' : 'hidden'}></span>`
+    : `
+        <span>scene</span><span class="muted">the prompt alone; the subject line above is the only thread back to the card${e.subject ? '' : ' (none set: its name and type line stand in)'}</span>`;
+  return `
+    <details class="sect gen" id="gen" ${state.genOpen ? 'open' : ''}>
+      <summary><h2>generate</h2><span class="muted">${esc(mode)} as ${esc(lookName || '?')}${overrides.length ? ` · this card's own ${overrides.join(', ')}` : ''}</span></summary>
+      <div class="kv">
+        <span>mode</span><span class="row"><span class="seg">${Object.keys(REMIX).map(m => `<button data-mode="${m}" class="${mode === m ? 'on' : ''}" title="${esc(REMIX[m])}${m === (style?.remix || 'restyle') ? ' (the style\'s default)' : ''}">${m}</button>`).join('')}</span><span class="muted">${esc(REMIX[mode])}</span></span>
+        <span>look</span><span class="row">${lookPicker('style', st.cards_detail, style)}</span>${rows}
+        <span>seed</span><span class="row">${seedRow}</span>
+        <span>takes</span><span class="row">${takesPicker()}${takes > 1 ? `<label title="drafts skip the ESRGAN pass, a large share of a take's time; enhance the one you keep"><input type="checkbox" id="upscale" ${state.upscale ? 'checked' : ''}> ESRGAN pass</label>` : ''}</span>
+        <span></span><span class="row"><button class="primary" data-cjob="restyle" ${tpl === null ? 'disabled' : ''}>${esc(mode)} as ${esc(lookName || '?')}${takes > 1 ? ` ×${takes}` : ''}</button>${hint}
+          ${overrides.length ? `<button class="small" id="resetentry" title="clear this card's own ${overrides.join(', ')}">reset to the set's</button>` : ''}</span>
+      </div>
+    </details>`;
 }
 async function card(r) {
   const c = cardOf(r.name);
-  const code = state.set.code;
+  const code = state.set.code, st = state.set;
   if (!c) { $('#main').innerHTML = `<div class="empty">no card ${esc(r.name)} in ${esc(code)}</div>`; return; }
   if (c.error) { $('#main').innerHTML = `<h1>${esc(c.name)}</h1><div class="empty bad">${esc(c.error)}</div>`; return; }
-  const cols = columns(c);
+  const groups = columns(c), cols = allColumns(c);
   const ab = state.ab;
   const find = k => cols.find(x => x.key === k);
   const A = find(ab.a), B = find(ab.b);
+  const styledV = c.entry.pick ? c.picked : c.current;  // the variant the styled render uses, if made
+  const styledCol = styledV && find(styledV.hash);
+  const styledLine = styledV
+    ? `<span class="badge accent">${esc(styledV.label)}-${styledV.hash}</span> <span class="muted">${c.entry.pick ? 'picked' : "the recipe's"}${styledCol?.enhanced?.length ? ' · enhanced' : ''}</span>
+       ${styledCol?.enhanced?.length ? '' : `<button class="small" data-cjob="enhance-styled" title="an ESRGAN pass on it; the render picks the enhance up">enhance</button>`}
+       ${c.entry.pick ? '<button class="small" data-act="unpick" data-arg="">unpick</button>' : ''}`
+    : c.entry.pick ? `<span class="warn">picked ${c.entry.pick}, which is gone</span> <button class="small" data-act="unpick" data-arg="">unpick</button>`
+    : c.style_hash ? `<span class="muted">none yet: the recipe would make <span class="mono">${c.style_hash}</span>; generate one below, or keep any variant</span>`
+    : '<span class="muted">no style and no pick: the plain art</span>';
+  const renders = groups.find(g => g.renders);
   $('#main').innerHTML = `
     <div class="cardhead">
       <div><h1>${esc(c.name)} <span class="muted mono">${c.number ?? ''}</span></h1>
@@ -526,42 +627,29 @@ async function card(r) {
           <span>printing</span><span class="printing"><button class="small" id="printing" title="which Scryfall printing's art this card starts from">
             ${c.entry.printing ? esc(c.entry.printing.toUpperCase()) : `${esc(c.card.set.toUpperCase())} ${esc(c.card.collector_number)} · default`} ▾</button>
             <span class="muted" id="printing-n"></span><div class="printings" id="printings" hidden></div></span>
-          <span>restyle base</span><span><span class="badge">${esc(c.entry.base || state.set.base || 'crop')}</span>${!c.entry.base && state.set.base ? ' <span class="muted">(set-wide)</span>' : ''} ${c.entry.base ? '<button class="small" id="basecrop">use set default</button>' : ''}
-            <select id="setbase" title="set-wide base: every card starts its restyle from this"><option value="">set-wide: crop</option>${styleLabels(state.set.cards_detail).filter(([l]) => l !== state.set.style?.name).map(([l, k]) => `<option value="${esc(l)}" ${state.set.base === l ? 'selected' : ''}>set-wide: ${esc(l)} (${k})</option>`).join('')}</select></span>
-          <span>pose</span><span title="repose only: the image whose OpenPose skeleton the new picture takes; a hash from this card's columns, or a path to any image file"><input type="text" id="pose" value="${esc(c.entry.pose || '')}" placeholder="the base (${esc(c.entry.base || state.set.base || 'crop')}); or any image's path" style="width:22em"> ${c.entry.pose ? '<button class="small" id="posebase">use base</button>' : ''}</span>
           <span>subject</span><span><input type="text" id="subject" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene"></span>
-          <span>seed</span><span><input type="number" id="seed" value="${c.entry.seed ?? ''}" placeholder="derived: ${c.recipe?.seed ?? '-'}" style="width:9em" title="the number the picture is generated from; same seed + same recipe = same picture. Empty = a fixed value derived from the set, so it is reproducible. Pin a number (or roll one) to explore other takes.">
-${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rolled seed each generate">unpin</button>' : '<span class="muted">rolled fresh each generate until you pin one</span>'}</span>
-          <span>remix</span><span><select id="remix" title="what the next restyle keeps of the base image">
-            <option value="">style's (${state.set.style?.remix || 'restyle'})</option>
-            ${Object.entries(REMIX).map(([m, d]) => `<option value="${m}" ${c.entry.remix === m ? 'selected' : ''}>${m} · ${d}</option>`).join('')}</select></span>
           ${(c.warnings || []).map(w => `<span>warning</span><span class="warn">${esc(w)}</span>`).join('')}
         </div></div>
-      <div><div class="muted" style="font-size:.85em">current recipe ${c.style_hash ? `<span class="mono">${c.style_hash}</span>` : '(no style)'}</div>
-        <div class="recipe mono" style="font-size:.78em;max-width:520px;color:var(--ink-2)">${c.recipe ? esc(c.recipe.prompt) : ''}</div></div>
       <div class="row" style="margin-left:auto"><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a><a class="pill" href="#/set/${esc(code)}/lab">lab</a></div>
     </div>
-    <div class="toolbar" title="jobs for this card; a restyle starts from the base shown above">
-      <span class="muted">this card:</span>
-      <button data-cjob="restyle" ${lookTemplate(state.set.style) === null ? 'disabled' : ''} title="${esc(lookTitle(state.set.style))}, from the base, subject and remix mode above; a fresh seed each click unless you pin one, so click again for another take">${esc(c.entry.remix || state.set.style?.remix || 'restyle')}</button>
-      ${lookPicker('style', state.set.cards_detail, state.set.style)}${takesPicker()}
-      <span class="sep"></span>
-      <button data-cjob="enhance">enhance</button>
-      <button data-cjob="render-plain">render plain</button>
-      <button data-cjob="render-styled" ${state.set.style ? '' : 'disabled'}>render styled</button>
-    </div>
-    ${A && B ? abPanel(A, B) : `<p class="muted">Pick <b>A</b> and <b>B</b> on two images to wipe between them.</p>`}
-    <div class="cols">${cols.map(x => `
-      <div class="col ${x.current ? 'current' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
-        <div class="pic ${x.kind === 'card' ? 'card' : ''}" data-open="${esc(x.path)}"><img loading="lazy" src="${img(x.path, 640)}">
-          <div class="ab"><b data-ab="a">A</b><b data-ab="b">B</b></div></div>
-        <div class="title"><span>${esc(x.title)}${x.isBase ? ' <span class="badge accent">base</span>' : ''}${x.isPose ? ' <span class="badge accent">pose</span>' : ''}</span><small>${esc(x.sub)}</small></div>
-        ${x.recipe ? `<div class="recipe">${recipeDiff(x.recipe, c.recipe)}</div>` : ''}
-        <div class="acts">${x.acts.map(([a, arg]) => `<button class="small" data-act="${a}" data-arg="${esc(arg)}">${
-          {enhance: 'enhance', base: 'use as base', pose: 'use as pose', promote: 'use recipe for set',
-           'render-plain': 're-render', 'render-styled': 're-render', delete: 'delete', 'delete-render': 'delete'}[a]}</button>`).join('')}</div>
-      </div>`).join('')}
-    </div>`;
+    <section class="sect">
+      <h2>card</h2>
+      <div class="kv">
+        <span title="the image a styled render uses: the card's pick, else the variant its recipe hashes to">styled art</span><span class="row">${styledLine}</span>
+        <span>renders</span><span class="row">
+          <button data-cjob="render-plain">render plain</button>
+          <button data-cjob="render-styled" ${styledV || st.style ? '' : 'disabled'} title="${styledV ? `the card with ${styledV.label}-${styledV.hash}` : st.style ? 'no styled art yet: the set\'s art_filter stands in' : 'nothing styled to render'}">render styled</button>
+          <select id="dpi">${[300, 600, 1200].map(d => `<option ${state.dpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span></span>
+      </div>
+      ${renders.cols.length ? `<div class="cols renders">${renders.cols.map(x => columnHtml(x, c)).join('')}</div>` : ''}
+    </section>
+    ${generatePanel(c, cols)}
+    <section class="sect">
+      <h2>images</h2>
+      ${A && B ? abPanel(A, B) : `<p class="muted">Pick <b>A</b> and <b>B</b> on two images to wipe between them.</p>`}
+      <div class="groups">${groups.filter(g => !g.renders && g.cols.length).map(g => `<div class="group"><h3>${esc(g.title)}</h3><div class="cols">${g.cols.map(x => columnHtml(x, c)).join('')}</div></div>`).join('')
+        || '<div class="empty">no images yet: fetch the crop (mint art) or generate one</div>'}</div>
+    </section>`;
   const put = body => api(`/api/sets/${code}/cards/${encodeURIComponent(c.name)}`, {method: 'PUT', body}).then(() => refresh()).catch(e => toast(e.message, true));
   // printings: a grid of art crops, each fetched from Scryfall the first time it is shown
   const cardUrl = `/api/sets/${code}/cards/${encodeURIComponent(c.name)}`;
@@ -579,48 +667,68 @@ ${c.entry.seed != null ? ' <button class="small" id="unpin" title="back to a rol
   }).catch(e => toast(e.message, true));
   $('#printing').onclick = e => { e.stopPropagation(); const box = $('#printings'); box.hidden = !box.hidden; };
   $('#printings').onclick = e => e.stopPropagation();
-  document.onclick = () => { const box = $('#printings'); if (box) box.hidden = true; };  // anywhere else closes it
+  document.onclick = () => {  // anywhere else closes the printings and any open column menu
+    const box = $('#printings'); if (box) box.hidden = true;
+    document.querySelectorAll('details.menu[open]').forEach(d => { d.open = false; });
+  };
+  document.querySelectorAll('details.menu').forEach(d => d.onclick = e => e.stopPropagation());
   document.onkeydown = e => { if (e.key === 'Escape' && $('#printings') && !$('#printings').hidden) { $('#printings').hidden = true; e.preventDefault(); } };
   $('#subject').onchange = e => put({subject: e.target.value || null});
-  $('#pose').onchange = e => put({pose: e.target.value.trim() || null});
-  if ($('#posebase')) $('#posebase').onclick = () => put({pose: null});
-  $('#seed').onchange = e => put({seed: e.target.value === '' ? null : +e.target.value});
-  $('#remix').onchange = e => put({remix: e.target.value || null});
+  $('#dpi').onchange = e => { state.dpi = +e.target.value; };
+  // the generate panel
+  $('#gen').ontoggle = e => { state.genOpen = e.target.open; };
+  document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => put({remix: b.dataset.mode === (st.style?.remix || 'restyle') ? null : b.dataset.mode}));
+  $('#style').onchange = e => { state.style = e.target.value; card(r); };
+  if ($('#from')) $('#from').onchange = e => put({base: e.target.value || null});
+  if ($('#posesel')) $('#posesel').onchange = e => {
+    if (e.target.value === 'path') { $('#posepath').hidden = false; $('#posepath').focus(); }
+    else put({pose: e.target.value || null});
+  };
+  if ($('#posepath')) $('#posepath').onchange = e => { if (e.target.value.trim()) put({pose: e.target.value.trim()}); };
+  if ($('#seed')) $('#seed').onchange = e => put({seed: e.target.value === '' ? null : +e.target.value});
   if ($('#unpin')) $('#unpin').onclick = () => put({seed: null});
-  if ($('#basecrop')) $('#basecrop').onclick = () => put({base: null});
-  $('#setbase').onchange = e => api(`/api/sets/${code}/base`, {method: 'PUT', body: {base: e.target.value || null}}).then(() => { toast(e.target.value ? `every ${code} restyle now starts from its ${e.target.value}` : 'restyles start from the crop'); refresh(); }).catch(e => toast(e.message, true));
+  if ($('#pinseed')) $('#pinseed').onclick = () => put({seed: c.recipe?.seed ?? 1 + Math.floor(Math.random() * 2 ** 31)});
+  if ($('#resetentry')) $('#resetentry').onclick = () => put({base: null, pose: null, seed: null, remix: null});
+  bindTakes();
+  $('#takes').addEventListener('change', () => card(r));  // the ESRGAN checkbox shows for drafts
+  if ($('#upscale')) $('#upscale').onchange = e => { state.upscale = e.target.checked; };
   document.querySelectorAll('[data-ab]').forEach(b => b.onclick = e => {
     e.stopPropagation(); const key = b.closest('.col').dataset.key;
     ab[b.dataset.ab] = ab[b.dataset.ab] === key ? null : key; card(r);
   });
-  $('#style').onchange = e => { state.style = e.target.value; card(r); };
-  bindTakes();
+  const render = styled => submit({kind: 'render', set: code, names: [c.name], styled, dpi: state.dpi});
   document.querySelectorAll('[data-cjob]').forEach(b => b.onclick = () => {
     const j = b.dataset.cjob, names = [c.name];
-    if (j === 'restyle') submit({kind: 'restyle', set: code, names, template: lookTemplate(state.set.style), takes: state.takes, seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined});
-    else if (j === 'enhance') submit({kind: 'enhance', set: code, names, base: c.entry.base || state.set.base || 'crop'});
-    else if (j === 'render-plain') submit({kind: 'render', set: code, names, styled: false, dpi: 1200});
-    else if (j === 'render-styled') submit({kind: 'render', set: code, names, styled: true, dpi: 1200});
+    if (j === 'restyle') submit({kind: 'restyle', set: code, names, template: lookTemplate(st.style), takes: state.takes,
+                                 upscale: state.takes > 1 ? state.upscale : undefined,
+                                 seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined});
+    else if (j === 'enhance-styled') submit({kind: 'enhance', set: code, names, base: styledV.hash});
+    else if (j === 'render-plain') render(false);
+    else if (j === 'render-styled') render(true);
   });
   document.querySelectorAll('.col [data-open]').forEach(p => p.onclick = () => { V.fromPage = true; location.hash = colHash(code, c.name, p.closest('.col').dataset.key); });
   if (r.key) { const slides = columnSlides(c); openViewer('columns', slides, slides.findIndex(x => x.key === r.key)); }
   document.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
     const act = b.dataset.act, arg = b.dataset.arg, names = [c.name];
-    if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg});
+    if (act === 'keep') put({pick: arg});
+    else if (act === 'unpick') put({pick: null});
+    else if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg});
     else if (act === 'base') put({base: arg === 'crop' ? null : arg});
     else if (act === 'pose') put({pose: arg});
+    else if (act === 'pin') put({seed: +arg});
     else if (act === 'delete-render') {
       if (!confirm(`Delete the render ${arg}? The PNG is removed from out/${code.toLowerCase()}/; re-render makes it again.`)) return;
       api(`/api/sets/${code}/renders/${encodeURIComponent(arg)}`, {method: 'DELETE'}).then(() => { toast(`deleted ${arg}`); refresh(); }).catch(e => toast(e.message, true));
     }
     else if (act === 'delete') {
       const v = c.variants.find(x => x.hash === arg);
-      if (!confirm(`Delete ${v.label}-${arg}${v.hash === c.current?.hash ? ' (the current variant)' : ''}? The file is removed; a restyle makes it again.`)) return;
+      const used = v.hash === c.entry.pick ? ' (the picked styled art)' : v.hash === c.current?.hash ? " (the recipe's)" : '';
+      if (!confirm(`Delete ${v.label}-${arg}${used}? The file is removed; a restyle makes it again.`)) return;
       api(`/api/sets/${code}/cards/${encodeURIComponent(c.name)}/variants/${arg}`, {method: 'DELETE'}).then(() => { toast(`deleted ${v.label}-${arg}`); refresh(); }).catch(e => toast(e.message, true));
     }
     else if (act === 'promote') api(`/api/sets/${code}/promote`, {method: 'POST', body: {name: c.name, hash: arg}}).then(() => { toast('set style updated'); refresh(); }).catch(e => toast(e.message, true));
-    else if (act === 'render-plain') submit({kind: 'render', set: code, names, styled: false, dpi: 1200});
-    else if (act === 'render-styled') submit({kind: 'render', set: code, names, styled: true, dpi: 1200});
+    else if (act === 'render-plain') render(false);
+    else if (act === 'render-styled') render(true);
   });
   bindAB(A, B, r);
 }

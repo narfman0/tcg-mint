@@ -32,11 +32,13 @@ def check_set(ws, cards, art, st):
         plain = art.resolve(card, override=entry.art, enhance=True) if art.crop(card, fetch=False).exists() or entry.art \
             else None
         notes.append(f"plain: {plain.describe() if plain else 'crop not fetched'}")
+        h = st.styled_hash(card, art=art)
+        if h:
+            v = art.variant(card, h)
+            picked = " (picked)" if entry.pick else ""
+            notes.append(f"styled: {v.label}-{v.hash}{picked}" if v else f"styled: missing ({h}{picked})")
         if st.style:
             recipe = st.recipe(card, art=art)
-            h = sets.recipe_hash(recipe)
-            v = art.variant(card, h)
-            notes.append(f"styled: {v.label}-{v.hash}" if v else f"styled: missing ({h})")
             if sets.is_label(recipe["base"]):
                 notes.append(f"base {recipe['base']}: none yet")
         others = [v for v in art.variants(card)]

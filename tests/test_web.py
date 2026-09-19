@@ -137,3 +137,28 @@ def test_restyle_takes_roll_a_seed_each(client):
     assert r.json()["title"] == "restyle 1 card(s) as look x 3 takes"
     r = client.post("/api/jobs", json={"kind": "restyle", "set": "TST", "names": ["Alpha"], "takes": 99})
     assert r.json()["params"]["takes"] == 16  # capped
+
+
+def test_pick_is_the_styled_art_and_clears_with_its_variant(client):
+    from mint.art import Art
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"], "style": "look"})
+    ws = client.ws
+    card = json.loads(ws.cards_file.read_text().splitlines()[0])
+    art = Art(ws.art)
+    crop = art.crop(card, fetch=False)
+    crop.parent.mkdir(parents=True, exist_ok=True)
+    crop.write_bytes(b"jpg")
+    v = art.new_variant(card, "look", "restyle", {"prompt": "x", "base": "crop", "seed": 5}, "crop", "abcd1234")
+    v.path.parent.mkdir(parents=True, exist_ok=True)
+    v.path.write_bytes(b"png")
+    art.record(v)
+    r = client.get("/api/sets/TST/cards/Alpha")
+    assert r.status_code == 200 and r.json()["current"] is None and "picked" not in r.json()
+    assert r.json()["styled"]["kind"] != "styled"
+    r = client.put("/api/sets/TST/cards/Alpha", json={"pick": "abcd1234"})
+    assert r.status_code == 200 and r.json()["picked"]["hash"] == "abcd1234"
+    assert r.json()["styled"]["kind"] == "styled" and r.json()["styled"]["hash"] == "abcd1234"
+    assert client.put("/api/sets/TST/cards/Alpha", json={"pick": "nope"}).status_code == 400
+    r = client.delete("/api/sets/TST/cards/Alpha/variants/abcd1234")
+    assert r.status_code == 200 and "pick" not in r.json()["entry"]
+    assert sets.load(ws.sets / "tst.json").cards["Alpha"].pick is None

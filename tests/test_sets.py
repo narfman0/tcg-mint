@@ -231,3 +231,20 @@ def test_repose_has_its_own_control_hold():
                           "cards": {"Alpha": {"base": "deadbeef", "pose": "art/other.png"}}})
     r4 = st4.recipe(alpha)
     assert r4["base"] == "art/other.png" and restyle.workflow("x.png", r4, "p")["3"]["class_type"] == "DWPreprocessor"
+
+
+def test_pick_names_the_styled_art_over_the_recipe(tmp_path):
+    from mint.art import Art
+    art = Art(tmp_path)
+    alpha = {"name": "Alpha", "illustration_id": "a"}
+    st = sets.from_dict(BASE)
+    derived = sets.recipe_hash(st.recipe(alpha, art=art))
+    assert st.styled_hash(alpha, art=art) == derived
+    st.cards["Alpha"].pick = "deadbeef"
+    assert st.styled_hash(alpha, art=art) == "deadbeef"  # the pick wins, whatever the recipe says
+    assert st.recipe(alpha, art=art)["seed"] == st.card_seed("Alpha", "a")  # and leaves the recipe alone
+    assert sets.from_dict(st.to_dict()).cards["Alpha"].pick == "deadbeef"
+    nostyle = sets.from_dict({"code": "N", "name": "n", "cards": {"Alpha": {"pick": "deadbeef"}, "Beta": {}}})
+    assert nostyle.styled_hash(alpha) == "deadbeef" and nostyle.styled_hash({"name": "Beta"}) is None
+    with pytest.raises(SetError, match="pick should be a variant hash"):
+        sets.from_dict({"code": "N", "name": "n", "cards": {"Alpha": {"pick": "spore"}}})

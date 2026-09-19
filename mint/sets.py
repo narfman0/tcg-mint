@@ -9,7 +9,8 @@
       "cards": {
         "Card Name": {"number": 1, "flavor": "...", "art": "path.png", "art_filter": "...",
                       "subject": "what the picture is of", "printing": "rvr:40",
-                      "base": "<variant hash>", "pose": "<variant hash>", "seed": 123}
+                      "base": "<variant hash>", "pose": "<variant hash>", "seed": 123,
+                      "pick": "<variant hash>"}
       }
     }
 
@@ -23,6 +24,11 @@ from; its hash names the restyle output (see art.py), so changing any knob
 gives a new variant instead of overwriting the old one. A base given as a
 label ("spore") is resolved to that card's newest such variant when the art
 cache is passed in, so the hash follows the actual input image.
+
+The card's *styled art* (`SetFile.styled_hash`) is the variant its `pick`
+names, else the one the effective recipe hashes to. A pick is how a take from
+a random seed, or a restyle in another look, becomes the card's art without
+rewriting the recipe to match it.
 """
 import dataclasses
 import hashlib
@@ -119,6 +125,7 @@ class CardEntry:
     pose: str | None = None          # repose: the image whose pose to take: a hash, label, "crop" or a file path; else the base
     seed: int | None = None          # this card's seed, instead of the derived one
     remix: str | None = None         # this card's remix mode (REMIX), instead of the style's
+    pick: str | None = None          # the variant hash --styled renders use, instead of the recipe's
 
 
 @dataclass
@@ -193,6 +200,14 @@ class SetFile:
             base = v.hash if v else base
         r["base"] = "none" if remix == "new" else base  # `new` reads no image, so none names its variant
         return r
+
+    def styled_hash(self, record, art=None):
+        """The variant hash the card's styled art comes from: its pick, else the effective
+        recipe's hash, else None without a style."""
+        pick = self.card(record).pick
+        if pick:
+            return pick
+        return recipe_hash(self.recipe(record, art=art)) if self.style else None
 
     def promote(self, recipe, record):
         """The Style a variant's recipe implies for the whole set: the set's style with the
@@ -296,6 +311,9 @@ def from_dict(d, where="set"):
     if not isinstance(cards, dict):
         raise SetError(f"{where}: cards must be an object of name -> entry")
     st.cards = {n: _build(CardEntry, e or {}, f"{where}: cards[{n!r}]") for n, e in cards.items()}
+    for n, e in st.cards.items():
+        if e.pick is not None and not re.fullmatch(r"[0-9a-f]{8}", e.pick):
+            raise SetError(f"{where}: cards[{n!r}]: pick should be a variant hash (8 hex characters), not {e.pick!r}")
     return st
 
 

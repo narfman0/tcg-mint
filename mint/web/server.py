@@ -358,6 +358,8 @@ def create_app(ws):
             if st.card_seed(name, card["illustration_id"]) != v.recipe.get("seed"):
                 entry.seed = v.recipe.get("seed")
             entry.base = None if v.base == "crop" else v.base
+            if entry.pick == h:  # the recipe now makes it current; the pick is redundant
+                entry.pick = None
             sets.save(st.path, st)
         return set_detail(S, st)
 
@@ -372,7 +374,7 @@ def create_app(ws):
 
     @app.delete("/api/sets/{code}/cards/{name}/variants/{h}")
     def delete_variant(code: str, name: str, h: str):
-        """Remove one variant (image + sidecar). A card entry that named it as its base goes back to the default."""
+        """Remove one variant (image + sidecar). A card entry that named it as its base or pick goes back to the default."""
         st = S.find_set(code)
         card = S.cards().find(name, st.card({"name": name}).printing)
         v = S.art.variant(card, h)
@@ -381,8 +383,10 @@ def create_app(ws):
         with S.lock:
             S.art.delete(v)
             entry = st.cards.get(name)
-            if entry and entry.base == h:
-                entry.base = None
+            if entry and h in (entry.base, entry.pick, entry.pose):
+                for k in ("base", "pick", "pose"):
+                    if getattr(entry, k) == h:
+                        setattr(entry, k, None)
                 sets.save(st.path, st)
         return card_detail(S, st, name)
 
@@ -570,9 +574,12 @@ def card_detail(S, st, name, cards=None):
         info["base_missing"] = recipe["base"] if sets.is_label(recipe["base"]) else None
         cur = art.variant(card, info["style_hash"])
         info["current"] = variant_dict(cur) if cur else None
+    if entry.pick:  # the styled art the card asked for by hash, whatever the recipe says
+        pv = art.variant(card, entry.pick)
+        info["picked"] = variant_dict(pv) if pv else None
     if crop.exists() or entry.art:
         info["plain"] = source_dict(art.resolve(card, override=entry.art))
-        info["styled"] = source_dict(art.resolve(card, override=entry.art, style_hash=info.get("style_hash")))
+        info["styled"] = source_dict(art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art)))
     info["renders"] = renders_for(S, st, name)
     return info
 

@@ -135,13 +135,19 @@ A local page over the workspace, for comparing and deciding:
 - **Viewer** (click a card) — the tile's image large: ← → or a swipe steps
   through the board in its current order, wheel / pinch / drag zoom and pan,
   `s` `p` `a` switch styled / plain / art, `c` opens compare, `f` fullscreen.
-- **Compare** (`c`, or *compare* in the viewer) — the Scryfall crop, every variant the cache
-  holds with the knobs that differ from the set's recipe, and the renders,
-  side by side. Mark two images A and B for a wipe with zoom and pan, or a
-  blind A/B. Each image offers *enhance* (an ESRGAN pass, from any image),
-  *restyle from this*, *use as base* (which image the next restyle starts
-  from) and *delete*; a restyled variant offers *use recipe for set*. The
-  card's printing, subject, seed and the set-wide restyle base are set here.
+- **Card** (`c`, or click a tile) — three parts. *Card*: type, printing,
+  subject, and the styled art — the variant the styled render uses — with
+  the renders and their buttons. *Generate*: one mode (restyle, repose, new)
+  and only that mode's inputs — the look, what the picture starts from or
+  takes its pose from, the seed, how many takes — all of them this card's
+  own overrides, with a reset back to the set's. *Images*: the Scryfall crop,
+  every variant the cache holds grouped by look with the knobs that differ
+  from the set's recipe, each enhance beside the image it was made from.
+  Mark two images A and B for a wipe with zoom and pan, or a blind A/B.
+  A restyled variant offers *keep* — it becomes the card's styled art (the
+  entry's `pick`), whatever the recipe says — and *enhance*; a menu on every
+  image holds *restyle from this*, *repose from this*, *pin its seed*,
+  *make the set style from this* and *delete*.
 - **Edit** — the set file as a form: its own fields (code, name, size, note,
   art filter, restyle base), the style block (edit the knobs, replace it
   from a template, save it as one, remove it) and the card list — every
@@ -158,13 +164,13 @@ A local page over the workspace, for comparing and deciding:
   holds, or a template not run yet. A styled tile shows that look, the
   filter finds cards without it, and *restyle* makes it — from each card's
   own base, subject, seed and remix mode. Variants land under the look's
-  name, side by side in Compare; *use recipe for set* adopts one. The
-  `× N` beside the button makes N takes per card, each from its own random
-  seed, to choose between. Takes are drafts — no ESRGAN pass, which is a
-  large share of a take's time — so pin the seed of the one you keep and
-  *enhance* it; the renderer picks the enhance up. (The base's resolution
-  doesn't matter for speed: everything is scaled to the generation size
-  first.)
+  name, side by side on the card page; *keep* adopts one for its card, *make
+  the set style from this* for the set. The `× N` beside the button makes N
+  takes per card, each from its own random seed, to choose between. Takes
+  are drafts — no ESRGAN pass, which is a large share of a take's time — so
+  *keep* the one you like and *enhance* it; the renderer picks the enhance
+  up. (The base's resolution doesn't matter for speed: everything is scaled
+  to the generation size first.)
 - **Recipe lab** — a form for every knob in the style block, a few probe
   cards, and a run button; results land as variants in a probe-by-recipe
   grid as they finish. New knobs are one field in `sets.Style` and one node
@@ -278,8 +284,10 @@ thread back to the original. `"refine": 0.4` adds a second sampling pass at
 checkpoints want.
 
 Per card, `"base": "<variant hash>"` starts the restyle from an enhanced or
-earlier restyled image instead of the crop, and `"seed": 123` pins a seed you
-liked.
+earlier restyled image instead of the crop, `"seed": 123` pins a seed you
+liked, and `"pick": "<variant hash>"` names the variant styled renders use
+outright — a take from a random seed, or one in another look — without the
+recipe having to match it.
 
 A card entry can add `"subject": "a red dragon with a blue-finned crest,
 wings spread"` — prepended to the prompt so the style can't drift a character
