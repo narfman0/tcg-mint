@@ -201,6 +201,7 @@ function badges(c) {
   if (styleOf(c) && !c.current && !c.picked) b.push(['', 'no restyle']);
   if (c.entry.pick) b.push([c.picked ? 'accent' : 'bad', c.picked ? 'picked' : 'pick gone']);
   if (c.renders?.plain?.shrunk || c.renders?.styled?.shrunk) b.push(['warn', 'text shrunk']);
+  if (c.renders?.plain?.stale || c.renders?.styled?.stale) b.push(['warn', 'stale render']);
   if (c.entry.art) b.push(['accent', 'own art']);
   if (c.entry.printing) b.push(['accent', c.entry.printing]);
   if (c.entry.base) b.push(['accent', 'base ' + c.entry.base]);
@@ -316,7 +317,7 @@ function board() {
   const labels = styleLabels(st.cards_detail);
   if (state.style !== 'current' && !labels.some(([l]) => l === state.style) && !templates(() => go()).some(t => t.name === state.style)) state.style = 'current';
   const cards = boardCards();
-  const filters = ['no restyle', ...(state.style !== 'current' ? [`no ${state.style}`] : []), 'not rendered', 'text shrunk', 'UB art', 'own art'];
+  const filters = ['no restyle', ...(state.style !== 'current' ? [`no ${state.style}`] : []), 'not rendered', 'stale render', 'text shrunk', 'UB art', 'own art'];
   // the two job stages. "restyle" makes art in the look picked; "render styled" composes cards from the art
   // each card's styled render uses (its pick, else the set recipe's variant), so it follows the look
   // only when that look is the set's recipe -- viewing another look, it is off rather than a surprise
@@ -331,8 +332,8 @@ function board() {
   const lacks = {
     'enhance': c => !c.plain || c.plain.kind === 'crop',
     'restyle': c => lookIsRecipe ? !hasStyled(c) : !variantFor(c, state.style),
-    'render-plain': c => !c.renders?.plain,
-    'render-styled': c => !c.renders?.styled,
+    'render-plain': c => !c.renders?.plain || !!c.renders.plain.stale,
+    'render-styled': c => !c.renders?.styled || !!c.renders.styled.stale,
   };
   const targets = job => state.missing ? target.filter(lacks[job]) : target;
   const count = job => state.missing ? ` <small>${targets(job).length}</small>` : '';
@@ -365,7 +366,7 @@ function board() {
         <button data-job="render-styled" ${styledOk ? '' : 'disabled'} title="${esc(styledTitle)}">render styled${state.missing ? count('render-styled') : styledOk && cover.have < cover.total ? ` <small>${cover.have}/${cover.total}</small>` : ''}</button>
         <select id="dpi">${[300, 600, 1200].map(d => `<option ${state.dpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span>
       </span>
-      <label class="missing" title="each job skips the cards that already have its product: an enhance of the crop, art in the look, a plain or styled render. The count is what it would make"><input type="checkbox" id="missing" ${state.missing ? 'checked' : ''}> only what's missing</label>
+      <label class="missing" title="each job skips the cards that already have its product: an enhance of the crop, art in the look, a plain or styled render that is not stale. The count is what it would make"><input type="checkbox" id="missing" ${state.missing ? 'checked' : ''}> only what's missing</label>
       ${n ? '<button id="clearsel" class="small">clear selection</button>' : ''}
     </div>
     <div class="grid"></div>`;
@@ -628,7 +629,7 @@ function columns(c) {
   const renders = [];
   for (const k of ['plain', 'styled']) {
     const r = c.renders?.[k];
-    if (r) renders.push({key: 'render-' + k, title: `render · ${k}`, sub: `${r.dpi || '?'} dpi · text ${r.sizes?.text}px${r.shrunk ? ' (shrunk)' : ''}`,
+    if (r) renders.push({key: 'render-' + k, title: `render · ${k}`, sub: `${r.dpi || '?'} dpi · text ${r.sizes?.text}px${r.shrunk ? ' (shrunk)' : ''}${r.stale ? ` · stale: ${r.stale}` : ''}`,
                          path: r.path, kind: 'card', which: k, file: r.file});
   }
   groups.push({title: 'renders', cols: renders, renders: true});
@@ -1040,6 +1041,7 @@ const FIELD_HELP = {
   controlnet: 'the ControlNet model file', upscaler: 'the ESRGAN model file', loras: 'JSON: [{"name": "x.safetensors", "strength": 0.7}]',
   width: 'generation width', height: 'generation height', grayscale_source: 'desaturate the base first (for ink styles)',
   refine: 'a second pass at refine_scale x the size with this denoise; 0 = off', refine_scale: '1-3',
+  color_match: 'after the picture is made, move its colours back to the base\'s by this much (0-1): the fix for a faithful restyle whose palette drifted; 0 = off',
   clip_skip: '1 = the checkpoint\'s CLIP; 2 for Pony-family checkpoints', remix: 'restyle: redraw the base; repose: a new picture holding only the pose image\'s skeleton; new: from the prompt alone; inspire: a new picture with the base as an IP-Adapter reference',
   repose_strength: 'repose only: how hard the OpenPose skeleton is held (0-1)', repose_end: 'repose only: the fraction of the steps the skeleton is held for',
   inspire_weight: 'inspire only: the reference image\'s weight against the words (0-2; 0.6-0.8 on base-SDXL checkpoints, 0.35-0.5 on Pony, which burns above that)', inspire_end: 'inspire only: the fraction of the steps the image is read for',

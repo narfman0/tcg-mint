@@ -18,6 +18,7 @@ block, so a set's look is reproducible:
       "remix": "restyle",                   restyle | repose | new (below); a card entry can override
       "repose_strength": 0.5, "repose_end": 0.3,   repose's own control hold (below)
       "refine": 0.4, "refine_scale": 1.5,   second pass at 1.5x size, denoise 0.4: detail; default off
+      "color_match": 0.8,                   move the result's colours back to the base's, this much; default off
       "loras": [{"name": "x.safetensors", "strength": 0.7}],
       "width": 1248, "height": 912          generation size (art window is 1.42:1)
     }
@@ -215,6 +216,9 @@ def restyle(server, art, card, st, style=None, force=False, upscale=True, seed=N
     src = None if recipe["base"] == "none" else art.base_path(card, recipe["base"])
     restyle_file(server, src, v.path, recipe,
                  "tcg-mint/" + card["illustration_id"] + "." + style.name, upscale)
+    if recipe.get("color_match") and src is not None:
+        from . import color
+        color.match_file(v.path, src, recipe["color_match"])
     return art.record(v), True
 
 

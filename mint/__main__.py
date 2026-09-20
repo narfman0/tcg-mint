@@ -14,6 +14,8 @@ COMMANDS = {
     "style":     ("save a set's art style as a template, or list them", "style"),
     "migrate":   ("move a pre-variant art cache into art/<id>/", "migrate"),
     "fonts":     ("report which frame fonts are present", "fonts"),
+    "doctor":    ("check the card file, fonts, Chromium, ComfyUI and its models", "doctor"),
+    "gc":        ("report and remove unneeded variants and stale renders", "gc"),
     "back":      ("render the BLS card back", "back"),
     "impose":    ("lay rendered PNGs out 3x3 on a printable PDF", "impose"),
     "serve":     ("the workbench: compare art and recipes in a browser", "serve"),

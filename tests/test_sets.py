@@ -293,3 +293,12 @@ def test_frame_block_round_trips_slim_and_validates():
         sets.from_dict({"code": "T", "frame": {"watermark": 3}})
     with pytest.raises(SetError, match="unknown key"):
         sets.from_dict({"code": "T", "frame": {"glitter": 1}})
+
+
+def test_color_match_is_a_knob_only_when_on():
+    from tests.conftest import synthetic_card
+    card = synthetic_card()
+    off = sets.from_dict({**BASE}).recipe(card)
+    assert "color_match" not in off
+    on = sets.from_dict({**BASE, "style": {**BASE["style"], "color_match": 0.7}}).recipe(card)
+    assert on["color_match"] == 0.7 and sets.recipe_hash(on) != sets.recipe_hash(off)

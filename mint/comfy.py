@@ -41,6 +41,20 @@ class Comfy:
         except (urllib.error.URLError, TimeoutError):
             return set()
 
+    def options(self, class_type, input_name):
+        """The choices a node's combo input offers -- CheckpointLoaderSimple's ckpt_name lists the
+        checkpoint files ComfyUI has -- or None when the server or the node is not there."""
+        try:
+            info = self._json(f"/object_info/{class_type}")[class_type]
+            spec = {**info["input"].get("required", {}), **info["input"].get("optional", {})}[input_name]
+            if isinstance(spec[0], list):  # the classic form: the choices themselves
+                return list(spec[0])
+            if spec[0] == "COMBO" and isinstance(spec[1], dict):  # the newer form: {"options": [...]}
+                return list(spec[1].get("options") or [])
+            return None
+        except (urllib.error.URLError, TimeoutError, KeyError, IndexError, TypeError):
+            return None
+
     def require(self):
         if not self.alive():
             raise ComfyError(f"no ComfyUI at {self.url}; start it with: python main.py --listen 127.0.0.1 --port 8188")

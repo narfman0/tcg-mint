@@ -72,6 +72,10 @@ A set is a JSON file (see `sets/bls1.json`):
 - `subject`, `base` and `seed` steer `mint restyle` for that card (below).
 - `art_filter` (set-wide or per card) is a CSS filter applied with
   `--styled` — the set's "flair" variant next to the faithful one.
+- In the style block, `color_match` (0–1) moves a finished restyle's
+  colours back to its base's by that much — the fix for a faithful style
+  whose palette drifts (a red seal gone brown). Off by default, and off
+  keeps out of the recipe hash.
 - A `frame` block holds the frame's dressing, each knob a strength from 0
   (off) to 1: `watermark` (the set symbol, faint, behind the rules text),
   `art_bevel` (a dark line and a light pinline around the art), `box_grain`
@@ -108,7 +112,9 @@ printer = "EPSON_ET_8500"
 | `mint migrate` | move a pre-variant art cache (`art/<id>.<style>.png`) into `art/<id>/` with recipe sidecars |
 | `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
-| `mint fonts` | report which frame fonts are present |
+| `mint fonts` | report which frame fonts are present; `--repair` fixes the community copies |
+| `mint gc` | report variants no card picks, renders with, or starts from, and renders gone stale; `--delete` removes them |
+| `mint doctor` | check the card file, the fonts, a Chromium launch, ComfyUI's nodes, and every model file the styles name |
 | `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
 | `mint serve` | the workbench: compare art, recipes and frames in a browser, and run the tools from it |
@@ -144,7 +150,8 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
 - **Sets** — *new set* makes a set file from a pasted decklist (code, name,
   a style template, private or not). Every card is a tile (styled render,
   plain render, or just the art), with badges from the render manifest: no restyle for the current
-  recipe, not rendered, rules text shrunk, Universes Beyond art, own art.
+  recipe, not rendered, stale render (the frame or the art changed since), rules text shrunk,
+  Universes Beyond art, own art. *only what's missing* counts a stale render as missing.
   A search box matches name, type and artist.
   Shift-click to select cards (or turn *select* on in the toolbar, or long-press
   a tile on a phone); render, enhance or restyle the selection.

@@ -14,7 +14,7 @@ from .. import PKG, comfy, frame, newset, render, restyle, sets, style, upscale
 from ..art import Art
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
-from ..manifest import Manifest
+from ..manifest import Manifest, frame_hash
 from .jobs import Jobs
 from .thumbs import inside, thumbnail
 
@@ -612,16 +612,23 @@ def card_detail(S, st, name, cards=None):
     if entry.pick:  # the styled art the card asked for by hash, whatever the recipe says
         pv = art.variant(card, entry.pick)
         info["picked"] = variant_dict(pv) if pv else None
+    want = {}
     if crop.exists() or entry.art:
-        info["plain"] = source_dict(art.resolve(card, override=entry.art))
-        info["styled"] = source_dict(art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art)))
-    info["renders"] = renders_for(S, st, name)
+        plain = art.resolve(card, override=entry.art)
+        styled = art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art))
+        info["plain"], info["styled"] = source_dict(plain), source_dict(styled)
+        want = {"plain": plain.hash, "styled": styled.hash}
+    info["renders"] = renders_for(S, st, name, want)
     return info
 
 
-def renders_for(S, st, name):
+def renders_for(S, st, name, want=None):
+    """The card's newest plain and styled render, its proof and its theme sheet. `want` is the art
+    hash each of plain / styled should render with now; a render is `stale` when the frame (template,
+    knobs, set css) or that art has changed since it was made."""
     out = {}
     m = Manifest(S.out_dir(st))
+    fh = frame_hash(st.css, frame.frame_css(st.frame))
     for fn, e in m.entries.items():
         if e.get("card") != name:
             continue
@@ -631,6 +638,9 @@ def renders_for(S, st, name):
         key = ("styled" if e.get("styled") else "plain") if e.get("theme") == "wizards" or not e.get("theme") else None
         if key and key not in out or (key and e["rendered_at"] > out[key]["rendered_at"]):
             out[key] = {**e, "file": fn, "path": str(p)}
+            if want is not None:
+                out[key]["stale"] = ("the frame changed" if e.get("frame") != fh
+                                     else "the art changed" if (e.get("source") or {}).get("hash") != want.get(key) else None)
     proof = S.out_dir(st) / "proof"
     if proof.is_dir():
         pm = Manifest(proof)

@@ -82,6 +82,10 @@ class Style:
     # denoise (0.3-0.5 adds detail without changing the picture); 0 = off
     refine: float = 0.0
     refine_scale: float = 1.5
+    # after the picture is made, move its colours back to the base's by this much (0-1; color.py):
+    # a faithful restyle keeps the drawing but lets the palette drift, and this brings it back.
+    # No-op in `new` mode, which has no base. 0 = off, and off keeps out of the recipe hash
+    color_match: float = 0.0
     # 1 = the checkpoint's own CLIP; 2 = CLIP skip 2, which Pony-family checkpoints are trained for
     clip_skip: int = 1
     remix: str = "restyle"  # REMIX above; a card entry can override it
@@ -209,6 +213,8 @@ class SetFile:
             del r["clip_skip"]
         if not r["refine"]:
             del r["refine"], r["refine_scale"]
+        if not r.get("color_match"):
+            del r["color_match"]
         remix = entry.remix or style.remix
         if remix not in REMIX:
             raise SetError(f"{record['name']}: remix must be one of {', '.join(REMIX)}, not {remix!r}")
@@ -273,6 +279,9 @@ class SetFile:
             d["frame"] = _slim(dataclasses.asdict(self.frame), Frame)
         d["cards"] = {n: {k: v for k, v in dataclasses.asdict(e).items() if v is not None} for n, e in self.cards.items()}
         return d
+
+
+HASH_RE = re.compile(r"^[0-9a-f]{8}$")
 
 
 def is_label(base):
