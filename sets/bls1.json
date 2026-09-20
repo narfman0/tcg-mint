@@ -1,21 +1,8 @@
 {
   "code": "BLS1",
   "name": "Blasted Studios, Set One",
-  "size": 48,
+  "size": 47,
   "note": "Test set: the priciest cards across satoru, niv and meren, numbered by price rank. Custom 'flavor' entries are placeholders to rewrite; delete a card's 'flavor' key to keep the printed one.",
-  "art_filter": "saturate(1.55) contrast(1.18) hue-rotate(-8deg)",
-  "style": {
-    "name": "neon",
-    "prompt": "cyberpunk fantasy illustration, neon-lit rain-slick night city, holographic signage and glowing kanji, chrome and black lacquer, magenta and cyan rim light, volumetric haze, detailed digital painting, dramatic cinematic composition",
-    "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, daylight, pastel",
-    "control": "canny",
-    "control_strength": 0.75,
-    "denoise": 0.85,
-    "steps": 28,
-    "cfg": 6,
-    "seed": 7,
-    "seed_rule": "position"
-  },
   "frame": {
     "watermark": 0.7,
     "rarity_tint": 0.7
@@ -84,92 +71,89 @@
     "Faerie Mastermind": {
       "number": 19
     },
-    "Goblin Recruiter": {
+    "Heroic Intervention": {
       "number": 20
     },
-    "Heroic Intervention": {
+    "Lotus Petal": {
       "number": 21
     },
-    "Lotus Petal": {
+    "Marsh Flats": {
       "number": 22
     },
-    "Marsh Flats": {
+    "Misty Rainforest": {
       "number": 23
     },
-    "Misty Rainforest": {
+    "Morphic Pool": {
       "number": 24
     },
-    "Morphic Pool": {
+    "Mystical Tutor": {
       "number": 25
     },
-    "Mystical Tutor": {
+    "Otawara, Soaring City": {
       "number": 26
     },
-    "Otawara, Soaring City": {
+    "Phyrexian Tower": {
       "number": 27
     },
-    "Phyrexian Tower": {
+    "Purphoros, God of the Forge": {
       "number": 28
     },
-    "Purphoros, God of the Forge": {
+    "Qasali Slingers": {
       "number": 29
     },
-    "Qasali Slingers": {
+    "Raugrin Triome": {
       "number": 30
     },
-    "Raugrin Triome": {
+    "Reflecting Pool": {
       "number": 31
     },
-    "Reflecting Pool": {
+    "Shizo, Death's Storehouse": {
       "number": 32
     },
-    "Shizo, Death's Storehouse": {
+    "Survival of the Fittest": {
       "number": 33
     },
-    "Survival of the Fittest": {
+    "Training Center": {
       "number": 34
     },
-    "Training Center": {
+    "Verdant Catacombs": {
       "number": 35
     },
-    "Verdant Catacombs": {
+    "Birds of Paradise": {
       "number": 36
     },
-    "Birds of Paradise": {
+    "Takenuma, Abandoned Mire": {
       "number": 37
     },
-    "Takenuma, Abandoned Mire": {
+    "Natural Order": {
       "number": 38
     },
-    "Natural Order": {
+    "Ashnod's Altar": {
       "number": 39
     },
-    "Ashnod's Altar": {
+    "Necromancy": {
       "number": 40
     },
-    "Necromancy": {
+    "Diabolic Intent": {
       "number": 41
     },
-    "Diabolic Intent": {
+    "Yavimaya, Cradle of Growth": {
       "number": 42
     },
-    "Yavimaya, Cradle of Growth": {
+    "Warren Soultrader": {
       "number": 43
     },
-    "Warren Soultrader": {
+    "Entomb": {
       "number": 44
     },
-    "Entomb": {
+    "Mikaeus, the Unhallowed": {
       "number": 45
     },
-    "Mikaeus, the Unhallowed": {
+    "Green Sun's Zenith": {
       "number": 46
     },
-    "Green Sun's Zenith": {
-      "number": 47
-    },
     "Agadeem's Awakening // Agadeem, the Undercrypt": {
-      "number": 48
+      "number": 47
     }
   }
 }
