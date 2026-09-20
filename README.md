@@ -87,11 +87,15 @@ A set is a JSON file (see `sets/bls1.json`):
   keeps out of the recipe hash.
 - A `frame` block holds the frame's dressing, each knob a strength from 0
   (off) to 1: `watermark` (the set symbol, faint, behind the rules text),
-  `art_bevel` (a dark line and a light pinline around the art), `box_grain`
-  (linen grain over the bars and text box), `foil_stamp` (the holofoil oval
-  under the text box on rares and mythics) and `rarity_tint` (the bars
-  tinted silver, gold or orange by rarity). The defaults are the bevel, the
-  grain and the stamp on; each reaches the frame as a CSS custom property of
+  `frame_texture` (the coloured frame's painted texture, one per colour as
+  on the real cards: marbled parchment on white, wet glass on blue, fissured
+  stone on black, crackle on red, a cell network on green, brushed metal on
+  artifacts and gold, sand on lands, grain on colorless; generated, not
+  copied), `art_bevel` (a dark line and a light pinline around the art),
+  `box_grain` (linen grain over the bars and text box), `foil_stamp` (the
+  holofoil oval under the text box on rares and mythics) and `rarity_tint`
+  (the bars tinted silver, gold or orange by rarity). The defaults are the
+  texture, the bevel, the grain and the stamp on; each reaches the frame as a CSS custom property of
   the same name (`--art-bevel`), so the set's css can still override any.
 - A `.css` file with the same name (`sets/bls1.css`) is injected after the
   base frame rules, so each set can carry its own frame identity: colours,

@@ -41,17 +41,18 @@ FONTS = PKG / "fonts"
 PACKAGED_FAMILIES = {"Almendra": "title fallback", "Liberation Serif": "rules text fallback", "Montserrat": "collector line"}
 LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", *PACKAGED_FAMILIES}  # never ask Google for these
 
-# M15 frame palette: (frame, frame-dark, bar, bar-edge, text box)
+# M15 frame palette: (frame, frame-dark, bar, bar-edge, text box). The frame, bar and text box are
+# medians sampled off Scryfall scans of recent printings (one per kind), the dark edge derived from the frame.
 FRAMES = {
-    "W": ("#e8e1c9", "#b9ad86", "#f4efdf", "#8b8160", "#f8f5ea"),
-    "U": ("#2160a3", "#143f6f", "#d7e3f1", "#34527a", "#e6edf5"),
-    "B": ("#3b3a3c", "#1c1b1d", "#cfcbca", "#3a3637", "#dad6d3"),
-    "R": ("#c8402d", "#7f2418", "#f2d9c8", "#7b3d2c", "#f5e6da"),
-    "G": ("#237243", "#144428", "#d3e3cf", "#2f5a3b", "#e2ebde"),
-    "gold": ("#d1b055", "#8f7228", "#f1e6bf", "#7d6530", "#f5eed6"),
-    "artifact": ("#a6b3ba", "#67747b", "#e4eaed", "#5d6a70", "#ecf0f2"),
-    "land": ("#b39a7c", "#7a6548", "#ece2d0", "#6b5a42", "#f2ebdd"),
-    "C": ("#c9cdc4", "#8e948a", "#e8ebe4", "#767b71", "#f0f2ec"),
+    "W": ("#d9d1ac", "#938e74", "#f1f1e8", "#8b8160", "#f2f3ea"),
+    "U": ("#3ca5da", "#287094", "#b2d4e6", "#34527a", "#dbeaf3"),
+    "B": ("#2a2e29", "#1c1f1b", "#b0a9a9", "#3a3637", "#b4b2ae"),
+    "R": ("#b4432e", "#7a2d1f", "#edc9c0", "#7b3d2c", "#f5e2e4"),
+    "G": ("#578265", "#3b5844", "#b8cdc3", "#2f5a3b", "#d3e5da"),
+    "gold": ("#c7b56d", "#877b4a", "#d0bf84", "#7d6530", "#f2ecd5"),
+    "artifact": ("#91afbc", "#62777f", "#cedadf", "#5d6a70", "#d8e2e6"),
+    "land": ("#ad8d76", "#755f50", "#d3b978", "#6b5a42", "#f2edd5"),
+    "C": ("#d8cecf", "#928c8c", "#bcb3ae", "#767b71", "#b3afad"),
 }
 
 # set symbol fill by rarity: (edge colour, highlight colour)
@@ -70,6 +71,67 @@ NOISE = base64.b64encode(
     b"<rect width='100%' height='100%' filter='url(#n)'/></svg>"
 ).decode()
 NOISE_URI = "data:image/svg+xml;base64," + NOISE
+
+# The frame's texture: on a real M15 card the coloured band between the border and the boxes is a
+# painted tile, one per colour and the same on every card of that colour -- marbled parchment on
+# white, wet glass on blue, fissured stone on black, crackle on red, a cell network on green,
+# brushed metal on artifacts and gold, sand on lands, grain on colorless. Ours are fractal noise
+# shaped per kind into a tile of white highlights and black shadows (each with its own alpha), laid
+# over the flat colour, so the palette above still sets the hue and the --frame-texture knob fades
+# it. A fixed seed per kind keeps the same crack in the same place on every card, as the real tiles
+# do. The tile is 256 SVG px drawn at 128 CSS px: a base frequency of 0.1 makes features about
+# 5/100 in wide, the scale of the real veins and cells.
+#   kind: (base frequency "x y", octaves, seed, shaping, sheen, highlight colour)
+#   shaping (mode, width, gain, slope): "veins" = contour lines of the noise, `width` wide, light
+#   (gain > 0) or dark (gain < 0), over a mottle of contrast `slope`; "tone" = the noise itself.
+#   One octave gives smooth closed contours (cells, pebbles); more give the wandering veins of
+#   marble and fissured stone. sheen: a light inner glow along the band, the gloss of blue's wet
+#   glass and the metals. The highlight colour tints the light layer; the shadows are always black.
+TEXTURES = {
+    "W":        ("0.07", 3, 3, ("veins", 0.06, 0.25, 0.18), 0.0, "1 .98 .9"),
+    "U":        ("0.06 0.01", 2, 5, ("tone", 0, 0, 0.22), 0.5, ".85 .95 1"),
+    "B":        ("0.09", 2, 7, ("veins", 0.05, 0.28, 0.18), 0.0, ".75 .85 .85"),
+    "R":        ("0.18", 1, 11, ("veins", 0.06, 0.28, 0.15), 0.0, "1 .88 .78"),
+    "G":        ("0.16", 1, 13, ("veins", 0.05, 0.3, -0.1), 0.0, ".88 1 .88"),
+    "gold":     ("0.01 0.5", 2, 17, ("tone", 0, 0, 0.18), 0.35, "1 .97 .85"),
+    "artifact": ("0.09", 2, 19, ("veins", 0.09, 0.18, 0.25), 0.3, ".95 .98 1"),
+    "land":     ("0.06", 1, 23, ("veins", 0.12, 0.25, 0.25), 0.0, "1 .96 .88"),
+    "C":        ("0.08", 2, 29, ("veins", 0.07, 0.18, 0.15), 0.1, "1 1 1"),
+}
+
+
+def _shape(mode, width, gain, slope, steps=64):
+    """feComponentTransfer table values: the noise (0-1, centred on .5) to the tile's tone,
+    .5 = the flat colour untouched, 1 = full highlight, 0 = full shadow."""
+    out = []
+    for i in range(steps):
+        x = i / (steps - 1)
+        v = 0.5 + slope * (x - 0.5)
+        if mode == "veins":
+            v += gain * math.exp(-((x - 0.5) / width) ** 2)
+        out.append(f"{min(1, max(0, v)):.3f}")
+    return " ".join(out)
+
+
+def texture_uri(kind):
+    """The frame texture tile for a frame kind, as an SVG data URI: a white layer whose alpha is
+    the tone above .5 and a black layer whose alpha is the tone below it."""
+    freq, octaves, seed, shaping, _, hi = TEXTURES[kind]
+    table = _shape(*shaping)
+    r, g, b = hi.split()
+    def layer(name, rgb, alpha_row):
+        return (f"<filter id='{name}' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'>"
+                f"<feTurbulence type='fractalNoise' baseFrequency='{freq}' numOctaves='{octaves}' seed='{seed}'"
+                f" stitchTiles='stitch'/>"
+                f"<feColorMatrix type='matrix' values='.33 .33 .33 0 0  .33 .33 .33 0 0  .33 .33 .33 0 0  0 0 0 0 1'/>"
+                f"<feComponentTransfer><feFuncR type='table' tableValues='{table}'/></feComponentTransfer>"
+                f"<feColorMatrix type='matrix' values='0 0 0 0 {rgb[0]}  0 0 0 0 {rgb[1]}  0 0 0 0 {rgb[2]}  {alpha_row}'/>"
+                f"</filter>")
+    svg = ("<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'>"
+           + layer("hi", (r, g, b), "2 0 0 0 -1") + layer("lo", (0, 0, 0), "-2 0 0 0 1")
+           + "<rect width='100%' height='100%' filter='url(#lo)'/><rect width='100%' height='100%' filter='url(#hi)'/></svg>")
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
 
 # rules text starts at 11.6px and fit() shrinks it; below this it is hard to read in print
 TEXT_FLOOR = 8.0
@@ -150,16 +212,69 @@ def stack(families):
 
 
 # --- pieces ---------------------------------------------------------------
-def frame_for(card):
+def frame_kind(card):
+    """Which frame a card gets: its colour, gold, artifact, land or C (colorless), the keys of FRAMES."""
     t = card["type_line"]
     cols = card.get("colors") or []
     if "Land" in t and not cols:
-        return FRAMES["land"]
+        return "land"
     if len(cols) > 1:
-        return FRAMES["gold"]
+        return "gold"
     if not cols:
-        return FRAMES["artifact"] if "Artifact" in t else FRAMES["C"]
-    return FRAMES[cols[0]]
+        return "artifact" if "Artifact" in t else "C"
+    return cols[0]
+
+
+def frame_for(card):
+    return FRAMES[frame_kind(card)]
+
+
+# The legendary crown's top edge, traced off a scan (Kykar, CMM) at 1/100 in steps from x = 9: the tips curl
+# down at the ends, the side peaks rise to 9, the centre to 7, and the valleys sit on the bar's top edge (15).
+CROWN_X0 = 9
+CROWN = [
+    18.5, 16.3, 14.5, 13.1, 11.8, 10.9, 10.7, 11.0, 11.5, 12.1, 12.7, 13.1, 13.4, 13.8, 14.1, 14.3, 14.5, 14.7, 14.9,
+    15.0, 15.1, 15.1, 15.1, 15.2, 15.3, 15.4, 15.4, 15.4, 15.4, 15.4, 15.3, 14.6, 13.5, 12.2, 11.1, 10.2, 9.4, 9.2,
+    9.4, 10.0, 10.5, 10.9, 11.3, 11.6, 12.1, 12.4, 12.8, 13.1, 13.3, 13.5, 13.8, 14.0, 14.2, 14.3, 14.5, 14.7, 14.8,
+    14.9, 15.0, 15.1, 15.1, 15.1, 15.2, 15.2, 15.2, 15.1, 15.1, 15.1, 15.1, 15.0, 14.9, 14.7, 14.5, 14.3, 14.2, 14.0,
+    13.8, 13.5, 13.3, 13.1, 12.9, 12.7, 12.4, 12.1, 11.7, 11.5, 11.3, 11.1, 10.7, 10.4, 10.1, 10.0, 10.3, 11.0, 11.5,
+    11.6, 11.3, 10.8, 10.4, 10.1, 9.7, 9.4, 9.1, 8.8, 8.6, 8.4, 8.2, 8.0, 7.8, 7.6, 7.5, 7.4, 7.3, 7.1, 7.0, 7.0, 7.0,
+    7.0, 7.1, 7.3, 7.4, 7.4, 7.5, 7.6, 7.8, 8.0, 8.2, 8.4, 8.6, 8.8, 9.1, 9.4, 9.7, 10.1, 10.4, 10.7, 11.2, 11.6,
+    11.5, 10.7, 9.9, 9.7, 10.1, 10.4, 10.6, 10.8, 11.1, 11.4, 11.7, 12.1, 12.3, 12.5, 12.8, 13.0, 13.2, 13.4, 13.7,
+    13.9, 14.0, 14.2, 14.3, 14.5, 14.7, 14.8, 14.9, 15.0, 15.1, 15.1, 15.1, 15.1, 15.1, 15.1, 15.1, 15.1, 15.1, 15.0,
+    14.9, 14.8, 14.7, 14.5, 14.3, 14.2, 14.0, 13.8, 13.4, 13.1, 12.8, 12.4, 12.1, 11.7, 11.3, 10.8, 10.4, 10.0, 9.4,
+    9.3, 9.6, 10.5, 11.5, 12.8, 14.1, 15.0, 15.4, 15.4, 15.4, 15.4, 15.4, 15.4, 15.3, 15.2, 15.1, 15.1, 15.0, 14.9,
+    14.8, 14.7, 14.4, 14.2, 14.0, 13.7, 13.2, 12.8, 12.3, 11.8, 11.3, 10.7, 10.6, 11.2, 12.4, 13.8, 15.2, 17.0, 19.1,
+]
+
+
+# ... and its left side, (y, x) down from where the top edge meets it: the tip bulges out to 8 beside the bar's
+# top, notches in to 10 at the bar's middle, flares to 7 below the bar and tucks back in under the art. The
+# right side mirrors it about the card's centre (125).
+CROWN_SIDE = [
+    (10.5, 14.1), (11.0, 13.8), (11.5, 13.1), (12.0, 12.8), (12.5, 12.4), (13.0, 12.1), (13.5, 11.4), (14.0, 11.4),
+    (14.5, 10.7), (15.0, 10.7), (15.5, 10.4), (16.0, 10.1), (16.5, 9.7), (17.0, 9.4), (17.5, 9.1), (18.0, 9.1),
+    (18.5, 8.7), (19.0, 8.7), (19.5, 8.4), (20.0, 8.4), (20.5, 8.1), (21.0, 8.1), (21.5, 8.1), (22.0, 8.1), (22.5,
+    8.1), (23.0, 8.1), (23.5, 8.4), (24.0, 8.4), (24.5, 8.7), (25.0, 8.7), (25.5, 9.1), (26.0, 9.4), (26.5, 9.4),
+    (27.0, 9.7), (27.5, 10.1), (28.0, 10.1), (28.5, 9.7), (29.0, 9.7), (29.5, 9.4), (30.0, 8.1), (30.5, 7.7), (31.0,
+    7.4), (31.5, 7.0), (32.0, 7.4), (32.5, 7.4), (33.0, 7.7), (33.5, 7.7), (34.0, 8.1), (34.5, 8.1), (35.0, 8.1),
+    (35.5, 8.4), (36.0, 8.7), (36.5, 8.7), (37.0, 9.1), (37.5, 9.1), (38.0, 9.4), (38.5, 9.4), (39.0, 9.7), (39.5,
+    10.1), (40.0, 10.4), (40.5, 10.4), (41.0, 11.1), (41.5, 11.1), (42.0, 11.7)
+]
+
+
+def crown_paths():
+    """(fill, outline) CSS path() strings for the crown badge, in card units from the card's top-left: up the
+    left side, along the traced top edge, down the mirrored right side, closed under the art; the outline is
+    the same shape pushed out 1.3."""
+    def path(o):
+        top = [(CROWN_X0 + i, y - o) for i, y in enumerate(CROWN) if 14 <= CROWN_X0 + i <= 236]
+        left = [(x - o, y) for y, x in reversed(CROWN_SIDE)]
+        right = [(250 - x + o, y) for y, x in CROWN_SIDE]
+        pts = left + top + right
+        body = " ".join(f"L{x:.1f} {y:.1f}" for x, y in pts)
+        return f"M{pts[0][0]:.1f} 44 {body} L{pts[-1][0]:.1f} 44 Z"
+    return path(0), path(1.3)
 
 
 def _burst():
@@ -371,7 +486,8 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
     knobs as css (frame_css), the defaults when None; `other_face` the record of a double-faced
     card's other side, named at the foot of the text box."""
     title, body = THEMES[theme]
-    frame, frame_dark, bar, bar_edge, box = frame_for(card)
+    kind = frame_kind(card)
+    frame, frame_dark, bar, bar_edge, box = FRAMES[kind]
     rarity = card["rarity"]
     rarity_hi = RARITY[rarity][1] if rarity in ("uncommon", "rare", "mythic") else "transparent"
     layout = layout_of(card)
@@ -379,7 +495,9 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
     # the collector line as the real cards set it: the number and set in a wide sans, the artist in the
     # title face as small caps after a brush; the credit line on the right stays in the rules serif
-    footer = (f'<div class="footer"><span class="collector"><b>{number:03d}/{set_size} {card["rarity"][0].upper()}</b><br>'
+    footer_cls = " has-pt" if pt else ""  # the credit line drops to the bottom line beside a P/T box
+    footer = (f'<div class="footer{footer_cls}"><span class="collector">'
+              f'<b>{number:03d}/{set_size} {card["rarity"][0].upper()}</b><br>'
               f'{esc(set_code)} • EN {BRUSH}<span class="artist">{esc(card["artist"])}</span></span>'
               f'<span class="credit">{esc(maker_code)} · {esc(maker)} · {year} · '
               f'{card["set"].upper()} {card["collector_number"]}</span></div>')
@@ -389,10 +507,13 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
         font_link=font_link(title + body), local_fonts=fonts_css,
         title_font=stack(title), body_font=stack(body),
         frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box,
-        noise=NOISE_URI, set_css=set_css, frame_vars=frame_vars or frame_css(),
+        noise=NOISE_URI, texture=texture_uri(kind), sheen=TEXTURES[kind][4], set_css=set_css,
+        frame_vars=frame_vars or frame_css(),
         watermark=watermark_uri(), rarity_hi=rarity_hi, layout=layout,
         stamp='<div class="stamp"></div>' if rarity in ("rare", "mythic") and not turned else "",
-        crown='<div class="crown-o"></div><div class="crown"></div>' if legendary and not turned else "",
+        crown=('<div class="crown-o" style="clip-path: path(\'{}\')"></div>'
+               '<div class="crown" style="clip-path: path(\'{}\')"></div>'.format(*crown_paths())
+               if legendary and not turned else ""),
         body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else ""),
         footer="" if layout == "battle" else footer,
         art=art_url, art_filter=art_filter or "none",
