@@ -28,7 +28,10 @@ $frame_vars
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .card { position: absolute; left: 11px; top: 11px; width: 250px; height: 350px;
-  background: #120d0c; border-radius: 10.5px; overflow: hidden; color: var(--ink); }  /* the cards' border is a warm near-black */
+  background: #000; border-radius: 10.5px; overflow: hidden; color: var(--ink); }
+/* the border is pure black, the same as the bleed around it, so a cut that lands in the bleed is invisible. Scans read
+   it as a warm near-black (#16130e), but that is ink through a scanner: the design files (Wizards' own renders on
+   Scryfall, Card Conjurer's M15 frame) are #000, and 0,0,0 is what lets an inkjet driver lay down black ink alone. */
 /* Geometry below is measured off Scryfall's 745x1040 scans (mint/calibrate.py):
    border 10, title bar 17-36.6, art 38.5-195, type bar 196.5-216, text box
    218.5-322.5, P/T box 313-333, collector text 329-339, bottom border from 324.
