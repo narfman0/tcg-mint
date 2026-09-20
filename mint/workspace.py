@@ -35,9 +35,10 @@ class Workspace:
     maker_code: str = "BLS"      # the studio code; set codes default to <code>1
     comfy_url: str = "http://127.0.0.1:8188"
     printer: str = "EPSON_ET_8500"
+    export_dir: str = "~/Desktop"  # where the workbench's pdf page exports a PDF to, for another app to print
 
     CONFIG = "mint.toml"
-    KEYS = ("maker", "maker_code", "comfy_url", "printer")
+    KEYS = ("maker", "maker_code", "comfy_url", "printer", "export_dir")
 
     @classmethod
     def from_env(cls, home=None):
@@ -51,6 +52,12 @@ class Workspace:
     @property
     def art(self):
         return self.home / "art"
+
+    @property
+    def export_path(self):
+        """export_dir with ~ expanded; a relative one lies under the workspace."""
+        p = Path(os.path.expanduser(self.export_dir))
+        return p if p.is_absolute() else self.home / p
 
     @property
     def fonts(self):

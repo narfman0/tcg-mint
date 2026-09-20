@@ -15,6 +15,7 @@ from ..art import Art
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
 from ..manifest import Manifest, frame_hash
+from . import pdfs
 from .jobs import Jobs
 from .thumbs import inside, thumbnail
 
@@ -136,11 +137,19 @@ def create_app(ws):
         return FileResponse(thumbnail(ws, path, w), headers={"Cache-Control": "max-age=3600"})
 
     @app.get("/file")
-    def file(path: str):
+    def file(path: str, download: bool = False):
+        """A file inside the workspace; `download` makes the browser save it instead of showing it."""
         p = inside(ws, path)
         if not p.is_file():
             raise HTTPException(404)
-        return FileResponse(p, headers={"Cache-Control": "max-age=60"})
+        return FileResponse(p, headers={"Cache-Control": "max-age=60"}, filename=p.name if download else None)
+
+    @app.get("/pdfpage")
+    def pdf_page(path: str, n: int = 1, w: int = 800):
+        """One page of a PDF inside the workspace as a PNG (see pdfs.py)."""
+        if n < 1:
+            raise HTTPException(400, "n is 1-based")
+        return FileResponse(pdfs.page_image(ws, path, n, w), headers={"Cache-Control": "max-age=3600"})
 
     # --- workspace --------------------------------------------------------------------
     @app.get("/api/workspace")
@@ -165,7 +174,8 @@ def create_app(ws):
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
                 "style_fields": style_fields(), "frame_fields": frame_fields(),
                 "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
-                "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer}}
+                "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer,
+                          "export_dir": str(ws.export_path)}}
 
     # --- sets ---------------------------------------------------------------------------
     @app.get("/api/sets/{code}")
@@ -483,6 +493,32 @@ def create_app(ws):
         return set_detail(S, st)
 
     # --- jobs ---------------------------------------------------------------------------------
+    # --- pdfs ---------------------------------------------------------------------------
+    @app.get("/api/sets/{code}/pdfs")
+    def list_pdfs(code: str):
+        """The set's PDFs: its print runs and `mint impose`'s file, newest first."""
+        st = S.find_set(code)
+        return {"pdfs": pdfs.pdfs(ws, st, S.out_dir(st)), "export_dir": str(ws.export_path)}
+
+    @app.post("/api/sets/{code}/pdfs/export")
+    def export_pdf(code: str, body: dict):
+        """Copy one of the set's PDFs (`file`) into the export directory; 409 when a file of that
+        name is already there and `force` is not set."""
+        st = S.find_set(code)
+        src = pdfs.find(ws, st, S.out_dir(st), body.get("file") or "")
+        try:
+            dest = pdfs.export(ws, src, force=bool(body.get("force")))
+        except FileExistsError as e:
+            raise HTTPException(409, f"{e} is already there") from None
+        return {"exported": str(dest)}
+
+    @app.delete("/api/sets/{code}/pdfs/{file}")
+    def delete_pdf(code: str, file: str):
+        st = S.find_set(code)
+        p = pdfs.find(ws, st, S.out_dir(st), file)
+        p.unlink()
+        return {"deleted": str(p)}
+
     @app.get("/api/jobs")
     def jobs_list():
         return S.jobs.list()

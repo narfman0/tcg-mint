@@ -184,3 +184,44 @@ def test_printrun_job_takes_paper_and_stock(client):
     assert client.post("/api/jobs", json={"kind": "printrun", "set": "TST", "paper": "tabloid"}).status_code == 400
     assert client.post("/api/jobs", json={"kind": "printrun", "set": "TST", "stock": "papyrus"}).status_code == 400
     assert client.get("/api/workspace").json()["print"]["paper"] == ["letter", "a4"]
+
+
+def _pdf(path, pages=2):
+    from PIL import Image
+    ims = [Image.new("RGB", (120, 160), (200 + i * 20, 200, 200)) for i in range(pages)]
+    ims[0].save(path, "PDF", save_all=True, append_images=ims[1:])
+
+
+def test_pdfs_list_export_delete(client, tmp_path, monkeypatch):
+    """The pdf page: a set's print runs and the impose file are listed, exported to export_dir
+    (refusing to clobber unless forced), downloadable through /file, and deletable."""
+    import shutil
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"]})
+    assert client.get("/api/sets/TST/pdfs").json()["pdfs"] == []
+    run = client.ws.home / "out" / "tst" / "print"
+    run.mkdir(parents=True)
+    _pdf(run / "TST-plain-1.pdf")
+    _pdf(client.ws.home / "out" / "tst.pdf", pages=1)
+    monkeypatch.setattr(client.ws, "export_dir", str(tmp_path / "desk"))
+    d = client.get("/api/sets/TST/pdfs").json()
+    assert d["export_dir"] == str(tmp_path / "desk")
+    assert {(p["file"], p["origin"]) for p in d["pdfs"]} == {("TST-plain-1.pdf", "print run"), ("tst.pdf", "mint impose")}
+    if shutil.which("pdfinfo"):
+        assert {p["file"]: p["pages"] for p in d["pdfs"]} == {"TST-plain-1.pdf": 2, "tst.pdf": 1}
+    if shutil.which("pdftoppm"):
+        r = client.get("/pdfpage", params={"path": str(run / "TST-plain-1.pdf"), "n": 2, "w": 400})
+        assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+        assert client.get("/pdfpage", params={"path": str(run / "TST-plain-1.pdf"), "n": 0}).status_code == 400
+    # the browser's save: a download flag turns the file route into an attachment
+    r = client.get("/file", params={"path": str(run / "TST-plain-1.pdf"), "download": "true"})
+    assert r.status_code == 200 and 'attachment; filename="TST-plain-1.pdf"' in r.headers["content-disposition"]
+    # export, refuse to clobber, force
+    r = client.post("/api/sets/TST/pdfs/export", json={"file": "TST-plain-1.pdf"})
+    assert r.status_code == 200 and (tmp_path / "desk" / "TST-plain-1.pdf").read_bytes() == (run / "TST-plain-1.pdf").read_bytes()
+    assert client.post("/api/sets/TST/pdfs/export", json={"file": "TST-plain-1.pdf"}).status_code == 409
+    assert client.post("/api/sets/TST/pdfs/export", json={"file": "TST-plain-1.pdf", "force": True}).status_code == 200
+    assert client.post("/api/sets/TST/pdfs/export", json={"file": "../../sets/tst.json"}).status_code == 400
+    # delete: only a listed name
+    assert client.delete("/api/sets/TST/pdfs/nope.pdf").status_code == 400
+    assert client.delete("/api/sets/TST/pdfs/TST-plain-1.pdf").status_code == 200
+    assert [p["file"] for p in client.get("/api/sets/TST/pdfs").json()["pdfs"]] == ["tst.pdf"]

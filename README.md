@@ -98,14 +98,15 @@ A set is a JSON file (see `sets/bls1.json`):
   textures, bar shapes, anything.
 
 Unknown keys are errors (`mint check` finds them), so a typo in a recipe never
-passes silently. Who you are on the cards, the ComfyUI address and the
-printer live in `mint.toml` in the workspace:
+passes silently. Who you are on the cards, the ComfyUI address, the printer
+and where the workbench exports a PDF to live in `mint.toml` in the workspace:
 
 ```toml
 maker = "narfman0"
 maker_code = "BLS"
 comfy_url = "http://127.0.0.1:8188"
 printer = "EPSON_ET_8500"
+export_dir = "~/Desktop"
 ```
 
 ## Commands
@@ -223,7 +224,15 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   renders the cards whose render is missing or stale, lays them out 3×3 as
   a PDF under `out/<code>/print/`, and, when a stock is picked, sends it to
   the workspace's printer at 100% with `mint print`'s checks. The PDF is
-  linked from the job.
+  linked from the job and opens on the set's pdf page.
+- **Pdfs** (*pdfs* on the board) — the set's print runs and `mint impose`'s
+  `out/<code>.pdf`, newest first, with every page of the picked one shown
+  as an image (poppler's `pdftoppm` renders them, cached like thumbnails).
+  *Open* shows the file in the browser's own viewer, *download* saves it to
+  the device the page is on, and *export* copies it to `export_dir` (the
+  Desktop unless `mint.toml` says otherwise) on the workbench's machine, for
+  another PDF app to print from; it asks before replacing a file already
+  there. *Delete* removes a PDF; the renders it was made from stay.
 - **Jobs** — what is queued and running, with logs and cancel.
 
 `mint gallery --set sets/x.json` exports the Sets and Compare views as a

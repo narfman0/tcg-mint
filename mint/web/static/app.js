@@ -124,7 +124,7 @@ async function go() {
   try {
     if (!state.ws) await loadWorkspace();
     if (r.code && (!state.set || state.set.code.toLowerCase() !== r.code.toLowerCase())) { await loadSet(r.code); state.sel.clear(); }
-    const views = {home, board, card, lab, frame, jobs, viewer, edit, styles};
+    const views = {home, board, card, lab, frame, jobs, viewer, edit, styles, pdfs};
     if (r.view !== 'viewer' && !(r.view === 'card' && r.key)) closeViewer();
     (views[r.view] || home)(r);
     renderNav();
@@ -376,7 +376,7 @@ function board() {
     : 'each card with its styled art: its pick, else the recipe\'s variant';
   $('#main').innerHTML = `
     <div class="row"><h1>${esc(code)} <span class="muted">${esc(st.name)}</span></h1>
-<button class="pill" id="gallery" title="flip through the cards full-screen">gallery</button>${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>`}
+<button class="pill" id="gallery" title="flip through the cards full-screen">gallery</button>${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a><a class="pill" href="#/set/${esc(code)}/pdfs" title="the set's PDFs: view, download, export">pdfs</a>`}
       <span class="muted">${st.cards_detail.length} cards${all ? ` across ${st.sets.length} sets` : ''}${st.style && !all ? ` · style ${esc(st.style.name)}` : ''}${st.base && !all ? ` · from <b>${esc(st.base)}</b>` : ''}${all ? '' : ` · <span class="mono">${esc(st.path)}</span>`}</span></div>
     <div class="toolbar">
       <span class="seg">${['plain', 'styled'].map(m => `<button data-mode="${m}" class="${state.mode === m ? 'on' : ''}">${m}</button>`).join('')}</span>
@@ -1214,9 +1214,9 @@ function edit() {
             <button id="savetpl" title="write this style block (and the set's css) to styles/ for other sets">save as template…</button>
             <button id="dropstyle" title="remove the style block; the variants it made stay in the art cache">remove style</button><span class="sep"></span>` : ''}
           <span class="muted">${st.style ? 'replace with' : 'start from'} template</span>
-          <select id="tpl">${(E.styles || []).map(t => `<option value="${esc(t.name)}" ${t.name === st.style?.name ? 'selected' : ''}>${esc(t.name)}${t.builtin ? ' (built-in)' : ''}${t.private ? ' (private)' : ''}${t.sets.length ? ' · ' + t.sets.join(' ') : ''}</option>`).join('')}</select>
+          <select id="tpl">${st.style ? '' : '<option value="">choose a template…</option>'}${(E.styles || []).map(t => `<option value="${esc(t.name)}" ${t.name === st.style?.name ? 'selected' : ''}>${esc(t.name)}${t.builtin ? ' (built-in)' : ''}${t.private ? ' (private)' : ''}${t.sets.length ? ' · ' + t.sets.join(' ') : ''}</option>`).join('')}</select>
           <label title="the template's .css becomes the set's, replacing ${esc(code.toLowerCase())}.css"><input type="checkbox" id="tplcss" ${st.css ? '' : 'checked'}> its css too</label>
-          <button id="applytpl" ${E.styles?.length ? '' : 'disabled'}>apply</button>
+          <button id="applytpl" ${E.styles?.length && st.style ? '' : 'disabled'}>apply</button>
         </div>
         ${st.style && E.knobs ? `<div class="form">${styleForm(fields, E.values, f => JSON.stringify(E.values[f.name] ?? f.default) !== JSON.stringify(st.style[f.name] ?? f.default))}
           <label></label><div class="row"><button class="primary" id="saveknobs">save style</button><button id="resetknobs" class="small">reset</button>
@@ -1271,9 +1271,13 @@ function edit() {
     if (!confirm(`Remove the style block from ${code}? Its restyle variants stay in the art cache; a template can bring it back.`)) return;
     api(`/api/sets/${code}/style`, {method: 'PUT', body: {}}).then(() => { toast('style removed'); refresh(); }).catch(e => toast(e.message, true));
   };
+  // with no style block the picker starts on a placeholder, so apply waits for a real choice and always asks:
+  // the list puts private templates first, and one click used to install the first of them unasked
+  if (!st.style) $('#tpl').onchange = () => { $('#applytpl').disabled = !$('#tpl').value; };
   $('#applytpl').onclick = () => {
     const t = $('#tpl').value;
-    if (st.style && !confirm(`Replace the style block of ${code} (${st.style.name}) with the template ${t}?`)) return;
+    if (!t) return;
+    if (!confirm(st.style ? `Replace the style block of ${code} (${st.style.name}) with the template ${t}?` : `Style ${code} as the template ${t}?`)) return;
     api(`/api/sets/${code}/style/template`, {method: 'POST', body: {template: t, css: $('#tplcss').checked}})
       .then(() => { toast(`${code} now styled as ${t}`); E.knobs = false; refresh(); }).catch(e => toast(e.message, true));
   };
@@ -1427,6 +1431,55 @@ async function styles(r) {
   };
 }
 
+/* --- pdfs: a set's print runs and `mint impose` file --------------------------------------- */
+/* The list on one side, the picked one's pages on the other, as images the server renders
+   (pdftoppm), so it works on a phone too. The file itself: the browser's own viewer in a tab,
+   a download, or an export -- a copy into the workspace's export_dir (the Desktop) for another
+   PDF app to print from. */
+const fmtSize = b => b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`;
+async function pdfs(r) {
+  const st = state.set, code = st.code;
+  const d = await api(`/api/sets/${code}/pdfs`);
+  const list = d.pdfs, cur = list.find(p => p.file === r.name) || list[0];
+  const P = state.pdfs || (state.pdfs = {zoom: false});
+  const pageW = P.zoom ? 1600 : 800;
+  $('#main').innerHTML = `
+    <div class="row"><h1>${esc(code)} <span class="muted">pdfs</span></h1><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a>
+      <span class="muted">print runs from the board land in <span class="mono">out/${esc(code.toLowerCase())}/print/</span>; <span class="mono">mint impose</span>'s file is listed too</span></div>
+    ${list.length ? `<div class="pdfs">
+      <div class="pdflist">${list.map(p => `<a class="pdf ${p === cur ? 'on' : ''}" href="#/set/${esc(code)}/pdfs/${encodeURIComponent(p.file)}">
+        <b>${esc(p.file)}</b><small class="muted">${p.pages != null ? `${p.pages} page${p.pages === 1 ? '' : 's'} · ` : ''}${fmtSize(p.size)} · ${new Date(p.mtime * 1000).toLocaleString()} · ${esc(p.origin)}</small></a>`).join('')}</div>
+      <div class="pdfview">
+        <div class="toolbar">
+          <b class="mono">${esc(cur.file)}</b><span class="muted">${cur.pages != null ? `${cur.pages} page${cur.pages === 1 ? '' : 's'} · ` : ''}${fmtSize(cur.size)}</span><span class="sep"></span>
+          <a class="pill" href="${file(cur.path)}" target="_blank" title="the file in the browser's own PDF viewer, in a new tab">open</a>
+          <a class="pill" href="${file(cur.path)}&download=1" download="${esc(cur.file)}" title="save the file with the browser (to this device)">download</a>
+          <button class="primary" id="pdfexport" title="copy the file to ${esc(d.export_dir)} on the workbench's machine, for another PDF app to print">export to ${esc(d.export_dir.replace(/^\/home\/[^/]+/, '~'))}</button>
+          <span class="sep"></span>
+          <button id="pdfzoom" class="${P.zoom ? 'on' : ''}" title="pages at twice the width">${P.zoom ? 'smaller' : 'larger'}</button>
+          <button class="danger small" id="pdfdel" style="margin-left:auto">delete</button>
+        </div>
+        ${cur.pages == null ? `<div class="empty">poppler (pdfinfo / pdftoppm) is not installed on the workbench's machine, so the pages cannot be shown here: <a href="${file(cur.path)}" target="_blank">open</a> the file instead</div>`
+          : `<div class="pages ${P.zoom ? 'zoom' : ''}">${Array.from({length: cur.pages}, (_, i) => `<figure class="page">
+              <a href="${file(cur.path)}#page=${i + 1}" target="_blank" title="page ${i + 1} in the browser's viewer"><img loading="lazy" alt="page ${i + 1}" src="/pdfpage?path=${encodeURIComponent(cur.path)}&n=${i + 1}&w=${pageW}"></a>
+              <figcaption class="muted">page ${i + 1} of ${cur.pages}</figcaption></figure>`).join('')}</div>`}
+      </div>
+    </div>` : `<div class="empty">no PDFs yet: run a print run from the board (stock "PDF only" makes the file and prints nothing), or <span class="mono">mint impose --out out/${esc(code.toLowerCase())}.pdf out/${esc(code.toLowerCase())}/*.png</span></div>`}`;
+  if (!cur) return;
+  const doExport = force => api(`/api/sets/${code}/pdfs/export`, {method: 'POST', body: {file: cur.file, force}})
+    .then(x => toast(`exported to ${x.exported}`))
+    .catch(e => {
+      if (/already there/.test(e.message) && !force) { if (confirm(`${e.message.replace(' is already there', '')} is already there. Replace it?`)) doExport(true); }
+      else toast(e.message, true);
+    });
+  $('#pdfexport').onclick = () => doExport(false);
+  $('#pdfzoom').onclick = () => { P.zoom = !P.zoom; pdfs(r); };
+  $('#pdfdel').onclick = () => {
+    if (!confirm(`Delete ${cur.file}? The renders it was made from stay.`)) return;
+    api(`/api/sets/${code}/pdfs/${encodeURIComponent(cur.file)}`, {method: 'DELETE'}).then(() => { toast(`deleted ${cur.file}`); location.hash = `#/set/${code}/pdfs`; if (route().name === undefined) pdfs(route()); }).catch(e => toast(e.message, true));
+  };
+}
+
 /* --- jobs ----------------------------------------------------------------------------- */
 async function jobs() {
   if (!Object.keys(state.jobs).length) (await api('/api/jobs')).forEach(j => state.jobs[j.id] = j);
@@ -1453,7 +1506,7 @@ async function jobs() {
 
 /* One thing a job made: a link to that image on the card page, the picture itself on hover. */
 function itemHtml(it) {
-  if (it.kind === 'pdf') return `<a class="it" href="${file(it.path)}" target="_blank">${esc(it.file)} <span class="mono muted">${esc(it.name)}</span></a>`;
+  if (it.kind === 'pdf') return `<a class="it" href="#/set/${esc(it.set)}/pdfs/${encodeURIComponent(it.file)}">${esc(it.file)} <span class="mono muted">${esc(it.name)}</span></a>`;
   const href = it.key ? colHash(it.set, it.name, it.key) : `#/set/${esc(it.set)}/card/${encodeURIComponent(it.name)}`;
   const what = it.label ? `${it.label}-${it.key}` : it.file || it.kind || '';
   return `<a class="it ${it.kind === 'render' || it.kind === 'theme' ? 'card' : ''}" href="${href}" ${it.path ? `data-src="${img(it.path, 320)}"` : ''}>

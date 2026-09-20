@@ -278,6 +278,23 @@ body.viewing { overflow: hidden; }
 .job .it.card .peek img { width: 220px; }
 .job details.log summary { cursor: pointer; font-size: .8em; margin-top: 6px; }
 
+/* pdfs: the list beside the pages */
+.pdfs { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
+.pdflist { display: flex; flex-direction: column; gap: 6px; }
+.pdflist .pdf { display: block; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; color: var(--ink); }
+.pdflist .pdf:hover { border-color: var(--line-2); }
+.pdflist .pdf.on { outline: 2px solid var(--accent); }
+.pdflist .pdf b { display: block; font-family: var(--mono); font-size: .9em; word-break: break-all; }
+.pdflist .pdf small { display: block; font-size: .8em; line-height: 1.3; }
+.pdfview { min-width: 0; }
+.pdfview .toolbar b { word-break: break-all; }
+.pdfview button.on { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-ink); }
+.pages { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.pages .page { margin: 0; max-width: 100%; width: min(100%, 800px); }
+.pages.zoom .page { width: 100%; }
+.pages .page img { display: block; width: 100%; background: #fff; border: 1px solid var(--line-2); box-shadow: 0 2px 12px #0006; }
+.pages .page figcaption { text-align: center; font-size: .85em; padding-top: 4px; }
+
 /* touch: bigger targets, and inputs at 16px so iOS does not zoom into them */
 @media (pointer: coarse) {
   button, .pill, select, input[type=text], input[type=number], details.menu summary { min-height: 38px; }
@@ -306,6 +323,9 @@ body.viewing { overflow: hidden; }
   .toolbar .sep { display: none; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .setlist { grid-template-columns: 1fr; }
+  .pdfs { grid-template-columns: 1fr; }
+  .pdflist { flex-direction: row; overflow-x: auto; }
+  .pdflist .pdf { flex: 0 0 auto; max-width: 16em; }
   .cardhead > div:first-child { width: 100%; }
   .cardhead .kv { grid-template-columns: auto 1fr; }
   .cardhead .kv input[type=text] { width: 100%; }

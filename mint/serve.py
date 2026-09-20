@@ -37,8 +37,10 @@ def main(argv=None):
         webbrowser.open(url)
     if a.reload:  # uvicorn's reloader needs an import string; the factory rebuilds the app from the environment
         from . import PKG
+        # a page's event stream (/api/events) never closes on its own, and uvicorn waits for open
+        # connections before restarting: without a limit a reload hangs for as long as a tab is open
         uvicorn.run("mint.web.server:app", factory=True, host=a.host, port=a.port, log_level="warning",
-                    reload=True, reload_dirs=[str(PKG)])
+                    reload=True, reload_dirs=[str(PKG)], timeout_graceful_shutdown=3)
     else:
         uvicorn.run(create_app(ws), host=a.host, port=a.port, log_level="warning")
 
