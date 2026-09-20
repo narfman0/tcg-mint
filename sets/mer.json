@@ -3,7 +3,7 @@
   "name": "Meren, a graveyard is a to-do list",
   "size": 92,
   "style": {
-    "name": "ink",
+    "name": "spore",
     "prompt": "dark painterly fantasy illustration, bioluminescence as the only light source, deep swamp greens and black, luminous teal and sickly yellow-green glow, damp overgrowth, volumetric mist, detailed oil-painting brushwork, moody cinematic",
     "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, nude, nsfw, daylight, bright sky, pastel, anime, flat colors, cheerful, neon city",
     "control": "depth",
@@ -12,17 +12,8 @@
     "denoise": 0.85,
     "steps": 30,
     "cfg": 6,
-    "seed": 11,
-    "seed_rule": "position",
-    "sampler": "dpmpp_2m",
-    "scheduler": "karras",
-    "checkpoint": "juggernautXL_v9.safetensors",
-    "controlnet": "controlnet-union-sdxl-promax.safetensors",
-    "upscaler": "4x-UltraSharp.pth",
-    "loras": [],
-    "width": 1248,
-    "height": 912,
-    "grayscale_source": false
+    "seed": 41,
+    "seed_rule": "stable"
   },
   "cards": {
     "Meren of Clan Nel Toth": {
