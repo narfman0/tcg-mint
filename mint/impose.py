@@ -75,18 +75,14 @@ def page_html(paths, paper, bleed):
     return "\n".join(parts)
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(prog="mint impose", description=__doc__.split("\n\n")[0])
-    ap.add_argument("cards", nargs="+", help="rendered card PNGs, in order")
-    ap.add_argument("--paper", default="letter", choices=PAPER)
-    ap.add_argument("--bleed", type=float, default=0.04, help="inches of bleed kept around each card (default 0.04)")
-    ap.add_argument("--dpi", type=int, default=600, help="resample cards to this before embedding (default 600)")
-    ap.add_argument("--out", default="sheet.pdf")
-    a = ap.parse_args(argv)
-    if a.bleed > RENDER_BLEED:
-        ap.error(f"renders only carry {RENDER_BLEED}in of bleed")
-
-    pw, ph = PAPER[a.paper]
+def impose(cards, out, paper="letter", bleed=0.04, dpi=600, log=print):
+    """Lay the rendered PNGs out on pages into the PDF `out`; returns the page count."""
+    if bleed > RENDER_BLEED:
+        raise ValueError(f"renders only carry {RENDER_BLEED}in of bleed")
+    if paper not in PAPER:
+        raise ValueError(f"paper is one of {', '.join(PAPER)}, not {paper!r}")
+    cards = [os.path.abspath(str(c)) for c in cards]
+    pw, ph = PAPER[paper]
     css = ("<!doctype html><meta charset=utf-8><style>"
            f"@page {{ size: {pw}in {ph}in; margin: 0; }}"
            "* { margin: 0; padding: 0; } body { background: #fff; }"
@@ -97,26 +93,42 @@ def main(argv=None):
            "</style>")
     per_page = COLS * ROWS
     chunk = per_page * PAGES_PER_RUN
+    os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp, Browser() as b:
         parts = []
         # a few pages per Chromium run: decoded 600 DPI PNGs are ~10 MB each and a
         # whole 90-card set in one document was enough to get the process killed
-        for c0 in range(0, len(a.cards), chunk):
-            prepared = [prepare(path, a.bleed, a.dpi, tmp, c0 + i) for i, path in enumerate(a.cards[c0:c0 + chunk])]
+        for c0 in range(0, len(cards), chunk):
+            prepared = [prepare(path, bleed, dpi, tmp, c0 + i) for i, path in enumerate(cards[c0:c0 + chunk])]
             pages = [prepared[i:i + per_page] for i in range(0, len(prepared), per_page)]
             fn = os.path.join(tmp, f"sheet{len(parts)}.html")
-            open(fn, "w").write(css + "\n".join(page_html(pg, a.paper, a.bleed) for pg in pages))
+            open(fn, "w").write(css + "\n".join(page_html(pg, paper, bleed) for pg in pages))
             part = os.path.join(tmp, f"part{len(parts)}.pdf")
             b.pdf(fn, part, f"{pw}in", f"{ph}in")
             parts.append(part)
             for fp in prepared:
                 os.unlink(fp)
         if len(parts) == 1:
-            shutil.move(parts[0], a.out)
+            shutil.move(parts[0], out)
         else:
-            subprocess.run(["pdfunite", *parts, a.out], check=True)
-    npages = -(-len(a.cards) // per_page)
-    print(f"{a.out}: {npages} page(s), {len(a.cards)} cards, {a.paper} at 100%, {a.bleed}in bleed, {a.dpi} DPI")
+            subprocess.run(["pdfunite", *parts, out], check=True)
+    npages = -(-len(cards) // per_page)
+    log(f"{out}: {npages} page(s), {len(cards)} cards, {paper} at 100%, {bleed}in bleed, {dpi} DPI")
+    return npages
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="mint impose", description=__doc__.split("\n\n")[0])
+    ap.add_argument("cards", nargs="+", help="rendered card PNGs, in order")
+    ap.add_argument("--paper", default="letter", choices=PAPER)
+    ap.add_argument("--bleed", type=float, default=0.04, help="inches of bleed kept around each card (default 0.04)")
+    ap.add_argument("--dpi", type=int, default=600, help="resample cards to this before embedding (default 600)")
+    ap.add_argument("--out", default="sheet.pdf")
+    a = ap.parse_args(argv)
+    try:
+        impose(a.cards, a.out, a.paper, a.bleed, a.dpi)
+    except ValueError as e:
+        ap.error(str(e))
 
 
 if __name__ == "__main__":

@@ -219,6 +219,11 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   stamp, rarity tint), saved to the set file as you let go; edit the set's
   CSS and render a 300 DPI proof; overlay a Scryfall scan on your render to
   check text placement; render one card in every font theme.
+- **Print run** (on the board, beside the render buttons) — one job that
+  renders the cards whose render is missing or stale, lays them out 3×3 as
+  a PDF under `out/<code>/print/`, and, when a stock is picked, sends it to
+  the workspace's printer at 100% with `mint print`'s checks. The PDF is
+  linked from the job.
 - **Jobs** — what is queued and running, with logs and cancel.
 
 `mint gallery --set sets/x.json` exports the Sets and Compare views as a

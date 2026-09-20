@@ -82,62 +82,79 @@ def driver_options(printer):
     return opts
 
 
-def check_printer(printer):
-    state = run(["lpstat", "-p", printer])
-    if not state.strip():
-        sys.exit(f"no such printer queue {printer!r} (see: lpstat -p)")
-    if "disabled" in state or "stopped" in state:
-        sys.exit(f"printer is not accepting jobs:\n{state.strip()}\n"
-                 f"resume with: cupsenable {printer}")
-
-    defaults = run(["lpoptions", "-p", printer])
-    names = re.search(r"marker-names=('[^']*'|\S+)", defaults)
-    levels = re.search(r"marker-levels=('[^']*'|\S+)", defaults)
-    if names and levels:
-        pairs = zip(names.group(1).strip("'").split(","),
-                    levels.group(1).strip("'").split(","))
-        low = [f"{n}={v}%" for n, v in pairs if v.lstrip("-").isdigit()
-               and 0 <= int(v) < LOW_INK]
-        if low:
-            print(f"warning: low ink -- {', '.join(low)} "
-                  f"(a starved GY/PB channel shows up first in small text)")
-
-
 def pdf_page_size(path):
     """(width, height) in points of the PDF's first page, or None."""
     m = re.search(r"Page size:\s+([\d.]+) x ([\d.]+) pts", run(["pdfinfo", path]))
     return (float(m.group(1)), float(m.group(2))) if m else None
 
 
-def check_page_size(path, page_size):
+class PrintError(Exception):
+    pass
+
+
+def print_pdf(pdf, stock, printer, page_size="Letter", copies=1, pages=None, dry_run=False, log=print):
+    """The checks `mint print` makes, then the lp command; returns the command. Raises PrintError
+    instead of exiting, so a job can report it."""
+    if not os.path.isfile(pdf):
+        raise PrintError(f"no such file: {pdf}")
+    if stock not in STOCKS:
+        raise PrintError(f"stock is one of {', '.join(sorted(STOCKS))}, not {stock!r}")
+    avail = driver_options(printer)
+    _check_printer(printer, log)
+    _check_page_size(pdf, page_size)
+    opts = _build_options(stock, page_size, avail)
+    cmd = ["lp", "-d", printer, "-n", str(copies), "-t", os.path.basename(pdf)]
+    if pages:
+        cmd += ["-P", pages]
+    for key, val in sorted(opts.items()):
+        cmd += ["-o", f"{key}={val}"]
+    cmd.append(pdf)
+    size = pdf_page_size(pdf)
+    log(f"{pdf} ({f'{size[0] / 72:.2f}x{size[1] / 72:.2f} in' if size else 'unknown size'}) -> {printer} "
+        f"[{stock}: {opts['MediaType']}, {opts['PageSize']}, scaling off]")
+    if not dry_run:
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode:
+            raise PrintError((r.stderr or r.stdout).strip() or f"lp exited {r.returncode}")
+        log((r.stdout or "").strip())
+    return cmd
+
+
+def _check_printer(printer, log=print):
+    state = run(["lpstat", "-p", printer])
+    if not state.strip():
+        raise PrintError(f"no such printer queue {printer!r} (see: lpstat -p)")
+    if "disabled" in state or "stopped" in state:
+        raise PrintError(f"printer is not accepting jobs:\n{state.strip()}\nresume with: cupsenable {printer}")
+    defaults = run(["lpoptions", "-p", printer])
+    names = re.search(r"marker-names=('[^']*'|\S+)", defaults)
+    levels = re.search(r"marker-levels=('[^']*'|\S+)", defaults)
+    if names and levels:
+        pairs = zip(names.group(1).strip("'").split(","), levels.group(1).strip("'").split(","))
+        low = [f"{n}={v}%" for n, v in pairs if v.lstrip("-").isdigit() and 0 <= int(v) < LOW_INK]
+        if low:
+            log(f"warning: low ink -- {', '.join(low)} (a starved GY/PB channel shows up first in small text)")
+
+
+def _check_page_size(path, page_size):
     pdf = pdf_page_size(path)
     want = MEDIA_PTS.get(page_size.lstrip("T"))
     if not pdf or not want:
         return
-    ok = (all(abs(a - b) <= 2 for a, b in zip(pdf, want))
-          or all(abs(a - b) <= 2 for a, b in zip(pdf[::-1], want)))
-    if ok:
+    if (all(abs(a - b) <= 2 for a, b in zip(pdf, want)) or all(abs(a - b) <= 2 for a, b in zip(pdf[::-1], want))):
         return
-    sys.exit(f"PDF page is {pdf[0]:.0f}x{pdf[1]:.0f} pts but media {page_size} is "
-             f"{want[0]:.0f}x{want[1]:.0f} pts. Scaling is off by design, so this "
-             f"would clip or offset the cards rather than resize them.\n"
-             f"Re-export the PDF at {page_size}, or pass --media for the size it is.")
+    raise PrintError(f"PDF page is {pdf[0]:.0f}x{pdf[1]:.0f} pts but media {page_size} is {want[0]:.0f}x{want[1]:.0f} pts. "
+                     "Scaling is off by design, so this would clip or offset the cards rather than resize them. "
+                     f"Re-export the PDF at {page_size}, or pass --media for the size it is.")
 
 
-def build_options(args, avail):
-    opts = {
-        "print-scaling": "none",   # true 100% -- never let CUPS resample the art
-        "number-up": "1",
-        "Duplex": "None",
-        "Ink": "COLOR",
-        "MediaType": STOCKS[args.stock],
-        "PageSize": args.page_size,
-        "InputSlot": INPUT_SLOT,
-    }
+def _build_options(stock, page_size, avail):
+    opts = {"print-scaling": "none", "number-up": "1", "Duplex": "None", "Ink": "COLOR",
+            "MediaType": STOCKS[stock], "PageSize": page_size, "InputSlot": INPUT_SLOT}
     for key, val in sorted(opts.items()):
         choices = avail.get(key)
         if choices and val not in choices:
-            sys.exit(f"driver rejects {key}={val}; choices: {' '.join(choices)}")
+            raise PrintError(f"driver rejects {key}={val}; choices: {' '.join(choices)}")
     return opts
 
 
@@ -177,27 +194,12 @@ def main(argv=None):
         sys.exit("pass -p to confirm what is loaded in the tray, e.g. -p vinyl\n"
                  f"choices: {', '.join(sorted(STOCKS))}")
 
-    check_printer(args.printer)
-    check_page_size(args.pdf, args.page_size)
-
-    opts = build_options(args, avail)
-    cmd = ["lp", "-d", args.printer, "-n", str(args.copies),
-           "-t", os.path.basename(args.pdf)]
-    if args.pages:
-        cmd += ["-P", args.pages]
-    for key, val in sorted(opts.items()):
-        cmd += ["-o", f"{key}={val}"]
-    cmd.append(args.pdf)
-
-    pdf = pdf_page_size(args.pdf)
-    size = f"{pdf[0] / 72:.2f}x{pdf[1] / 72:.2f} in" if pdf else "unknown size"
-    print(f"{args.pdf} ({size}) -> {args.printer} "
-          f"[{args.stock}: {opts['MediaType']}, {opts['PageSize']}, "
-          f"scaling off]")
+    try:
+        cmd = print_pdf(args.pdf, args.stock, args.printer, args.page_size, args.copies, args.pages, args.dry_run)
+    except PrintError as e:
+        sys.exit(str(e))
     if args.dry_run:
         print(" ".join(cmd))
-        return
-    subprocess.run(cmd, check=True)
 
 
 if __name__ == "__main__":

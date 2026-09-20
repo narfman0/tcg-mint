@@ -10,7 +10,7 @@ import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from .. import PKG, comfy, frame, newset, render, restyle, sets, style, upscale
+from .. import PKG, comfy, frame, impose, newset, printing, render, restyle, sets, style, upscale
 from ..art import Art
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
@@ -163,7 +163,8 @@ def create_app(ws):
                           "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes()},
                 "cards": {"path": str(ws.cards_file), "count": count},
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
-                "style_fields": style_fields(), "frame_fields": frame_fields(), "current_job": S.jobs.current.to_dict() if S.jobs.current else None}
+                "style_fields": style_fields(), "frame_fields": frame_fields(), "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
+                "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer}}
 
     # --- sets ---------------------------------------------------------------------------
     @app.get("/api/sets/{code}")
@@ -496,7 +497,8 @@ def create_app(ws):
         kind = body.get("kind")
         st = S.find_set(body["set"]) if body.get("set") else None
         names = body.get("names") or (st.names() if st else [])
-        submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes}.get(kind)
+        submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes,
+                  "printrun": submit_printrun}.get(kind)
         if not submit:
             raise HTTPException(400, f"unknown job kind {kind!r}")
         job = submit(S, st, names, body)
@@ -689,6 +691,71 @@ def submit_render(S, st, names, body):
         return {"files": done, "out_dir": out_dir}
     return S.jobs.submit("render", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi,
                                            "what": what, "dest": out_dir}, run)
+
+
+def submit_printrun(S, st, names, body):
+    """A print run: the cards rendered (only those without a fresh render), imposed onto pages as a
+    PDF under out/<set>/print/, and -- with a `stock` -- sent to the workspace's printer at 100%."""
+    styled, dpi = bool(body.get("styled")), int(body.get("dpi") or 1200)
+    paper, bleed, sheet_dpi = body.get("paper") or "letter", float(body.get("bleed") or 0.04), int(body.get("sheet_dpi") or 600)
+    stock, copies = body.get("stock") or None, max(1, int(body.get("copies") or 1))
+    if paper not in impose.PAPER:
+        raise HTTPException(400, f"paper is one of {', '.join(impose.PAPER)}")
+    if stock and stock not in printing.STOCKS:
+        raise HTTPException(400, f"stock is one of {', '.join(sorted(printing.STOCKS))}")
+    out_dir = S.out_dir(st)
+    key = "styled" if styled else "plain"
+    stamp = time.strftime("%Y%m%d-%H%M")
+    pdf = out_dir / "print" / f"{st.code}-{key}-{stamp}.pdf"
+    title = f"print run: {st.code} {key}, {len(names)} card(s) on {paper}" + (f", {copies}x on {stock}" if stock else ", PDF only")
+    what = (f"renders the {len(names)} card(s) whose {key} render is missing or stale at {dpi} dpi, lays them out 3x3 on "
+            f"{paper} with {bleed}in bleed at {sheet_dpi} dpi into {pdf.name}" + (f", and prints {copies} copy(ies) on {stock} to {S.ws.printer}" if stock else ""))
+
+    def run(job):
+        need = [n for n in names if not (r := renders_for(S, st, n, want_for(S, st, n)).get(key)) or r.get("stale")]
+        job.step(0, len(need) + 2)
+        done = 0
+        if need:
+            def on_rendered(r):
+                nonlocal done
+                done += 1
+                job.say(f"rendered {os.path.basename(r.out)}")
+                job.made(set=st.code, name=r.name, kind="render", key=f"render-{key}", file=os.path.basename(r.out), path=r.out)
+                job.step(done)
+            render.render_cards(S.ws, need, set_path=st.path, styled=styled, dpi=dpi, out_dir=str(out_dir), on_rendered=on_rendered)
+        else:
+            job.say("every card has a fresh render")
+        files = []
+        for n in names:
+            r = renders_for(S, st, n).get(key)
+            if not r:
+                raise MintError(f"{n}: no {key} render to print")
+            files.append(r["path"])
+        pages = impose.impose(files, str(pdf), paper, bleed, sheet_dpi, log=job.say)
+        job.made(set=st.code, name=f"{pages} page(s)", kind="pdf", file=pdf.name, path=str(pdf))
+        job.step(len(need) + 1)
+        if stock:
+            page_size = "Letter" if paper == "letter" else "A4"
+            try:
+                printing.print_pdf(str(pdf), stock, S.ws.printer, page_size, copies, log=job.say)
+            except printing.PrintError as e:
+                raise MintError(str(e)) from None
+        job.step(len(need) + 2)
+        return {"pdf": str(pdf), "pages": pages, "rendered": need}
+    return S.jobs.submit("printrun", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi, "paper": paper,
+                                             "stock": stock, "copies": copies, "what": what, "dest": str(pdf.parent)}, run)
+
+
+def want_for(S, st, name):
+    """The art hash each of plain / styled should render with now, for the stale check."""
+    entry = st.card({"name": name})
+    try:
+        card = S.cards().find(name, entry.printing)
+    except MintError:
+        return {}
+    art = S.art
+    return {"plain": art.resolve(card, override=entry.art).hash,
+            "styled": art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art)).hash}
 
 
 def submit_themes(S, st, names, body):

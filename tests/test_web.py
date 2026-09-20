@@ -172,3 +172,15 @@ def test_pick_is_the_styled_art_and_clears_with_its_variant(client):
     r = client.delete("/api/sets/TST/cards/Alpha/variants/abcd1234")
     assert r.status_code == 200 and "pick" not in r.json()["entry"]
     assert sets.load(ws.sets / "tst.json").cards["Alpha"].pick is None
+
+
+def test_printrun_job_takes_paper_and_stock(client):
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha", "Beta"]})
+    r = client.post("/api/jobs", json={"kind": "printrun", "set": "TST", "names": ["Alpha"], "paper": "a4"})
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "print run: TST plain, 1 card(s) on a4, PDF only" and r.json()["params"]["stock"] is None
+    r = client.post("/api/jobs", json={"kind": "printrun", "set": "TST", "styled": True, "stock": "matte", "copies": 2})
+    assert r.status_code == 200 and r.json()["title"] == "print run: TST styled, 2 card(s) on letter, 2x on matte"
+    assert client.post("/api/jobs", json={"kind": "printrun", "set": "TST", "paper": "tabloid"}).status_code == 400
+    assert client.post("/api/jobs", json={"kind": "printrun", "set": "TST", "stock": "papyrus"}).status_code == 400
+    assert client.get("/api/workspace").json()["print"]["paper"] == ["letter", "a4"]

@@ -20,7 +20,7 @@ const REMIX_BADGE = {repose: 'repose', new: 'new scene', inspire: 'inspired'};
 /* style2: a second look shown beside the first on every tile (the set-level A/B); sort: number | name |
    colour (the shown image's hue, measured in the browser); sheet: tiles without names and badges, tighter */
 const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
-               style2: '', sort: 'number', sheet: false, colours: {},
+               style2: '', sort: 'number', sheet: false, colours: {}, paper: 'letter', stock: '',
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
                takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false};
 
@@ -402,6 +402,11 @@ function board() {
         <button data-job="render-styled" ${styledOk ? '' : 'disabled'} title="${esc(styledTitle)}">render styled${state.missing ? count('render-styled') : styledOk && cover.have < cover.total ? ` <small>${cover.have}/${cover.total}</small>` : ''}</button>
         <select id="dpi">${[300, 600, 1200].map(d => `<option ${state.dpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span>
       </span>
+      <span class="stage" title="a print run: the cards' renders in the mode picked above (made where missing or stale), laid out 3x3 as a PDF under out/${esc(code.toLowerCase())}/print/, and printed when a stock is picked"><span class="lbl">print</span>
+        <button data-job="printrun" title="render what is missing or stale, impose, and print if a stock is picked">print run · ${state.mode}</button>
+        <select id="paper">${(state.ws.print?.paper || ['letter']).map(p => `<option ${state.paper === p ? 'selected' : ''}>${p}</option>`).join('')}</select>
+        <select id="stock" title="what is in the tray; PDF only makes the file and prints nothing"><option value="">PDF only</option>${(state.ws.print?.stocks || []).map(s => `<option ${state.stock === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      </span>
       <label class="missing" title="each job skips the cards that already have its product: an enhance of the crop, art in the look, a plain or styled render that is not stale. The count is what it would make"><input type="checkbox" id="missing" ${state.missing ? 'checked' : ''}> only what's missing</label>
       ${n ? '<button id="clearsel" class="small">clear selection</button>' : ''}
     </div>
@@ -430,9 +435,12 @@ function board() {
   if ($('#selshown')) $('#selshown').onclick = () => { boardCards().forEach(c => sel.add(c.name)); board(); };
   $('#missing').onchange = e => { state.missing = e.target.checked; board(); };
   $('#dpi').onchange = e => { state.dpi = +e.target.value; };
+  $('#paper').onchange = e => { state.paper = e.target.value; };
+  $('#stock').onchange = e => { state.stock = e.target.value; };
   document.querySelectorAll('[data-job]').forEach(b => b.onclick = () => {
     const dpi = +$('#dpi').value, job = b.dataset.job;
-    const cs = targets(job);
+    const cs = job === 'printrun' ? target : targets(job);  // a print run wants every card it is aimed at
+    if (job === 'printrun' && state.stock && !confirm(`Print ${cs.length} card(s) of ${code} on ${state.stock} to ${state.ws.print?.printer}? Check what is in the tray.`)) return;
     if (!cs.length) return toast(state.missing ? 'nothing missing: every card has it' : 'no cards');
     // on the ALL board a job is one submission per set. The names go explicitly unless the job is
     // the whole set (no selection, not narrowed to the missing), which null says
@@ -447,6 +455,7 @@ function board() {
         'render-styled': styled && {kind: 'render', set: s, names: list, styled: true, dpi},
         'enhance': {kind: 'enhance', set: s, names: list, base: 'crop'},
         'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
+        'printrun': {kind: 'printrun', set: s, names: list, styled: state.mode === 'styled', dpi, paper: state.paper || 'letter', stock: state.stock || null},
       };
       const origin = `${all ? 'all-sets board' : code + ' board'}: ${n ? `${n} selected` : 'all cards'}${state.missing ? ', only what\'s missing' : ''}${all ? ` (${s})` : ''}`;
       if (jobs[job]) submit(jobs[job], origin);
@@ -1444,6 +1453,7 @@ async function jobs() {
 
 /* One thing a job made: a link to that image on the card page, the picture itself on hover. */
 function itemHtml(it) {
+  if (it.kind === 'pdf') return `<a class="it" href="${file(it.path)}" target="_blank">${esc(it.file)} <span class="mono muted">${esc(it.name)}</span></a>`;
   const href = it.key ? colHash(it.set, it.name, it.key) : `#/set/${esc(it.set)}/card/${encodeURIComponent(it.name)}`;
   const what = it.label ? `${it.label}-${it.key}` : it.file || it.kind || '';
   return `<a class="it ${it.kind === 'render' || it.kind === 'theme' ? 'card' : ''}" href="${href}" ${it.path ? `data-src="${img(it.path, 320)}"` : ''}>
