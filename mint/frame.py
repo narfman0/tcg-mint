@@ -220,7 +220,34 @@ def ability_word(p):
     return p
 
 
-def render_text(card, symbols, flavor=None):
+ROMAN = r"(?:I|II|III|IV|V|VI|VII|VIII)"
+CHAPTER_RE = re.compile(rf"^({ROMAN}(?:, {ROMAN})*) — ")
+LOYALTY_RE = re.compile(r"^([+−\-]\d+|0): ")
+LEVEL_RE = re.compile(r"^(\{[^}]+\})+: Level (\d+)$")
+
+
+def layout_of(card):
+    """Which frame a record wants: planeswalker, saga, class, adventure, split, battle, or normal.
+    Transform and modal faces come through as normal (the back face is its own record) with their
+    double-faced markers; a battle is a transform front that is a Battle."""
+    t = card.get("type_line") or ""
+    layout = card.get("layout") or "normal"
+    if layout == "split":
+        return "split"
+    if layout == "adventure" and card.get("card_faces"):
+        return "adventure"
+    if "Planeswalker" in t and card.get("loyalty") is not None:
+        return "planeswalker"
+    if "Battle" in t and card.get("defense") is not None:
+        return "battle"
+    if "Saga" in t:
+        return "saga"
+    if "Class" in t and "Level" in (card.get("oracle_text") or ""):
+        return "class"
+    return "normal"
+
+
+def render_text(card, symbols, flavor=None, layout="normal"):
     def syms(s):
         return re.sub(r"\{[^}]+\}", lambda m: f'<img class="sym" src="{symbols.data_uri(m.group(0))}">', esc(s))
     text = card.get("oracle_text") or ""
@@ -229,6 +256,38 @@ def render_text(card, symbols, flavor=None):
     if card["type_line"].startswith("Basic") and m:
         return f'<p class="big-sym"><span class="pip"><img src="{symbols.data_uri(m.group(1))}"></span></p>'
     paras = []
+    if layout == "planeswalker":  # each loyalty ability a row with its cost in a badge; static ones plain
+        for p in text.split("\n") if text else []:
+            m = LOYALTY_RE.match(p)
+            if m:
+                cost = m.group(1).replace("-", "−")
+                kind = "up" if cost.startswith("+") else "down" if cost.startswith("−") else "zero"
+                paras.append(f'<p class="loyal"><span class="lcost {kind}">{cost}</span><span>{syms(p[m.end():])}</span></p>')
+            else:
+                paras.append(f'<p class="static">{syms(ability_word(p))}</p>')
+        return "".join(paras)
+    if layout == "saga":  # the reminder line, then a row per chapter with its numerals in a badge
+        for p in text.split("\n") if text else []:
+            m = CHAPTER_RE.match(p)
+            if m:
+                nums = "".join(f"<b>{n}</b>" for n in m.group(1).split(", "))
+                paras.append(f'<p class="chapter"><span class="numeral">{nums}</span><span>{syms(p[m.end():])}</span></p>')
+            elif p.startswith("("):
+                paras.append(f'<p class="reminder">{syms(p)}</p>')
+            else:
+                paras.append(f"<p>{syms(p)}</p>")
+        return "".join(paras)
+    if layout == "class":  # a band per level header, its cost as symbols; the abilities under each
+        for p in text.split("\n") if text else []:
+            m = LEVEL_RE.match(p)
+            if m:
+                cost = p[:p.index(":")]
+                paras.append(f'<p class="level"><span>{syms(cost)}</span><b>Level {m.group(2)}</b></p>')
+            elif p.startswith("("):
+                paras.append(f'<p class="reminder">{syms(p)}</p>')
+            else:
+                paras.append(f"<p>{syms(ability_word(p))}</p>")
+        return "".join(paras)
     for p in text.split("\n") if text else []:  # a vanilla card has no rules paragraph, only its flavor
         p = ability_word(syms(p))
         p = re.sub(r"\(([^)]*)\)", r'<span class="reminder">(\1)</span>', p)
@@ -243,34 +302,77 @@ def render_text(card, symbols, flavor=None):
     return "\n".join(paras)
 
 
+def mana(symbols, cost):
+    return "".join(f'<span class="pip"><img src="{symbols.data_uri(m)}"></span>' for m in re.findall(r"\{[^}]+\}", cost or ""))
+
+
+# the double-faced markers: what sits before the name, and what the other face is called at the foot
+DFC_ICON = {("transform", 0): "☀", ("transform", 1): "☾", ("modal_dfc", 0): "▲", ("modal_dfc", 1): "▼"}
+
+
+def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""):
+    """The markup inside .card for a layout: the bars, the art window, the text box and its
+    companions. Split builds two half cards; battle and split lie sideways (the .turn box)."""
+    ident = card.get("layout"), card.get("face_index", 0)
+    icon = f'<span class="dfc">{DFC_ICON[ident]}</span>' if ident in DFC_ICON else ""
+    title = lambda c: f'<div class="bar titlebar"><span class="name">{icon}{esc(c["name"])}</span><span class="cost">{mana(symbols, c.get("mana_cost"))}</span></div>'  # noqa: E731
+    typebar = lambda c: f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{set_symbol(card["rarity"])}</div>'  # noqa: E731
+    other = (f'<div class="other-face"><span class="dfc">{DFC_ICON.get((card.get("layout"), 1 - card.get("face_index", 0)), "")}</span> '
+             f'{esc(other_face["name"])} <small>{esc(other_face["type_line"])}</small></div>') if other_face else ""
+    if layout == "split":
+        halves = []
+        for f in card["card_faces"][:2]:
+            halves.append(f'<div class="half"><div class="frame"></div>{title(f)}<div class="art"></div>{typebar(f)}'
+                          f'<div class="textbox">{render_text(f, symbols)}</div></div>')
+        return f'<div class="turn">{"".join(halves)}</div>'
+    if layout == "battle":
+        return (f'<div class="turn"><div class="frame"></div>{title(card)}<div class="art"></div>{typebar(card)}'
+                f'<div class="textbox" id="text">{render_text(card, symbols, flavor)}</div>'
+                f'<div class="defense"><span>{esc(str(card.get("defense")))}</span></div>{other}{footer}</div>')
+    if layout == "adventure":
+        main, adv = card["card_faces"][0], card["card_faces"][1]
+        box = (f'<div class="textbox adventure" id="text"><div class="adv"><div class="adv-title"><span>{esc(adv["name"])}</span>'
+               f'<span class="cost">{mana(symbols, adv.get("mana_cost"))}</span></div><div class="adv-type">{esc(adv["type_line"])}</div>'
+               f'<div class="adv-text">{render_text(adv, symbols)}</div></div><div class="main">{render_text(main, symbols, flavor)}</div></div>')
+        return f'{title(main)}<div class="art"></div>{typebar(main)}{box}{pt_html}'
+    text = render_text(card, symbols, flavor, layout)
+    if layout == "planeswalker":
+        loyalty = f'<div class="loyalty"><span>{esc(str(card.get("loyalty")))}</span></div>'
+        return f'{title(card)}<div class="art"></div>{typebar(card)}<div class="textbox" id="text">{text}</div>{loyalty}{other}'
+    if layout in ("saga", "class"):
+        return f'{title(card)}<div class="art"></div><div class="textbox" id="text">{text}</div>{typebar(card)}{other}'
+    cls = "has-pt" if pt_html else ""
+    return f'{title(card)}<div class="art"></div>{typebar(card)}<div class="textbox {cls}" id="text">{text}{other}</div>{pt_html}'
+
+
 def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=1, set_code="SET", set_size=1,
-               flavor=None, art_filter=None, set_css="", frame_vars=None, maker="", maker_code="", year=""):
+               flavor=None, art_filter=None, set_css="", frame_vars=None, maker="", maker_code="", year="",
+               other_face=None):
     """The whole page for one card. `art_url` is the file:// URL of the image to show;
     `fonts_css` the @font-face rules for local faces (frame.local_fonts); `frame_vars` the frame
-    knobs as css (frame_css), the defaults when None."""
+    knobs as css (frame_css), the defaults when None; `other_face` the record of a double-faced
+    card's other side, named at the foot of the text box."""
     title, body = THEMES[theme]
     frame, frame_dark, bar, bar_edge, box = frame_for(card)
     rarity = card["rarity"]
     rarity_hi = RARITY[rarity][1] if rarity in ("uncommon", "rare", "mythic") else "transparent"
-    cost = "".join(f'<span class="pip"><img src="{symbols.data_uri(m)}"></span>'
-                   for m in re.findall(r"\{[^}]+\}", card.get("mana_cost") or ""))
+    layout = layout_of(card)
     pt = f'<div class="pt"><span>{card["power"]}/{card["toughness"]}</span></div>' if card.get("power") is not None else ""
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
+    footer = (f'<div class="footer"><span><b>{number:03d}/{set_size} {card["rarity"][0].upper()}</b><br>{esc(set_code)} · EN · '
+              f'<span class="brush">✎</span> {esc(card["artist"])}</span>'
+              f'<span>{esc(maker_code)} · {esc(maker)} · {year} · {card["set"].upper()} {card["collector_number"]}</span></div>')
+    turned = layout in ("split", "battle")  # sideways: no stamp or crown; a battle's footer rides inside the turned box
     tpl = string.Template((PKG / "template.html").read_text())
     return tpl.substitute(
         font_link=font_link(title + body), local_fonts=fonts_css,
         title_font=stack(title), body_font=stack(body),
         frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box,
         noise=NOISE_URI, set_css=set_css, frame_vars=frame_vars or frame_css(),
-        watermark=watermark_uri(), rarity_hi=rarity_hi,
-        stamp='<div class="stamp"></div>' if rarity in ("rare", "mythic") else "",
-        crown='<div class="crown-o"></div><div class="crown"></div>' if legendary else "",
-        name=esc(card["name"]), cost=cost,
+        watermark=watermark_uri(), rarity_hi=rarity_hi, layout=layout,
+        stamp='<div class="stamp"></div>' if rarity in ("rare", "mythic") and not turned else "",
+        crown='<div class="crown-o"></div><div class="crown"></div>' if legendary and not turned else "",
+        body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else ""),
+        footer="" if layout == "battle" else footer,
         art=art_url, art_filter=art_filter or "none",
-        type_line=esc(card["type_line"]), set_symbol=set_symbol(card["rarity"]), set_code=set_code,
-        text=render_text(card, symbols, flavor), pt=pt, text_class="has-pt" if pt else "",
-        number=f"{number:03d}", set_size=set_size, rarity=card["rarity"][0].upper(),
-        artist=esc(card["artist"]), maker_code=maker_code, maker=maker,
-        date=year,
-        orig_set=card["set"].upper(), orig_number=card["collector_number"],
     )

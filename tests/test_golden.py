@@ -57,6 +57,26 @@ CARDS = {
                      oracle_text="Equipped creature gets +1/+1.\nEquip {2} ({2}: Fasten this to a creature you control. "
                                  "Do it only when you could cast a sorcery.)",
                      flavor_text="Every fixture needs fixing."),
+    # the other layouts: a planeswalker, a saga, an adventure and a split card, all made up
+    "planeswalker": dict(name="Fixture, Who Waits", type_line="Legendary Planeswalker — Fixture", colors=["W"], mana_cost="{2}{W}",
+                         rarity="mythic", power=None, toughness=None, loyalty="4", flavor_text=None,
+                         oracle_text="Each opponent can't attack you with more than one creature each turn.\n"
+                                     "+1: You gain 2 life.\n−3: Exile target creature. (It goes.)\n−7: You get an emblem."),
+    "saga": dict(name="The Fixing of the Fixture", type_line="Enchantment — Saga", colors=["B"], mana_cost="{2}{B}", rarity="rare",
+                 power=None, toughness=None, flavor_text=None,
+                 oracle_text="(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\n"
+                             "I — Each opponent discards a card.\nII — Each opponent loses 2 life.\n"
+                             "III — Return target creature card from your graveyard to the battlefield."),
+    "adventure": dict(name="Fixture Knight // Fix It", type_line="Creature — Fixture Knight // Instant — Adventure", colors=["G"],
+                      mana_cost="{2}{G}", rarity="uncommon", power="3", toughness="3", layout="adventure", oracle_text="Trample",
+                      flavor_text="A knight, and a plan.",
+                      card_faces=[dict(name="Fixture Knight", type_line="Creature — Fixture Knight", mana_cost="{2}{G}", oracle_text="Trample"),
+                                  dict(name="Fix It", type_line="Instant — Adventure", mana_cost="{G}",
+                                       oracle_text="Destroy target artifact. (Then exile this card. You may cast the creature later from exile.)")]),
+    "split": dict(name="Fix // Fixture", type_line="Instant // Sorcery", colors=["R", "U"], mana_cost="{1}{R} // {2}{U}", rarity="uncommon",
+                  power=None, toughness=None, layout="split", oracle_text="", flavor_text=None,
+                  card_faces=[dict(name="Fix", type_line="Instant", mana_cost="{1}{R}", oracle_text="Fix deals 2 damage to any target."),
+                              dict(name="Fixture", type_line="Sorcery", mana_cost="{2}{U}", oracle_text="Draw two cards.")]),
 }
 
 

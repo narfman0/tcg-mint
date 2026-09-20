@@ -12,6 +12,15 @@ eyeballed (`mint calibrate` shows the numbers). Cards carry your own collector
 line: your set code and numbering, your name, the mint date, and a pointer
 back to the original printing.
 
+Beyond the normal card the frame knows the other shapes a deck holds:
+planeswalkers (loyalty badges per ability, the loyalty shield), sagas
+(chapters down the left, the art the full height on the right), classes (the
+mirror, level bands on the right), adventures (the adventure in its own box
+beside the creature's text), split cards and battles (sideways, two half
+cards or the art beside the text), and both faces of transform and modal
+double-faced cards, each marked with its icon and naming the other face at
+the foot of the text box (`--faces` renders the backs).
+
 Output is 2.72 × 3.72 in with bleed — MakePlayingCards' template size, and
 what any imposer wants.
 

@@ -71,9 +71,11 @@ def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",),
     with Browser(dpi) as browser:
         for i, name in enumerate(names, 1):
             found = cards.find(name, st.card({"name": name}).printing)
-            for card in (faces(found) if back_faces else faces(found)[:1]):
+            fs = faces(found)
+            for card in (fs if back_faces else fs[:1]):
+                other = fs[1 - card["face_index"]] if len(fs) == 2 else None  # a double-faced card's other side
                 for r in render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year, fhash,
-                                    symbols, art, fonts_css, manifest, dpi, set_path):
+                                    symbols, art, fonts_css, manifest, dpi, set_path, other):
                     results.append(r)
                     if on_rendered:
                         on_rendered(r)
@@ -81,7 +83,7 @@ def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",),
 
 
 def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year, fhash, symbols, art, fonts_css,
-       manifest, dpi, set_path):
+       manifest, dpi, set_path, other_face=None):
     """Render one face of one card in each theme, yielding a Rendered per file."""
     set_code = st.code
     set_size = st.size or len(st.cards) or 100
@@ -102,7 +104,8 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
         html = frame.build_html(
             card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
             number=number, set_code=set_code, set_size=set_size, flavor=entry.flavor,
-            art_filter=art_filter, set_css=st.css, frame_vars=frame.frame_css(st.frame), maker=ws.maker, maker_code=ws.maker_code, year=year)
+            art_filter=art_filter, set_css=st.css, frame_vars=frame.frame_css(st.frame), maker=ws.maker, maker_code=ws.maker_code, year=year,
+            other_face=other_face)
         sizes = browser.render(html, out)
         r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
         manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash, dpi=dpi)

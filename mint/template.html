@@ -102,6 +102,73 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   background: radial-gradient(ellipse at 35% 30%, rgba(255,255,255,.75), transparent 45%),
     linear-gradient(120deg, #cdb8ff, #9fe0ff 28%, #ffe9a6 52%, #ffb3c6 76%, #b8f2cf);
   box-shadow: 0 0 0 0.9px #000, inset 0 0 0 0.6px rgba(0,0,0,.35); }
+/* --- the other layouts. Everything above is the normal frame; each of these moves its parts. --- */
+/* double-faced: the face's icon before its name, and the other face named at the foot of the text box */
+.dfc { display: inline-block; font-size: .8em; margin-right: 3px; opacity: .8; }
+.other-face { position: absolute; left: 0; right: 0; bottom: 0; padding: 1px 5px; font-size: 6px; line-height: 1.3;
+  color: var(--ink); background: color-mix(in srgb, var(--bar) 70%, var(--frame)); border-top: 0.7px solid var(--bar-edge); }
+.other-face small { color: rgba(0,0,0,.6); margin-left: 3px; }
+.textbox .other-face { margin: 0 -5px -4px; position: static; }
+/* planeswalker: a loyalty badge per ability, rows shaded in turn, and the loyalty shield where P/T sits */
+.planeswalker .textbox { padding: 2px 5px 2px 4px; justify-content: safe center; font-size: 10.6px; }
+.planeswalker .textbox p { margin: 0; padding: 2px 0; }
+.planeswalker .textbox p.loyal { display: flex; gap: 5px; align-items: center; }
+.planeswalker .textbox p.loyal:nth-child(even) { background: rgba(0,0,0,.06); margin: 0 -5px 0 -4px; padding-left: 4px; padding-right: 5px; }
+.lcost { flex: none; width: 24px; height: 14px; line-height: 14px; text-align: center; color: #fff; font-weight: 700; font-size: 8.5px;
+  font-family: var(--title-font); background: #222; border-radius: 3px 3px 5px 5px / 3px 3px 7px 7px; box-shadow: inset 0 0 0 0.7px rgba(255,255,255,.35); }
+.lcost.up { background: #4d5a3a; } .lcost.down { background: #5a3a3a; } .lcost.zero { background: #3a3a3a; }
+.loyalty { position: absolute; right: 13px; top: 313px; width: 30px; height: 21px; color: #fff; font-family: var(--title-font); font-weight: 700;
+  font-size: 12px; text-align: center; line-height: 21px; background: #1a1a1a; box-shadow: inset 0 0 0 0.9px #b9b9b9;
+  clip-path: polygon(0 20%, 50% 0, 100% 20%, 100% 70%, 50% 100%, 0 70%); }
+/* saga: chapters down the left, the art the full height on the right, the type line under both */
+.saga .art { left: 126px; top: 38.5px; width: 110px; height: 262px; }
+.saga .textbox { left: 14px; top: 38.5px; width: 110px; height: 262px; padding: 5px 4px; font-size: 9.6px; justify-content: flex-start; }
+.saga .typebar { top: 302px; }
+.saga .textbox p.reminder { font-style: italic; font-size: .82em; color: rgba(0,0,0,.75); margin-bottom: 4px; }
+.saga .textbox p.chapter { display: flex; gap: 4px; align-items: flex-start; padding: 3px 0; border-top: 0.7px solid rgba(0,0,0,.25); margin: 0; }
+.saga .numeral { flex: none; display: flex; flex-direction: column; gap: 1px; }
+.saga .numeral b { display: block; width: 15px; height: 13px; line-height: 13px; text-align: center; font-family: var(--title-font); font-size: 8.5px;
+  color: #fff; background: #222; clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%); }
+/* class: the mirror of a saga -- art on the left, the levels on the right */
+.class .art { left: 14px; top: 38.5px; width: 110px; height: 262px; }
+.class .textbox { left: 126px; top: 38.5px; width: 110px; height: 262px; padding: 4px; font-size: 9.6px; justify-content: flex-start; }
+.class .typebar { top: 302px; }
+.class .textbox p.reminder { font-style: italic; font-size: .82em; color: rgba(0,0,0,.75); }
+.class .textbox p.level { display: flex; justify-content: space-between; align-items: center; margin: 4px -4px 3px; padding: 1px 4px;
+  background: color-mix(in srgb, var(--bar) 75%, var(--frame)); border-top: 0.7px solid var(--bar-edge); border-bottom: 0.7px solid var(--bar-edge);
+  font-family: var(--title-font); font-size: 9px; }
+/* adventure: the creature's text on the right, the adventure in its own box on the left */
+.textbox.adventure { flex-direction: row; gap: 4px; padding: 3px; }
+.textbox.adventure .adv { flex: 0 0 50%; display: flex; flex-direction: column; border: 0.9px solid var(--bar-edge); border-radius: 2px;
+  background: rgba(255,255,255,.35); font-size: .86em; overflow: hidden; }
+.textbox.adventure .adv-title { display: flex; justify-content: space-between; align-items: center; gap: 2px; padding: 1px 3px;
+  font-family: var(--title-font); font-weight: 700; font-size: 1.02em; background: color-mix(in srgb, var(--bar) 85%, var(--frame)); white-space: nowrap; }
+.textbox.adventure .adv-title .pip, .textbox.adventure .adv-title .pip img { width: 8px; height: 8px; }
+.textbox.adventure .adv-type { padding: 0 3px; font-family: var(--title-font); font-weight: 700; font-size: .88em; border-bottom: 0.7px solid var(--bar-edge); white-space: nowrap; }
+.textbox.adventure .adv-text { padding: 2px 3px; flex: 1; display: flex; flex-direction: column; justify-content: safe center; }
+.textbox.adventure .main { flex: 1; display: flex; flex-direction: column; justify-content: safe center; padding: 1px 2px; }
+/* sideways cards: a 350x250 box turned a quarter turn inside the 250x350 card */
+.turn { position: absolute; left: 0; top: 0; width: 350px; height: 250px; transform-origin: 0 0; transform: rotate(90deg) translate(0, -250px); }
+/* split: two half cards side by side in the turned box, each a normal frame at 0.64, leaving the portrait
+   bottom for the footer as on the real cards; a battle's footer rides in the turned box instead */
+.turn .footer { left: 14px; right: 14px; bottom: 3px; }
+.split .turn .half { position: absolute; top: 6px; left: 8px; width: 250px; height: 350px; transform-origin: 0 0; transform: scale(0.64); }
+.split .turn .half + .half { left: 172px; }
+.split .footer { left: 12px; right: 12px; bottom: 6px; }
+.split .half .frame { bottom: 9.5px; }
+.split .half .textbox { height: 118px; }
+.split > .frame { display: none; }
+/* battle: the art on the left half, the text on the right, the defense shield bottom right */
+.battle .turn .frame { left: 9.5px; top: 9.5px; right: 9.5px; bottom: 9.5px; }
+.battle .turn .titlebar { left: 14px; width: 322px; top: 14px; }
+.battle .turn .art { left: 14px; top: 36px; width: 150px; height: 176px; }
+.battle .turn .typebar { left: 168px; width: 168px; top: 36px; }
+.battle .turn .textbox { left: 168px; top: 57px; width: 168px; height: 155px; font-size: 9.8px; }
+.battle .turn .other-face { left: 14px; right: auto; width: 150px; bottom: 36px; }
+.battle .turn .footer { left: 30px; right: 48px; }
+.defense { position: absolute; right: 13px; bottom: 16px; width: 26px; height: 22px; color: #fff; font-family: var(--title-font); font-weight: 700;
+  font-size: 12px; text-align: center; line-height: 22px; background: #1a1a1a; box-shadow: inset 0 0 0 0.9px #b9b9b9;
+  clip-path: polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%); }
 /* collector info: two rows on the left (number, then set/language/artist); the mint credit
    only on the bottom row, on the right, so it stays below the P/T box (which ends at 333) */
 .footer { position: absolute; left: 12px; right: 12px; bottom: 10.5px; color: rgba(255,255,255,.72);
@@ -114,34 +181,35 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 /* per-set frame identity: sets/<code>.css, injected last so it can override any rule above */
 $set_css
 </style>
-<div class="card">
+<div class="card $layout">
   <div class="frame"></div>
   $crown
-  <div class="bar titlebar"><span class="name">$name</span><span class="cost">$cost</span></div>
-  <div class="art"></div>
-  <div class="bar typebar"><span class="type">$type_line</span>$set_symbol</div>
-  <div class="textbox $text_class" id="text">$text</div>
-  $pt
+  $body
   $stamp
-  <div class="footer">
-    <span><b>$number/$set_size $rarity</b><br>$set_code · EN · <span class="brush">✎</span> $artist</span>
-    <span>$maker_code · $maker · $date · $orig_set $orig_number</span>
-  </div>
+  $footer
 </div>
 <script>
 // Shrink rules text until it fits its box; same trick the real frames use.
 // Called by mint.py once the fonts have loaded -- measuring before that uses
 // the fallback face's metrics and the real font then reflows wider.
 window.fit = () => {
-  const t = document.getElementById('text');
-  t.style.fontSize = '';
-  let fs = parseFloat(getComputedStyle(t).fontSize);
-  while (t.scrollHeight > t.clientHeight && fs > 6) { fs -= 0.2; t.style.fontSize = fs + 'px'; }
+  // every text box (a split card has two) shrinks on its own; the smallest size is reported
+  let fs = Infinity;
+  for (const t of document.querySelectorAll('.textbox')) {
+    t.style.fontSize = '';
+    let f = parseFloat(getComputedStyle(t).fontSize);
+    while (t.scrollHeight > t.clientHeight && f > 6) { f -= 0.2; t.style.fontSize = f + 'px'; }
+    fs = Math.min(fs, f);
+  }
   // long names shrink until name + cost fit the title bar, as on the real cards
-  const bar = document.querySelector('.titlebar'), name = bar.querySelector('.name');
-  name.style.fontSize = '';
-  let ns = parseFloat(getComputedStyle(name).fontSize);
-  while (bar.scrollWidth > bar.clientWidth && ns > 8) { ns -= 0.2; name.style.fontSize = ns + 'px'; }
+  let ns = Infinity;
+  for (const bar of document.querySelectorAll('.titlebar')) {
+    const name = bar.querySelector('.name');
+    name.style.fontSize = '';
+    let n = parseFloat(getComputedStyle(name).fontSize);
+    while (bar.scrollWidth > bar.clientWidth && n > 8) { n -= 0.2; name.style.fontSize = n + 'px'; }
+    ns = Math.min(ns, n);
+  }
   return [fs, ns];
 };
 </script>

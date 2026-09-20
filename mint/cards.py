@@ -129,7 +129,7 @@ class Cards:
     # --- index ---------------------------------------------------------------
     def _signature(self):
         st = os.stat(self.path)
-        return f"{st.st_size}:{int(st.st_mtime)}"
+        return f"v2:{st.st_size}:{int(st.st_mtime)}"  # v2: split and adventure cards indexed by their first face too
 
     def db(self):
         if self._db is None:
@@ -159,7 +159,9 @@ class Cards:
                 n = len(line)
                 if n > 1:
                     c = front_face(json.loads(line))
-                    rows.append((c["name"], c["name"].lower(), c.get("full_name", c["name"]).lower(),
+                    # a split or adventure card keeps its 'A // B' name; its first face's name finds it too
+                    first = (c.get("card_faces") or [{}])[0].get("name") or c["name"]
+                    rows.append((c["name"], first.lower(), c.get("full_name", c["name"]).lower(),
                                  c.get("set"), c.get("collector_number"),
                                  c.get("illustration_id"), c.get("layout"), c.get("security_stamp"),
                                  c.get("released_at"), offset, n))
