@@ -1,7 +1,7 @@
 {
   "code": "BLS1",
   "name": "Blasted Studios, Set One",
-  "size": 18,
+  "size": 49,
   "note": "Test set: the priciest cards across satoru, niv and meren, numbered by price rank. Custom 'flavor' entries are placeholders to rewrite; delete a card's 'flavor' key to keep the printed one.",
   "art_filter": "saturate(1.55) contrast(1.18) hue-rotate(-8deg)",
   "style": {
@@ -80,6 +80,99 @@
     },
     "Yawgmoth, Thran Physician": {
       "number": 18
+    },
+    "Ajani's Welcome": {
+      "number": 19
+    },
+    "Expedite": {
+      "number": 20
+    },
+    "Faerie Mastermind": {
+      "number": 21
+    },
+    "Goblin Recruiter": {
+      "number": 22
+    },
+    "Heroic Intervention": {
+      "number": 23
+    },
+    "Leap": {
+      "number": 24
+    },
+    "Leonin Warleader": {
+      "number": 25
+    },
+    "Lotus Petal": {
+      "number": 26
+    },
+    "Marisi, Breaker of the Coil": {
+      "number": 27
+    },
+    "Marsh Flats": {
+      "number": 28
+    },
+    "Maskwood Nexus": {
+      "number": 29
+    },
+    "Misty Rainforest": {
+      "number": 30
+    },
+    "Morphic Pool": {
+      "number": 31
+    },
+    "Mystical Tutor": {
+      "number": 32
+    },
+    "Narset, Enlightened Exile": {
+      "number": 33
+    },
+    "Otawara, Soaring City": {
+      "number": 34
+    },
+    "Overgrown Farmland": {
+      "number": 35
+    },
+    "Phyrexian Tower": {
+      "number": 36
+    },
+    "Purphoros, God of the Forge": {
+      "number": 37
+    },
+    "Qasali Slingers": {
+      "number": 38
+    },
+    "Raugrin Triome": {
+      "number": 39
+    },
+    "Reflecting Pool": {
+      "number": 40
+    },
+    "Regal Caracal": {
+      "number": 41
+    },
+    "Shizo, Death's Storehouse": {
+      "number": 42
+    },
+    "Slip Through Space": {
+      "number": 43
+    },
+    "Steam Vents": {
+      "number": 44
+    },
+    "Survival of the Fittest": {
+      "number": 45
+    },
+    "Swan Song": {
+      "number": 46
+    },
+    "Training Center": {
+      "number": 47
+    },
+    "Valgavoth, Terror Eater": {
+      "number": 48
+    },
+    "Verdant Catacombs": {
+      "number": 49
     }
   }
 }
