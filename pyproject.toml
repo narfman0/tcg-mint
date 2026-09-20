@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 fonts = ["fonttools>=4.40"]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "httpx2>=2"]  # httpx2: starlette's test client
 web = ["fastapi>=0.110", "uvicorn>=0.27"]
 
 [project.scripts]
