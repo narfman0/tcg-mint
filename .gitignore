@@ -32,3 +32,6 @@ styles/private/
 
 # workbench thumbnails and other caches
 .cache/
+
+# the workbench icons, the one set of PNGs that is source
+!mint/web/static/*.png

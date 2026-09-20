@@ -115,6 +115,15 @@ def create_app(ws):
                'fill="#2160a3" stroke="#0d2b4d"/><rect x="4" y="3" width="8" height="5" fill="#d7e3f1"/></svg>')
         return Response(svg, media_type="image/svg+xml")
 
+    # the PWA's manifest and service worker, at the root so the worker's scope is the whole app
+    @app.get("/manifest.webmanifest")
+    def manifest():
+        return FileResponse(STATIC / "manifest.webmanifest", media_type="application/manifest+json")
+
+    @app.get("/sw.js")
+    def service_worker():
+        return FileResponse(STATIC / "sw.js", media_type="text/javascript", headers={"Cache-Control": "no-cache"})
+
     @app.get("/static/{name}")
     def static(name: str):
         p = STATIC / name

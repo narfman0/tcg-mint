@@ -126,7 +126,12 @@ mint serve --host 0.0.0.0  # reachable from a phone on the same network
 
 A local page over the workspace, for comparing and deciding. It fits a phone
 too: the set nav scrolls, tiles and images fall into two columns, and every
-control is thumb-sized.
+control is thumb-sized. It is installable — *add to home screen* gives it an
+icon and its own window, and a service worker keeps the page shell so the app
+opens (and says the server is down) without it. Browsers only install from a
+secure origin: `localhost`, or https — over plain http on the LAN the home
+screen entry is a bookmark that opens in the browser. For a real install from
+a phone, front it with https (`tailscale serve 8300` does it in one line).
 
 - **Sets** — *new set* makes a set file from a pasted decklist (code, name,
   a style template, private or not). Every card is a tile (styled render,

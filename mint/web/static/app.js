@@ -122,7 +122,12 @@ async function go() {
     if (r.view !== 'viewer' && !(r.view === 'card' && r.key)) closeViewer();
     (views[r.view] || home)(r);
     renderNav();
-  } catch (e) { $('#main').innerHTML = `<div class="empty bad">${esc(e.message)}</div>`; }
+  } catch (e) {
+    const down = e instanceof TypeError;  // fetch itself failed: no server behind the installed shell
+    $('#main').innerHTML = down
+      ? `<div class="empty">the workbench is not reachable: is <code>mint serve</code> running? <a href="#/" onclick="location.reload()">retry</a></div>`
+      : `<div class="empty bad">${esc(e.message)}</div>`;
+  }
 }
 window.addEventListener('hashchange', go);
 
@@ -1367,3 +1372,7 @@ function itemHtml(it) {
 api('/api/jobs').then(list => { list.forEach(j => state.jobs[j.id] = j); renderJobstrip(); }).catch(() => {});
 connect();
 go();
+/* Installable: the service worker keeps the page shell so the home-screen app opens without the
+   server (and says so). Browsers only register one on a secure origin -- localhost, or https --
+   so over plain http on the LAN this is a no-op and the page works as a bookmark. */
+if (!STATIC && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

@@ -1,0 +1,16 @@
+{
+  "name": "tcg-mint workbench",
+  "short_name": "tcg-mint",
+  "description": "compare art, recipes and frames for a card set, and run the tools",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1b1b1e",
+  "theme_color": "#232327",
+  "icons": [
+    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
