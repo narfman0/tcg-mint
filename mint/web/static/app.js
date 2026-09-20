@@ -982,16 +982,14 @@ function frame() {
   const proof = c?.renders?.proof, themes = c?.renders?.themes || [];
   // the frame's dressing: one slider per knob, saved to the set file as it settles
   const knobs = state.ws.frame_fields || [], fr = st.frame || {};
-  const kv = f => fr[f.name] ?? f.default;
   $('#main').innerHTML = `
     <div class="row"><h1>${esc(code)} <span class="muted">frame</span></h1><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a>
       <select id="fcard">${st.cards_detail.map(x => `<option ${x.name === F.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
     <div class="panel" style="margin-bottom:16px">
       <h2>frame knobs</h2>
-      <div class="knobs">${knobs.map(f => `<label title="${esc(FIELD_HELP[f.name] || '')}"><span class="${kv(f) !== f.default ? 'changed' : ''}">${esc(f.name)}</span>
-          <input type="range" data-fk="${f.name}" min="0" max="1" step="0.05" value="${kv(f)}"><output>${kv(f)}</output></label>`).join('')}</div>
+      ${knobsHtml(knobs, fr)}
       <div class="toolbar"><span class="muted">each a strength, 0 = off; saved to the set's frame block as you let go, and a proof shows them. The css below can still override any (<span class="mono">--art-bevel</span> and so on)</span>
-        <button id="knobreset" class="small" ${knobs.every(f => kv(f) === f.default) ? 'disabled' : ''}>reset to defaults</button></div>
+        <button id="knobreset" class="small" ${knobs.every(f => (fr[f.name] ?? f.default) === f.default) ? 'disabled' : ''}>reset to defaults</button></div>
     </div>
     <div class="frame-tools">
       <div class="panel">
@@ -1015,11 +1013,10 @@ function frame() {
       </div>
     </div>`;
   $('#fcard').onchange = e => { F.name = e.target.value; frame(); };
-  const putFrame = body => api(`/api/sets/${code}/frame`, {method: 'PUT', body}).then(d => { st.frame = d; toast('frame knobs saved'); frame(); }).catch(e => toast(e.message, true));
-  document.querySelectorAll('[data-fk]').forEach(el => {
-    el.oninput = () => { el.nextElementSibling.textContent = el.value; };
-    el.onchange = () => putFrame({[el.dataset.fk]: +el.value});
-  });
+  const putFrame = body => api(`/api/sets/${code}/frame`, {method: 'PUT', body})
+    .then(d => { st.frame = d; toast('frame knobs saved'); if (route().view === 'frame') frame(); })  // not if the page moved on meanwhile
+    .catch(e => toast(e.message, true));
+  bindKnobs((k, v) => putFrame({[k]: v}));
   $('#knobreset').onclick = () => putFrame(Object.fromEntries(knobs.map(f => [f.name, f.default])));
   const saveCss = () => api(`/api/sets/${code}/css`, {method: 'PUT', body: {css: $('#css').value}}).then(() => { F.css = $('#css').value; st.css = F.css; toast('css saved'); });
   $('#savecss').onclick = () => saveCss().catch(e => toast(e.message, true));
@@ -1028,6 +1025,19 @@ function frame() {
   $('#getscan').onclick = () => api(`/api/sets/${code}/cards/${encodeURIComponent(F.name)}/scan`, {method: 'POST'}).then(d => { F.scan = d.path; frame(); }).catch(e => toast(e.message, true));
   $('#op').oninput = e => { F.opacity = +e.target.value; const o = $('#ours'); if (o) o.style.opacity = 1 - F.opacity / 100; };
   document.querySelectorAll('[data-open]').forEach(p => p.onclick = () => window.open(file(p.dataset.open), '_blank'));
+}
+
+/* --- the frame knobs: a slider per sets.Frame field, on the frame page and the styles page --- */
+function knobsHtml(fields, values) {
+  const kv = f => values?.[f.name] ?? f.default;
+  return `<div class="knobs">${fields.map(f => `<label title="${esc(FIELD_HELP[f.name] || '')}"><span class="${kv(f) !== f.default ? 'changed' : ''}">${esc(f.name)}</span>
+      <input type="range" data-fk="${f.name}" min="0" max="1" step="0.05" value="${kv(f)}"><output>${kv(f)}</output></label>`).join('')}</div>`;
+}
+function bindKnobs(onchange) {
+  document.querySelectorAll('[data-fk]').forEach(el => {
+    el.oninput = () => { el.nextElementSibling.textContent = el.value; };
+    el.onchange = () => onchange(el.dataset.fk, +el.value);
+  });
 }
 
 /* --- style form: one input per Style field, shared by the lab, the set editor and the styles page --- */
@@ -1278,18 +1288,22 @@ function saveTemplateFromSet(st) {
 async function styles(r) {
   const fields = state.ws.style_fields;
   let T = state.styles;
-  if (!T) T = state.styles = {list: null, name: null, values: null, css: '', private: false, keep: [], draft: false};
+  if (!T) T = state.styles = {list: null, name: null, values: null, css: '', private: false, keep: [], draft: false, frame: null};
   if (!T.list) T.list = await api('/api/styles');
   const cur = r.name ? T.list.find(t => t.name === r.name) : null;
   if (r.name && !cur) { $('#main').innerHTML = `<div class="empty bad">no template ${esc(r.name)}</div>`; return; }
   if (cur && T.name !== cur.name) {
     T.name = cur.name; T.draft = false; T.values = {...cur.style}; T.css = cur.css || ''; T.private = cur.private; T.keep = Object.keys(cur.style);
+    T.frame = cur.frame ? {...cur.frame} : null;
   }
+  const knobs = state.ws.frame_fields || [];
+  const frameSlim = fr => Object.fromEntries(knobs.filter(f => fr && fr[f.name] !== undefined && fr[f.name] !== f.default).map(f => [f.name, fr[f.name]]));
   if (!cur && !T.draft) T.name = null;
   const editing = cur || T.draft;
   const lit = f => JSON.stringify(T.values?.[f.name] ?? f.default) !== JSON.stringify(f.default);
   const asFile = cur ? Object.fromEntries(Object.entries(cur.style).filter(([k]) => k !== 'name')) : null;
-  const dirty = cur && (JSON.stringify(slimStyle(fields, T.values, T.keep)) !== JSON.stringify(asFile) || T.css !== (cur.css || '') || T.private !== cur.private);
+  const dirty = cur && (JSON.stringify(slimStyle(fields, T.values, T.keep)) !== JSON.stringify(asFile) || T.css !== (cur.css || '') || T.private !== cur.private
+    || JSON.stringify(frameSlim(T.frame)) !== JSON.stringify(frameSlim(cur.frame)));
   const sets = (state.ws.sets || []).filter(s => !s.error);
   $('#main').innerHTML = `
     <div class="row"><h1>Styles</h1><span class="muted">templates in styles/ — a set starts from one, or is saved as one</span>
@@ -1312,6 +1326,7 @@ async function styles(r) {
           <label title="styles/private/ is git-ignored; a private template shadows a shared one of the same name">private</label><span><input type="checkbox" id="tprivate" ${T.private ? 'checked' : ''}></span>
           ${styleForm(fields, T.values, lit)}
           <label title="frame rules that go with the style; a set that starts from the template gets them as its css">css</label><textarea class="css" id="tcss" style="min-height:90px">${esc(T.css)}</textarea>
+          <label title="the frame's dressing that goes with the style: a set that takes the template takes these knobs too. All at their defaults = none saved">frame</label>${knobsHtml(knobs, T.frame)}
           <label></label><div class="row">
             <button class="primary" id="tsave">save</button>
             <button id="tsaveas" title="a copy under another name">save as…</button>
@@ -1328,18 +1343,20 @@ async function styles(r) {
   document.querySelectorAll('[data-tpl]').forEach(el => el.onclick = e => { if (e.target.tagName !== 'A') location.hash = `#/styles/${encodeURIComponent(el.dataset.tpl)}`; });
   if ($('#newtpl')) $('#newtpl').onclick = () => {
     T.draft = true; T.name = ''; T.values = {}; fields.forEach(f => { if (f.name !== 'name' && f.default !== null) T.values[f.name] = f.default; });
-    T.values.prompt = ''; T.css = ''; T.private = false; T.keep = [];
+    T.values.prompt = ''; T.css = ''; T.private = false; T.keep = []; T.frame = null;
     if (location.hash !== '#/styles') location.hash = '#/styles'; else styles({view: 'styles'});
   };
   if (!editing) return;
   bindStyleForm(fields, T.values, () => styles(r));
+  bindKnobs((k, v) => { T.frame = {...(T.frame || {}), [k]: v}; styles(r); });
   $('#tprivate').onchange = e => { T.private = e.target.checked; styles(r); };
   $('#tcss').onchange = e => { T.css = e.target.value; };
   if ($('#tname')) $('#tname').onchange = e => { T.name = e.target.value.trim(); };
   const save = (name, then) => {
     if (!name) { toast('a template needs a name', true); return; }
     T.css = $('#tcss').value;
-    api(`/api/styles/${encodeURIComponent(name)}`, {method: 'PUT', body: {style: slimStyle(fields, T.values, T.keep), css: T.css, private: T.private}})
+    const fr = frameSlim(T.frame);
+    api(`/api/styles/${encodeURIComponent(name)}`, {method: 'PUT', body: {style: slimStyle(fields, T.values, T.keep), css: T.css, private: T.private, frame: Object.keys(fr).length ? fr : null}})
       .then(t => { toast(`saved ${t.path}`); T.list = null; T.name = null; T.draft = false; if (state.edit) state.edit.styles = null; (then || (() => { location.hash = `#/styles/${encodeURIComponent(name)}`; if (r.name === name) styles({view: 'styles', name}); }))(); })
       .catch(e => toast(e.message, true));
   };

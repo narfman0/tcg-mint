@@ -96,7 +96,8 @@ def create(ws, code, name, names, style_name=None, private=False, out=None):
     st.code, st.name = code, name
     css = None
     if style_name and st.style is None:
-        st.style, css = style.load(ws, style_name)
+        t = style.read(ws, style_name)
+        st.style, css, st.frame = t["style"], t["css"], t["frame"]
     added = add_cards(st, names)
     sets.save(out, st)
     css_fn = out.with_suffix(".css")

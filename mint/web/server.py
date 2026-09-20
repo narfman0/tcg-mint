@@ -294,9 +294,12 @@ def create_app(ws):
         """Replace the set's style block with a template's (or a built-in's); its css too when
         `css` is true or the set has none."""
         st = S.find_set(code)
-        new_style, css = style.load(ws, body.get("template") or "")
+        t = style.read(ws, body.get("template") or "")
+        new_style, css = t["style"], t["css"]
         with S.lock:
             st.style = new_style
+            if t["frame"] is not None and body.get("frame", True):  # the template's dressing comes along
+                st.frame = t["frame"]
             sets.save(st.path, st)
             css_fn = st.path.with_suffix(".css")
             if css and (body.get("css") or not st.css):
@@ -323,9 +326,10 @@ def create_app(ws):
         a file that shadows it."""
         block = dict(body.get("style") or {})
         block["name"] = name
-        new_style = sets.from_dict({"code": "x", "style": block}, f"styles/{name}.json").style
+        fr = body.get("frame")
+        parsed = sets.from_dict({"code": "x", "style": block, **({"frame": fr} if fr else {})}, f"styles/{name}.json")
         with S.lock:
-            p = style.write(ws, name, new_style, body.get("css") or "", private=bool(body.get("private")))
+            p = style.write(ws, name, parsed.style, body.get("css") or "", private=bool(body.get("private")), frame=parsed.frame)
         return template_dict(S, name, p, ws.is_private(p))
 
     @app.post("/api/styles")
@@ -541,7 +545,8 @@ def card_names(body):
 def template_dict(S, name, path, private):
     """A style template for the page: the block as its file spells it, its css, and which sets
     carry a style of that name."""
-    st, css = style.load(S.ws, name)
+    t = style.read(S.ws, name)
+    st, css = t["style"], t["css"]
     block = sets._slim(dataclasses.asdict(st), sets.Style, st.explicit)
     used = []
     for p in S.set_paths():
@@ -553,7 +558,8 @@ def template_dict(S, name, path, private):
             used.append(s.code)
     shadowed = path is not None and style.find(S.ws, name) != path
     return {"name": name, "path": str(path) if path else None, "private": private, "builtin": path is None,
-            "shadowed": shadowed, "style": block, "css": css, "sets": used}
+            "shadowed": shadowed, "style": block, "css": css, "sets": used,
+            "frame": dataclasses.asdict(t["frame"]) if t["frame"] is not None else None}
 
 
 def style_fields():

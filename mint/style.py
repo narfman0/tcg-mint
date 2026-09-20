@@ -6,7 +6,8 @@
 
 A template is a bare style block (the `style` object of a set file, see
 sets.py) in styles/<name>.json, plus an optional styles/<name>.css holding the
-frame rules that go with it. `mint newset --style <name>` seeds a new set from
+frame rules that go with it, and an optional `frame` key inside the JSON: the
+frame's dressing knobs (sets.Frame), so a template brings its whole look. `mint newset --style <name>` seeds a new set from
 it; the three built-in recipes (neon, ink, glass) are the fallback when no
 template has that name. Templates in styles/private/ are found the same way
 but git never sees them (`--private` writes there; workspace.py explains).
@@ -41,21 +42,30 @@ def find(ws, name):
     return None
 
 
-def load(ws, name):
-    """A (Style, css) pair from a template file or a built-in recipe."""
+def read(ws, name):
+    """A template as {"style": Style, "css": str, "frame": Frame | None} from its file or a built-in."""
     p = find(ws, name)
     if p is None:
         d = builtin(name)
         if d is None:
             raise SetError(f"no style template {name!r}: `mint style list` shows what there is")
-        return sets.from_dict({"code": "x", "style": d}).style, ""
+        return {"style": sets.from_dict({"code": "x", "style": d}).style, "css": "", "frame": None}
     try:
         d = json.loads(p.read_text())
     except json.JSONDecodeError as e:
         raise SetError(f"{p}: not valid JSON ({e})") from None
-    style = sets.from_dict({"code": "x", "style": d}, str(p)).style
+    if not isinstance(d, dict):
+        raise SetError(f"{p}: expected an object")
+    frame = d.pop("frame", None)
+    st = sets.from_dict({"code": "x", "style": d, **({"frame": frame} if frame is not None else {})}, str(p))
     css_fn = p.with_suffix(".css")
-    return style, css_fn.read_text() if css_fn.exists() else ""
+    return {"style": st.style, "css": css_fn.read_text() if css_fn.exists() else "", "frame": st.frame}
+
+
+def load(ws, name):
+    """A (Style, css) pair from a template file or a built-in recipe."""
+    t = read(ws, name)
+    return t["style"], t["css"]
 
 
 def templates(ws):
@@ -92,7 +102,7 @@ def save(ws, st, name=None, private=False, force=False):
     p = (ws.styles / ws.PRIVATE if private else ws.styles) / f"{name}.json"
     if p.exists() and not force:
         raise SetError(f"{p} exists; --force replaces it")
-    return write(ws, name, st.style, st.css, private=private)
+    return write(ws, name, st.style, st.css, private=private, frame=st.frame)
 
 
 def check_name(name):
@@ -100,15 +110,18 @@ def check_name(name):
         raise SetError(f"a template name is letters, digits, - and _, not {name!r}")
 
 
-def write(ws, name, style, css="", private=False):
-    """Write a Style (and its css) as the template `name` in the shared or the private tier,
-    removing a copy in the other tier so the name lives in one place. Returns the path."""
+def write(ws, name, style, css="", private=False, frame=None):
+    """Write a Style (its css, and its frame knobs when any is off its default) as the template
+    `name` in the shared or the private tier, removing a copy in the other tier so the name lives
+    in one place. Returns the path."""
     check_name(name)
     d = ws.styles / ws.PRIVATE if private else ws.styles
     p = d / f"{name}.json"
     d.mkdir(parents=True, exist_ok=True)
     body = sets._slim(dataclasses.asdict(style), sets.Style, style.explicit)
     body["name"] = name
+    if frame is not None and sets._slim(dataclasses.asdict(frame), sets.Frame):
+        body["frame"] = sets._slim(dataclasses.asdict(frame), sets.Frame)
     p.write_text(json.dumps(body, indent=2, ensure_ascii=False) + "\n")
     css_fn = p.with_suffix(".css")
     if css:
@@ -160,10 +173,13 @@ def main(argv=None):
             p = save(ws, st, a.name, private=a.private, force=a.force)
             print(f"{p}: style {st.style.name} of {st.code}" + (" (+ css)" if st.css else ""))
         elif a.cmd == "show":
-            style, css = load(ws, a.name)
-            print(json.dumps(sets._slim(dataclasses.asdict(style), sets.Style, style.explicit), indent=2))
-            if css:
-                print(css, end="")
+            t = read(ws, a.name)
+            body = sets._slim(dataclasses.asdict(t["style"]), sets.Style, t["style"].explicit)
+            if t["frame"] is not None:
+                body["frame"] = dataclasses.asdict(t["frame"])
+            print(json.dumps(body, indent=2))
+            if t["css"]:
+                print(t["css"], end="")
     except MintError as e:
         raise SystemExit(str(e)) from None
 

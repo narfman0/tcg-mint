@@ -111,6 +111,16 @@ def test_style_templates(client):
     assert client.post("/api/styles", json={"set": "TST", "name": "copy"}).status_code == 400  # exists, no force
     assert client.post("/api/styles", json={"set": "TST", "name": "copy", "force": True}).status_code == 200
 
+    # a template carries frame knobs: saved slim, reported whole, and applied to a set with the style
+    r = client.put("/api/styles/dressed", json={"style": {"prompt": "d"}, "frame": {"watermark": 0.6, "art_bevel": 1.0}})
+    assert r.status_code == 200 and r.json()["frame"]["watermark"] == 0.6
+    assert json.loads((client.ws.styles / "dressed.json").read_text())["frame"] == {"watermark": 0.6}
+    assert client.get("/api/styles/mine").json()["frame"] is None
+    assert client.post("/api/sets/TST/style/template", json={"template": "dressed"}).json()["frame"]["watermark"] == 0.6
+    assert sets.load(client.ws.sets / "tst.json").frame.watermark == 0.6
+    assert client.put("/api/styles/dressed", json={"style": {"prompt": "d"}, "frame": {"watermark": 5}}).status_code == 400
+    r = client.post("/api/styles", json={"set": "TST", "name": "fromset"})
+    assert json.loads((client.ws.styles / "fromset.json").read_text())["frame"] == {"watermark": 0.6}
     assert client.delete("/api/styles/mine").status_code == 200
     assert client.delete("/api/styles/neon").status_code == 400  # a built-in has no file
     assert client.get("/api/styles/mine").status_code == 404

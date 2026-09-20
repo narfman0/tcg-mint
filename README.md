@@ -182,8 +182,8 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   table, with move, rename, remove, add-from-decklist and renumber. Delete
   the set from here too; renders and the art cache stay.
 - **Styles** (*styles* in the nav) — the templates in `styles/`: make one,
-  edit every knob and its css, move it between the shared and private
-  tiers, apply it to a set, delete it. Which sets carry each is shown; a
+  edit every knob, its css and its frame knobs, move it between the shared
+  and private tiers, apply it to a set (its frame knobs come along), delete it. Which sets carry each is shown; a
   set's block is a copy, so editing a template changes no set until it is
   applied again.
 - **The look** — one picker on the board, in the viewer and beside the
@@ -344,7 +344,9 @@ the block in the set file is the source of truth once created.
 ### Style templates and private sets
 
 A style you want to reuse lives in `styles/<name>.json` — a bare style block,
-plus an optional `styles/<name>.css` with the frame rules that go with it:
+plus an optional `styles/<name>.css` with the frame rules that go with it, and
+an optional `frame` key holding the frame knobs, so a template brings its
+whole look (a set that takes it takes the knobs too):
 
 ```sh
 mint style save NIV                 # -> styles/glass.json, named after NIV's style
