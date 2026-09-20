@@ -64,10 +64,10 @@ def test_font_files_parse_names(tmp_path):
 def test_packaged_fonts_are_present_with_licenses():
     faces = {(f, w, s): fn for f, w, s, fn in frame.font_files(frame.FONTS)}
     assert set(faces) == {("Almendra", 700, "normal"), ("Liberation Serif", 400, "normal"),
-                          ("Liberation Serif", 400, "italic")}
-    assert all(fn.stat().st_size > 10_000 and fn.read_bytes()[:4] == b"\x00\x01\x00\x00" for fn in faces.values())
+                          ("Liberation Serif", 400, "italic"), ("Montserrat", 700, "normal")}
+    assert all(fn.stat().st_size > 10_000 and fn.read_bytes()[:4] in (b"\x00\x01\x00\x00", b"OTTO") for fn in faces.values())
     assert {f for f, *_ in faces} == set(frame.PACKAGED_FAMILIES) <= frame.LOCAL_FAMILIES
-    assert (frame.FONTS / "Almendra-OFL.txt").exists() and (frame.FONTS / "LiberationSerif-LICENSE.txt").exists()
+    assert all((frame.FONTS / n).exists() for n in ("Almendra-OFL.txt", "LiberationSerif-LICENSE.txt", "Montserrat-OFL.txt"))
     assert sum(fn.stat().st_size for fn in frame.FONTS.iterdir()) < 1_500_000
 
 
@@ -76,11 +76,11 @@ def test_local_fonts_workspace_first_then_packaged(tmp_path):
     (tmp_path / "Almendra-Bold.ttf").write_bytes(b"")
     rules = frame.local_fonts(tmp_path).split("\n")
     fams = [re.search(r"font-family: '(.*?)'", r).group(1) for r in rules]
-    assert fams == ["Almendra", "Beleren", "Liberation Serif", "Liberation Serif"]
+    assert fams == ["Almendra", "Beleren", "Liberation Serif", "Liberation Serif", "Montserrat"]
     assert f"file://{tmp_path}/Almendra-Bold.ttf" in rules[0]  # yours, not the packaged one
     assert all(str(frame.FONTS) in r for r in rules[2:])
     assert "format('truetype'); font-weight: 400; font-style: italic;" in "\n".join(rules[2:])
-    assert frame.local_fonts(tmp_path / "missing").count("@font-face") == 3
+    assert frame.local_fonts(tmp_path / "missing").count("@font-face") == 4
 
 
 class FakeSymbols:

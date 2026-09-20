@@ -37,7 +37,8 @@ THEMES = {
 }
 # the open fallbacks that ship with the package (mint/fonts/), by family
 FONTS = PKG / "fonts"
-PACKAGED_FAMILIES = {"Almendra": "title fallback", "Liberation Serif": "rules text fallback"}
+# the collector line's face: the real cards use a proprietary geometric sans (Relay); Montserrat is the open stand-in
+PACKAGED_FAMILIES = {"Almendra": "title fallback", "Liberation Serif": "rules text fallback", "Montserrat": "collector line"}
 LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", *PACKAGED_FAMILIES}  # never ask Google for these
 
 # M15 frame palette: (frame, frame-dark, bar, bar-edge, text box)
@@ -106,7 +107,7 @@ def font_files(fonts_dir):
     """(family, weight, style, path) for every font file in fonts/, keyed off
     the filename: Beleren-Bold.ttf -> Beleren 700; Mplantin-Italic.ttf -> MPlantin italic."""
     known = {"beleren": "Beleren", "matrix": "Matrix Bold", "mplantin": "MPlantin",
-             "almendra": "Almendra", "liberationserif": "Liberation Serif", "tinos": "Tinos"}
+             "almendra": "Almendra", "liberationserif": "Liberation Serif", "tinos": "Tinos", "montserrat": "Montserrat"}
     out = []
     fonts_dir = Path(fonts_dir)
     if not fonts_dir.is_dir():
@@ -302,6 +303,11 @@ def render_text(card, symbols, flavor=None, layout="normal"):
     return "\n".join(paras)
 
 
+# the paintbrush before the artist's name: a tip and a handle, in the line's colour
+BRUSH = ('<svg class="brush" viewBox="0 0 20 10"><path d="M0 5 C3 1.5 6 1.5 10.5 2.6 L10.5 7.4 C6 8.5 3 8.5 0 5 Z" fill="currentColor"/>'
+         '<rect x="10.8" y="3.4" width="9.2" height="3.2" rx="1.4" fill="currentColor"/></svg>')
+
+
 def mana(symbols, cost):
     return "".join(f'<span class="pip"><img src="{symbols.data_uri(m)}"></span>' for m in re.findall(r"\{[^}]+\}", cost or ""))
 
@@ -359,9 +365,11 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
     layout = layout_of(card)
     pt = f'<div class="pt"><span>{card["power"]}/{card["toughness"]}</span></div>' if card.get("power") is not None else ""
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
-    footer = (f'<div class="footer"><span><b>{number:03d}/{set_size} {card["rarity"][0].upper()}</b><br>{esc(set_code)} · EN · '
-              f'<span class="brush">✎</span> {esc(card["artist"])}</span>'
-              f'<span>{esc(maker_code)} · {esc(maker)} · {year} · {card["set"].upper()} {card["collector_number"]}</span></div>')
+    # the collector line as the real cards set it: the number and set in a wide sans, the artist in the
+    # title face as small caps after a brush; the credit line on the right stays in the rules serif
+    footer = (f'<div class="footer"><span class="collector"><b>{number:03d}/{set_size} {card["rarity"][0].upper()}</b><br>'
+              f'{esc(set_code)} • EN {BRUSH}<span class="artist">{esc(card["artist"])}</span></span>'
+              f'<span class="credit">{esc(maker_code)} · {esc(maker)} · {year} · {card["set"].upper()} {card["collector_number"]}</span></div>')
     turned = layout in ("split", "battle")  # sideways: no stamp or crown; a battle's footer rides inside the turned box
     tpl = string.Template((PKG / "template.html").read_text())
     return tpl.substitute(

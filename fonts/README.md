@@ -11,6 +11,10 @@ directory). They are picked up by filename: `Beleren-Bold.ttf`,
 | MPlantin | rules and flavor text | https://github.com/narfman0/mtg-font branch `fix/empty-glyphs` — `fonts/Mplantin.ttf` (a fork of AlexandreArpin/mtg-font with the repair below already applied) |
 | Matrix Bold | title face of the 2003–2014 frame; fallback for Beleren | same repo — `fonts/Matrix-Bold.ttf` |
 
+The collector line at the foot of a real card is set in a proprietary
+geometric sans (Relay); Montserrat SemiBold (SIL OFL) ships in the package
+as the stand-in, and the artist's name is the title face as small caps.
+
 These are Wizards of the Coast / Monotype / Emigre property; use them for
 personal proxies only. Without them the `wizards` theme substitutes the
 closest open faces, which ship with the package under `mint/fonts/`
