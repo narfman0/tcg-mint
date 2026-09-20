@@ -272,10 +272,12 @@ def test_inspire_reads_the_base_through_an_ip_adapter_and_no_controlnet():
     assert w["31"]["inputs"]["embeds_scaling"] == "K+V w/ C penalty"
     assert w["13"]["inputs"]["model"] == ["31", 0] and w["13"]["inputs"]["positive"] == ["7", 0]
     assert w["12"]["class_type"] == "EmptyLatentImage" and w["13"]["inputs"]["denoise"] == 1.0
-    st2 = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "remix": "inspire", "inspire_type": "prompt first", "refine": 0.4}})
+    st2 = sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "remix": "inspire", "inspire_type": "prompt first",
+                                            "refine": 0.4}})
     w2 = restyle.workflow("x.png", st2.recipe(alpha), "p")
     assert w2["31"]["inputs"]["weight_type"] == "ease out"
-    assert w2["13"]["inputs"]["model"] == ["31", 0] and w2["22"]["inputs"]["model"] == ["4", 0]  # the refine pass: no image prompt
+    assert w2["13"]["inputs"]["model"] == ["31", 0]
+    assert w2["22"]["inputs"]["model"] == ["4", 0]  # the refine pass: no image prompt
     assert sets.recipe_hash(st2.recipe(alpha)) != sets.recipe_hash(r)
     with pytest.raises(SetError, match="inspire_type"):
         sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "inspire_type": "vibes"}})

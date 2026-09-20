@@ -17,7 +17,8 @@ from .errors import MintError
 
 # what each remix mode (restyle.py) asks ComfyUI for, beyond the core nodes
 NODES = {
-    "core":     ["CheckpointLoaderSimple", "CLIPTextEncode", "KSampler", "VAEEncode", "VAEDecode", "LoadImage", "ImageScale", "Canny"],
+    "core":     ["CheckpointLoaderSimple", "CLIPTextEncode", "KSampler", "VAEEncode", "VAEDecode", "LoadImage", "ImageScale",
+                 "Canny"],
     "controls": ["ControlNetLoader", "SetUnionControlNetType", "ControlNetApplyAdvanced"],
     "lineart / depth (controlnet_aux)": ["LineArtPreprocessor", "DepthAnythingV2Preprocessor"],
     "repose (DWPose)": ["DWPreprocessor"],
@@ -51,7 +52,8 @@ def check_workspace(ws, r):
         return
     age = (dt.datetime.now() - dt.datetime.fromtimestamp(ws.cards_file.stat().st_mtime)).days
     size = ws.cards_file.stat().st_size / 1e6
-    (r.warn if age > 60 else r.ok)("card file", f"{ws.cards_file.name}, {size:.0f} MB, {age} days old" + (": `mint cards` refreshes it" if age > 60 else ""))
+    detail = f"{ws.cards_file.name}, {size:.0f} MB, {age} days old" + (": `mint cards` refreshes it" if age > 60 else "")
+    (r.warn if age > 60 else r.ok)("card file", detail)
 
 
 def check_fonts(ws, r):
@@ -105,7 +107,8 @@ def check_comfy(ws, r, styles):
         if not missing:
             r.ok("nodes: " + group)
         else:
-            (r.fail if group in ("core", "controls", "enhance / ESRGAN") else r.warn)("nodes: " + group, "missing " + ", ".join(missing))
+            say = r.fail if group in ("core", "controls", "enhance / ESRGAN") else r.warn
+            say("nodes: " + group, "missing " + ", ".join(missing))
     for knob, node, inp in MODELS:
         avail = server.options(node, inp)
         if avail is None:
@@ -116,11 +119,13 @@ def check_comfy(ws, r, styles):
             if st is not None:
                 wanted.setdefault(getattr(st, knob), []).append(where)
         for fn, wheres in sorted(wanted.items()):
-            (r.ok if fn in avail else r.fail)(f"{knob} {fn}", ("" if fn in avail else "not in ComfyUI; wanted by ") + ", ".join(wheres))
+            (r.ok if fn in avail else r.fail)(f"{knob} {fn}",
+                                              ("" if fn in avail else "not in ComfyUI; wanted by ") + ", ".join(wheres))
     loras = server.options("LoraLoader", "lora_name") or []
     for where, st in styles:
         for lora in (st.loras if st else []):
-            (r.ok if lora["name"] in loras else r.fail)(f"lora {lora['name']}", "" if lora["name"] in loras else f"not in ComfyUI; wanted by {where}")
+            have = lora["name"] in loras
+            (r.ok if have else r.fail)(f"lora {lora['name']}", "" if have else f"not in ComfyUI; wanted by {where}")
 
 
 def check_sets(r, styles):

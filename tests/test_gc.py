@@ -44,12 +44,13 @@ def test_collect_keeps_the_right_variants_and_finds_stale_renders(ws):
     old = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=30)).isoformat(timespec="seconds")
     cur_hash = sets.recipe_hash(st.recipe(card, art=art))
     current = variant(art, card, "look", cur_hash, created=old, recipe=st.recipe(card, art=art))
-    base_of_current = variant(art, card, "spore", "aaaaaaaa", created=old)
-    current.base = "aaaaaaaa"; art.record(current)
-    enhance_of_base = variant(art, card, "enhance", "bbbbbbbb", kind="enhance", base="aaaaaaaa", created=old)
-    stray = variant(art, card, "look", "cccccccc", created=old)
-    fresh = variant(art, card, "look", "dddddddd")
-    orphan_enh = variant(art, card, "enhance", "eeeeeeee", kind="enhance", base="cccccccc", created=old)
+    variant(art, card, "spore", "aaaaaaaa", created=old)  # what current was made from
+    current.base = "aaaaaaaa"
+    art.record(current)
+    variant(art, card, "enhance", "bbbbbbbb", kind="enhance", base="aaaaaaaa", created=old)  # an enhance of that base
+    variant(art, card, "look", "cccccccc", created=old)  # a stray take
+    variant(art, card, "look", "dddddddd")  # a fresh take
+    variant(art, card, "enhance", "eeeeeeee", kind="enhance", base="cccccccc", created=old)  # an enhance of the stray
     # a variant of a card no set has
     beta = json.loads(ws.cards_file.read_text().splitlines()[1])
     variant(art, beta, "look", "ffffffff", created=old)
@@ -58,9 +59,11 @@ def test_collect_keeps_the_right_variants_and_finds_stale_renders(ws):
     out.mkdir(parents=True)
     m = Manifest(out)
     fh = frame_hash(st.css, frame.frame_css(st.frame))
-    for fn, fhash, src in [("TST-001_Alpha.png", fh, None), ("TST-001_Alpha.styled.png", "00000000", cur_hash), ("gone.png", fh, None)]:
+    renders = [("TST-001_Alpha.png", fh, None), ("TST-001_Alpha.styled.png", "00000000", cur_hash), ("gone.png", fh, None)]
+    for fn, fhash, src in renders:
         m.entries[fn] = {"card": "Alpha", "number": 1, "theme": "wizards", "styled": ".styled" in fn,
-                         "source": {"kind": "styled" if src else "crop", "hash": src}, "frame": fhash, "rendered_at": "2026-01-01"}
+                         "source": {"kind": "styled" if src else "crop", "hash": src}, "frame": fhash,
+                         "rendered_at": "2026-01-01"}
         if fn != "gone.png":
             (out / fn).write_bytes(b"png")
     (out / "stray.png").write_bytes(b"png")

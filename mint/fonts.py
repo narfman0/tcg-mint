@@ -76,7 +76,8 @@ def repair_all(fonts_dir):
             print(f"  failed   {p.name}: {e}")
             continue
         chars = "".join(chr(c) for c in dropped[:12]) + ("…" if len(dropped) > 12 else "")
-        print(f"  repaired {p.name}: table directory rebuilt" + (f", {len(dropped)} empty glyph(s) unmapped ({chars})" if dropped else ""))
+        print(f"  repaired {p.name}: table directory rebuilt"
+              + (f", {len(dropped)} empty glyph(s) unmapped ({chars})" if dropped else ""))
     return len(files)
 
 

@@ -65,7 +65,7 @@ def export(ws, set_path, out, width=640):
                         f"<script>window.MINT_STATIC = {json.dumps(snapshot)};</script>\n<script src=\"app.js\"></script>")
     html = html.replace('href="/static/app.css"', 'href="app.css"')
     # a static page installs nothing: drop the manifest and icon links, which would point at the server
-    html = "\n".join(l for l in html.split("\n") if "manifest.webmanifest" not in l and "apple-touch-icon" not in l)
+    html = "\n".join(line for line in html.split("\n") if "manifest.webmanifest" not in line and "apple-touch-icon" not in line)
     (out / "index.html").write_text(html)
     shutil.copyfile(STATIC / "app.css", out / "app.css")
     shutil.copyfile(STATIC / "app.js", out / "app.js")

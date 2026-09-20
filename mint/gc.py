@@ -20,7 +20,6 @@ set. Nothing is removed without --delete; the report says what would be.
 import argparse
 import datetime as dt
 import sys
-from pathlib import Path
 
 from . import frame, sets, workspace
 from .art import Art
@@ -171,7 +170,7 @@ def main(argv=None):
     st = r["stale"]
     print(f"stale renders (the frame or the art changed since, or the card left): {len(st)}, "
           f"{mb([m.path.parent / fn for _, m, fn, _ in st]):.0f} MB")
-    for code, m, fn, why in st:
+    for code, _, fn, why in st:
         print(f"  {code} {fn}: {why}")
     if r["orphans"]:
         print(f"renders the manifest does not know: {len(r['orphans'])}, {mb(r['orphans']):.0f} MB")

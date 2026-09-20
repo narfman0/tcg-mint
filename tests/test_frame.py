@@ -160,7 +160,8 @@ def test_frame_knobs_reach_the_page_as_custom_properties(card, art):
     from mint import sets
     assert frame.frame_css() == frame.frame_css(sets.Frame())
     assert "--watermark: 0.3;" in frame.frame_css({"watermark": 0.3})
-    html = frame.build_html({**card, "rarity": "common"}, symbols=NoSymbols(), art_url="file://" + art, frame_vars=frame.frame_css({"art_bevel": 0}))
+    html = frame.build_html({**card, "rarity": "common"}, symbols=NoSymbols(), art_url="file://" + art,
+                            frame_vars=frame.frame_css({"art_bevel": 0}))
     assert "--art-bevel: 0;" in html and 'class="stamp"' not in html      # a common: no foil stamp
     rare = frame.build_html({**card, "rarity": "mythic"}, symbols=NoSymbols(), art_url="file://" + art)
     assert 'class="stamp"' in rare and "--rarity-hi: #f7a23c" in rare and "--art-bevel: 1.0;" in rare

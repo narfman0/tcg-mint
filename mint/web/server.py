@@ -163,7 +163,8 @@ def create_app(ws):
                           "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes()},
                 "cards": {"path": str(ws.cards_file), "count": count},
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
-                "style_fields": style_fields(), "frame_fields": frame_fields(), "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
+                "style_fields": style_fields(), "frame_fields": frame_fields(),
+                "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
                 "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer}}
 
     # --- sets ---------------------------------------------------------------------------
@@ -707,9 +708,11 @@ def submit_printrun(S, st, names, body):
         raise HTTPException(400, f"stock is one of {', '.join(sorted(printing.STOCKS))}")
     out_dir = S.out_dir(st)
     key = "styled" if styled else "plain"
-    title = f"print run: {st.code} {key}, {len(names)} card(s) on {paper}" + (f", {copies}x on {stock}" if stock else ", PDF only")
+    title = (f"print run: {st.code} {key}, {len(names)} card(s) on {paper}"
+             + (f", {copies}x on {stock}" if stock else ", PDF only"))
     what = (f"renders the {len(names)} card(s) whose {key} render is missing or stale at {dpi} dpi, lays them out 3x3 on "
-            f"{paper} with {bleed}in bleed at {sheet_dpi} dpi into out/{st.code.lower()}/print/" + (f", and prints {copies} copy(ies) on {stock} to {S.ws.printer}" if stock else ""))
+            f"{paper} with {bleed}in bleed at {sheet_dpi} dpi into out/{st.code.lower()}/print/"
+            + (f", and prints {copies} copy(ies) on {stock} to {S.ws.printer}" if stock else ""))
 
     def run(job):
         # named when it runs, with the job's id: two runs queued in the same minute keep their own files
@@ -724,7 +727,8 @@ def submit_printrun(S, st, names, body):
                 job.say(f"rendered {os.path.basename(r.out)}")
                 job.made(set=st.code, name=r.name, kind="render", key=f"render-{key}", file=os.path.basename(r.out), path=r.out)
                 job.step(done)
-            render.render_cards(S.ws, need, set_path=st.path, styled=styled, dpi=dpi, out_dir=str(out_dir), on_rendered=on_rendered)
+            render.render_cards(S.ws, need, set_path=st.path, styled=styled, dpi=dpi, out_dir=str(out_dir),
+                                on_rendered=on_rendered)
         else:
             job.say("every card has a fresh render")
         files = []
@@ -800,7 +804,8 @@ def submit_enhance(S, st, names, body):
             job.step(i + 1)
         return {"variants": made}
     title = f"enhance {len(names)} card(s) from {base}"
-    what = f"an ESRGAN pass ({model}) over the {'crop' if base == 'crop' else 'variant ' + base} of {len(names)} card(s); a new enhance variant each"
+    what = (f"an ESRGAN pass ({model}) over the {'crop' if base == 'crop' else 'variant ' + base} of {len(names)} card(s); "
+            "a new enhance variant each")
     return S.jobs.submit("enhance", title, {"set": st.code if st else None, "names": names, "base": base, "model": model,
                                             "what": what, "dest": str(S.art.dir)}, run)
 

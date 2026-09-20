@@ -304,7 +304,8 @@ def render_text(card, symbols, flavor=None, layout="normal"):
 
 
 # the paintbrush before the artist's name: a tip and a handle, in the line's colour
-BRUSH = ('<svg class="brush" viewBox="0 0 20 10"><path d="M0 5 C3 1.5 6 1.5 10.5 2.6 L10.5 7.4 C6 8.5 3 8.5 0 5 Z" fill="currentColor"/>'
+BRUSH = ('<svg class="brush" viewBox="0 0 20 10">'
+         '<path d="M0 5 C3 1.5 6 1.5 10.5 2.6 L10.5 7.4 C6 8.5 3 8.5 0 5 Z" fill="currentColor"/>'
          '<rect x="10.8" y="3.4" width="9.2" height="3.2" rx="1.4" fill="currentColor"/></svg>')
 
 
@@ -321,10 +322,18 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
     companions. Split builds two half cards; battle and split lie sideways (the .turn box)."""
     ident = card.get("layout"), card.get("face_index", 0)
     icon = f'<span class="dfc">{DFC_ICON[ident]}</span>' if ident in DFC_ICON else ""
-    title = lambda c: f'<div class="bar titlebar"><span class="name">{icon}{esc(c["name"])}</span><span class="cost">{mana(symbols, c.get("mana_cost"))}</span></div>'  # noqa: E731
-    typebar = lambda c: f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{set_symbol(card["rarity"])}</div>'  # noqa: E731
-    other = (f'<div class="other-face"><span class="dfc">{DFC_ICON.get((card.get("layout"), 1 - card.get("face_index", 0)), "")}</span> '
-             f'{esc(other_face["name"])} <small>{esc(other_face["type_line"])}</small></div>') if other_face else ""
+    def title(c):
+        return (f'<div class="bar titlebar"><span class="name">{icon}{esc(c["name"])}</span>'
+                f'<span class="cost">{mana(symbols, c.get("mana_cost"))}</span></div>')
+
+    def typebar(c):
+        return f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{set_symbol(card["rarity"])}</div>'
+
+    other = ""
+    if other_face:
+        other_icon = DFC_ICON.get((card.get("layout"), 1 - card.get("face_index", 0)), "")
+        other = (f'<div class="other-face"><span class="dfc">{other_icon}</span> '
+                 f'{esc(other_face["name"])} <small>{esc(other_face["type_line"])}</small></div>')
     if layout == "split":
         halves = []
         for f in card["card_faces"][:2]:
@@ -337,9 +346,12 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
                 f'<div class="defense"><span>{esc(str(card.get("defense")))}</span></div>{other}{footer}</div>')
     if layout == "adventure":
         main, adv = card["card_faces"][0], card["card_faces"][1]
-        box = (f'<div class="textbox adventure" id="text"><div class="adv"><div class="adv-title"><span>{esc(adv["name"])}</span>'
-               f'<span class="cost">{mana(symbols, adv.get("mana_cost"))}</span></div><div class="adv-type">{esc(adv["type_line"])}</div>'
-               f'<div class="adv-text">{render_text(adv, symbols)}</div></div><div class="main">{render_text(main, symbols, flavor)}</div></div>')
+        box = (f'<div class="textbox adventure" id="text"><div class="adv">'
+               f'<div class="adv-title"><span>{esc(adv["name"])}</span>'
+               f'<span class="cost">{mana(symbols, adv.get("mana_cost"))}</span></div>'
+               f'<div class="adv-type">{esc(adv["type_line"])}</div>'
+               f'<div class="adv-text">{render_text(adv, symbols)}</div></div>'
+               f'<div class="main">{render_text(main, symbols, flavor)}</div></div>')
         return f'{title(main)}<div class="art"></div>{typebar(main)}{box}{pt_html}'
     text = render_text(card, symbols, flavor, layout)
     if layout == "planeswalker":
@@ -369,7 +381,8 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
     # title face as small caps after a brush; the credit line on the right stays in the rules serif
     footer = (f'<div class="footer"><span class="collector"><b>{number:03d}/{set_size} {card["rarity"][0].upper()}</b><br>'
               f'{esc(set_code)} • EN {BRUSH}<span class="artist">{esc(card["artist"])}</span></span>'
-              f'<span class="credit">{esc(maker_code)} · {esc(maker)} · {year} · {card["set"].upper()} {card["collector_number"]}</span></div>')
+              f'<span class="credit">{esc(maker_code)} · {esc(maker)} · {year} · '
+              f'{card["set"].upper()} {card["collector_number"]}</span></div>')
     turned = layout in ("split", "battle")  # sideways: no stamp or crown; a battle's footer rides inside the turned box
     tpl = string.Template((PKG / "template.html").read_text())
     return tpl.substitute(

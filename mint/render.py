@@ -104,8 +104,8 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
         html = frame.build_html(
             card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
             number=number, set_code=set_code, set_size=set_size, flavor=entry.flavor,
-            art_filter=art_filter, set_css=st.css, frame_vars=frame.frame_css(st.frame), maker=ws.maker, maker_code=ws.maker_code, year=year,
-            other_face=other_face)
+            art_filter=art_filter, set_css=st.css, frame_vars=frame.frame_css(st.frame),
+            maker=ws.maker, maker_code=ws.maker_code, year=year, other_face=other_face)
         sizes = browser.render(html, out)
         r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
         manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash, dpi=dpi)

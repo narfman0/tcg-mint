@@ -231,7 +231,8 @@ class SetFile:
                 del r[k]
         # a new picture has nothing but words to tie it to the card: the subject, else the card itself
         # (inspire has the reference image too, but the words still set the scene)
-        subject = entry.subject or (f"{record['name']}, {record.get('type_line', '')}".rstrip(", ") if remix in ("new", "inspire") else None)
+        fallback = f"{record['name']}, {record.get('type_line', '')}".rstrip(", ")  # a fresh picture's only thread to the card
+        subject = entry.subject or (fallback if remix in ("new", "inspire") else None)
         if subject:
             r["prompt"] = f"{subject}, {r['prompt']}"
         r["seed"] = seed if seed is not None else self.card_seed(record["name"], record.get("illustration_id", ""), style)
