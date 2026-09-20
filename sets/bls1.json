@@ -1,7 +1,7 @@
 {
   "code": "BLS1",
   "name": "Blasted Studios, Set One",
-  "size": 49,
+  "size": 61,
   "note": "Test set: the priciest cards across satoru, niv and meren, numbered by price rank. Custom 'flavor' entries are placeholders to rewrite; delete a card's 'flavor' key to keep the printed one.",
   "art_filter": "saturate(1.55) contrast(1.18) hue-rotate(-8deg)",
   "style": {
@@ -173,6 +173,42 @@
     },
     "Verdant Catacombs": {
       "number": 49
+    },
+    "Birds of Paradise": {
+      "number": 50
+    },
+    "Takenuma, Abandoned Mire": {
+      "number": 51
+    },
+    "Natural Order": {
+      "number": 52
+    },
+    "Ashnod's Altar": {
+      "number": 53
+    },
+    "Necromancy": {
+      "number": 54
+    },
+    "Diabolic Intent": {
+      "number": 55
+    },
+    "Yavimaya, Cradle of Growth": {
+      "number": 56
+    },
+    "Warren Soultrader": {
+      "number": 57
+    },
+    "Entomb": {
+      "number": 58
+    },
+    "Mikaeus, the Unhallowed": {
+      "number": 59
+    },
+    "Green Sun's Zenith": {
+      "number": 60
+    },
+    "Agadeem's Awakening // Agadeem, the Undercrypt": {
+      "number": 61
     }
   }
 }
