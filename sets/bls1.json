@@ -16,6 +16,10 @@
     "seed": 7,
     "seed_rule": "position"
   },
+  "frame": {
+    "watermark": 0.7,
+    "rarity_tint": 0.7
+  },
   "cards": {
     "Imperial Seal": {
       "number": 1,

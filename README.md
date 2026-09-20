@@ -72,6 +72,14 @@ A set is a JSON file (see `sets/bls1.json`):
 - `subject`, `base` and `seed` steer `mint restyle` for that card (below).
 - `art_filter` (set-wide or per card) is a CSS filter applied with
   `--styled` — the set's "flair" variant next to the faithful one.
+- A `frame` block holds the frame's dressing, each knob a strength from 0
+  (off) to 1: `watermark` (the set symbol, faint, behind the rules text),
+  `art_bevel` (a dark line and a light pinline around the art), `box_grain`
+  (linen grain over the bars and text box), `foil_stamp` (the holofoil oval
+  under the text box on rares and mythics) and `rarity_tint` (the bars
+  tinted silver, gold or orange by rarity). The defaults are the bevel, the
+  grain and the stamp on; each reaches the frame as a CSS custom property of
+  the same name (`--art-bevel`), so the set's css can still override any.
 - A `.css` file with the same name (`sets/bls1.css`) is injected after the
   base frame rules, so each set can carry its own frame identity: colours,
   textures, bar shapes, anything.
@@ -187,9 +195,10 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   cards, and a run button; results land as variants in a probe-by-recipe
   grid as they finish. New knobs are one field in `sets.Style` and one node
   in the workflow; the form follows.
-- **Frame** — edit the set's CSS and render a 300 DPI proof; overlay a
-  Scryfall scan on your render to check text placement; render one card in
-  every font theme.
+- **Frame** — a slider per frame knob (watermark, art bevel, box grain, foil
+  stamp, rarity tint), saved to the set file as you let go; edit the set's
+  CSS and render a 300 DPI proof; overlay a Scryfall scan on your render to
+  check text placement; render one card in every font theme.
 - **Jobs** — what is queued and running, with logs and cancel.
 
 `mint gallery --set sets/x.json` exports the Sets and Compare views as a

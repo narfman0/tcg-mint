@@ -59,7 +59,7 @@ def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",),
     if not names:
         raise MintError("give card names or a --set with cards")
     year = year or dt.date.today().strftime("%Y")
-    fhash = frame_hash(st.css)
+    fhash = frame_hash(st.css, frame.frame_css(st.frame))
 
     cards = Cards(ws.cards_file)
     art = Art(ws.art)
@@ -102,7 +102,7 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
         html = frame.build_html(
             card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
             number=number, set_code=set_code, set_size=set_size, flavor=entry.flavor,
-            art_filter=art_filter, set_css=st.css, maker=ws.maker, maker_code=ws.maker_code, year=year)
+            art_filter=art_filter, set_css=st.css, frame_vars=frame.frame_css(st.frame), maker=ws.maker, maker_code=ws.maker_code, year=year)
         sizes = browser.render(html, out)
         r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
         manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash, dpi=dpi)

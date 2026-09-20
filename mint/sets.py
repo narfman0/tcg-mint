@@ -128,6 +128,23 @@ class Style:
 
 
 @dataclass
+class Frame:
+    """The frame's dressing: each knob a strength 0-1 (0 = off), reaching template.html as a CSS
+    custom property of the same name (--art-bevel ...), so a set's css can still override any."""
+    watermark: float = 0.0     # the set symbol, faint, behind the rules text
+    art_bevel: float = 1.0     # a dark line and a light pinline around the art window
+    box_grain: float = 1.0     # linen grain over the bars and the text box (1 = the text box's old look)
+    foil_stamp: float = 1.0    # the holofoil oval under the text box, on rares and mythics
+    rarity_tint: float = 0.0   # the bars tinted with the rarity's colour
+
+    def validate(self, where="frame"):
+        for f in fields(self):
+            v = getattr(self, f.name)
+            if not 0 <= v <= 1:
+                raise SetError(f"{where}: {f.name} should be between 0 and 1, not {v!r}")
+
+
+@dataclass
 class CardEntry:
     number: int | None = None
     flavor: str | None = None        # replaces the printed flavor text
@@ -150,6 +167,7 @@ class SetFile:
     note: str | None = None
     art_filter: str | None = None
     style: Style | None = None
+    frame: Frame | None = None                 # the frame's dressing; None = the defaults
     base: str | None = None                    # every card's restyle base unless its entry says: hash or label
     cards: dict = field(default_factory=dict)  # name -> CardEntry, in collector order
     # not part of the file
@@ -251,6 +269,8 @@ class SetFile:
                 d[k] = getattr(self, k)
         if self.style:
             d["style"] = _slim(dataclasses.asdict(self.style), Style, self.style.explicit)
+        if self.frame and _slim(dataclasses.asdict(self.frame), Frame):
+            d["frame"] = _slim(dataclasses.asdict(self.frame), Frame)
         d["cards"] = {n: {k: v for k, v in dataclasses.asdict(e).items() if v is not None} for n, e in self.cards.items()}
         return d
 
@@ -322,8 +342,12 @@ def from_dict(d, where="set"):
         raise SetError(f"{where}: a set needs a code")
     d = dict(d)
     style = d.pop("style", None)
+    frame = d.pop("frame", None)
     cards = d.pop("cards", {})
     st = _build(SetFile, d, where)
+    if frame is not None:
+        st.frame = _build(Frame, frame, f"{where}: frame")
+        st.frame.validate(f"{where}: frame")
     if style is not None:
         st.style = _build(Style, style, f"{where}: style")
         st.style.explicit = set(style)

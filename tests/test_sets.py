@@ -281,3 +281,15 @@ def test_inspire_reads_the_base_through_an_ip_adapter_and_no_controlnet():
         sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "inspire_type": "vibes"}})
     with pytest.raises(SetError, match="inspire_weight"):
         sets.from_dict({**BASE, "style": {"name": "s", "prompt": "p", "inspire_weight": 3}})
+
+
+def test_frame_block_round_trips_slim_and_validates():
+    st = sets.from_dict({"code": "T", "frame": {"watermark": 0.4}})
+    assert st.frame.watermark == 0.4 and st.frame.art_bevel == 1.0
+    assert st.to_dict()["frame"] == {"watermark": 0.4}          # only what is off its default
+    assert "frame" not in sets.from_dict({"code": "T", "frame": {}}).to_dict()
+    assert sets.from_dict({"code": "T"}).frame is None
+    with pytest.raises(SetError, match="between 0 and 1"):
+        sets.from_dict({"code": "T", "frame": {"watermark": 3}})
+    with pytest.raises(SetError, match="unknown key"):
+        sets.from_dict({"code": "T", "frame": {"glitter": 1}})

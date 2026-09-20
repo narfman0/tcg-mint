@@ -161,17 +161,38 @@ def frame_for(card):
     return FRAMES[cols[0]]
 
 
-def set_symbol(rarity):
-    """An eight-point burst -- 'blasted' -- filled by rarity like a real expansion symbol."""
+def _burst():
+    """The set symbol's outline: an eight-point burst -- 'blasted' -- as SVG polygon points."""
     pts = []
     for i in range(16):
         r = 11 if i % 2 == 0 else 5.2
         a = math.pi * i / 8 - math.pi / 2
         pts.append(f"{12 + r * math.cos(a):.2f},{12 + r * math.sin(a):.2f}")
+    return " ".join(pts)
+
+
+def set_symbol(rarity):
+    """The burst filled by rarity like a real expansion symbol."""
     edge, hi = RARITY.get(rarity, RARITY["common"])
     return (f'<svg class="setsym" viewBox="0 0 24 24"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">'
             f'<stop offset="0" stop-color="{edge}"/><stop offset=".5" stop-color="{hi}"/><stop offset="1" stop-color="{edge}"/>'
-            f'</linearGradient></defs><polygon points="{" ".join(pts)}" fill="url(#g)" stroke="#000" stroke-width="1"/></svg>')
+            f'</linearGradient></defs><polygon points="{_burst()}" fill="url(#g)" stroke="#000" stroke-width="1"/></svg>')
+
+
+def watermark_uri():
+    """The burst in flat black, as a data URI: the text box's watermark, faded by the knob."""
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="{_burst()}" fill="#000"/></svg>'
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
+def frame_css(knobs=None):
+    """The frame's dressing knobs (a sets.Frame, a dict of some of them, or None for the defaults)
+    as CSS custom properties on :root, ahead of the set's css so that can still override any."""
+    import dataclasses
+
+    from . import sets
+    d = dataclasses.asdict(knobs) if dataclasses.is_dataclass(knobs) else {**dataclasses.asdict(sets.Frame()), **(knobs or {})}
+    return ":root { " + " ".join(f"--{k.replace('_', '-')}: {v};" for k, v in d.items()) + " }"
 
 
 def esc(s):
@@ -223,11 +244,14 @@ def render_text(card, symbols, flavor=None):
 
 
 def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=1, set_code="SET", set_size=1,
-               flavor=None, art_filter=None, set_css="", maker="", maker_code="", year=""):
+               flavor=None, art_filter=None, set_css="", frame_vars=None, maker="", maker_code="", year=""):
     """The whole page for one card. `art_url` is the file:// URL of the image to show;
-    `fonts_css` the @font-face rules for local faces (frame.local_fonts)."""
+    `fonts_css` the @font-face rules for local faces (frame.local_fonts); `frame_vars` the frame
+    knobs as css (frame_css), the defaults when None."""
     title, body = THEMES[theme]
     frame, frame_dark, bar, bar_edge, box = frame_for(card)
+    rarity = card["rarity"]
+    rarity_hi = RARITY[rarity][1] if rarity in ("uncommon", "rare", "mythic") else "transparent"
     cost = "".join(f'<span class="pip"><img src="{symbols.data_uri(m)}"></span>'
                    for m in re.findall(r"\{[^}]+\}", card.get("mana_cost") or ""))
     pt = f'<div class="pt"><span>{card["power"]}/{card["toughness"]}</span></div>' if card.get("power") is not None else ""
@@ -237,7 +261,9 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
         font_link=font_link(title + body), local_fonts=fonts_css,
         title_font=stack(title), body_font=stack(body),
         frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box,
-        noise=NOISE_URI, set_css=set_css,
+        noise=NOISE_URI, set_css=set_css, frame_vars=frame_vars or frame_css(),
+        watermark=watermark_uri(), rarity_hi=rarity_hi,
+        stamp='<div class="stamp"></div>' if rarity in ("rare", "mythic") else "",
         crown='<div class="crown-o"></div><div class="crown"></div>' if legendary else "",
         name=esc(card["name"]), cost=cost,
         art=art_url, art_filter=art_filter or "none",

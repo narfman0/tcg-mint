@@ -15,9 +15,10 @@ from pathlib import Path
 from . import PKG
 
 
-def frame_hash(set_css=""):
-    """Identifies the frame rules a render used: the template and the set's CSS."""
+def frame_hash(set_css="", frame_vars=""):
+    """Identifies the frame rules a render used: the template, the set's frame knobs and its CSS."""
     h = hashlib.sha1((PKG / "template.html").read_bytes())
+    h.update(frame_vars.encode())
     h.update(set_css.encode())
     return h.hexdigest()[:8]
 

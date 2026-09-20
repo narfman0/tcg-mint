@@ -163,7 +163,7 @@ def create_app(ws):
                           "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes()},
                 "cards": {"path": str(ws.cards_file), "count": count},
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
-                "style_fields": style_fields(), "current_job": S.jobs.current.to_dict() if S.jobs.current else None}
+                "style_fields": style_fields(), "frame_fields": frame_fields(), "current_job": S.jobs.current.to_dict() if S.jobs.current else None}
 
     # --- sets ---------------------------------------------------------------------------
     @app.get("/api/sets/{code}")
@@ -355,6 +355,17 @@ def create_app(ws):
             st.cards[name] = sets.from_dict({"code": "x", "cards": {name: cur}}).cards[name]
             sets.save(st.path, st)
         return card_detail(S, st, name)
+
+    @app.put("/api/sets/{code}/frame")
+    def put_frame(code: str, body: dict):
+        """Frame knobs, merged onto the set's; the whole block comes back."""
+        st = S.find_set(code)
+        with S.lock:
+            cur = dataclasses.asdict(st.frame or sets.Frame())
+            cur.update(body or {})
+            st.frame = sets.from_dict({"code": "x", "frame": cur}).frame
+            sets.save(st.path, st)
+        return dataclasses.asdict(st.frame)
 
     @app.put("/api/sets/{code}/css")
     def put_css(code: str, body: dict):
@@ -561,10 +572,16 @@ def style_fields():
     return out
 
 
+def frame_fields():
+    """The Frame schema for the frame page's knobs: name, default; every one a float 0-1."""
+    return [{"name": f.name, "type": "float", "default": f.default} for f in dataclasses.fields(sets.Frame)]
+
+
 def set_detail(S, st):
     d = st.to_dict()
     d["path"] = str(st.path)
     d["css"] = st.css
+    d["frame"] = dataclasses.asdict(st.frame or sets.Frame())
     d["out_dir"] = str(S.out_dir(st))
     d["cards_detail"] = [card_detail(S, st, n, cards=None) for n in st.names()]
     return d

@@ -979,9 +979,19 @@ function frame() {
   if (F.code !== code) { Object.assign(F, {code, name: st.cards_detail[0]?.name, css: st.css, opacity: 50, scan: null}); }
   const c = cardOf(F.name);
   const proof = c?.renders?.proof, themes = c?.renders?.themes || [];
+  // the frame's dressing: one slider per knob, saved to the set file as it settles
+  const knobs = state.ws.frame_fields || [], fr = st.frame || {};
+  const kv = f => fr[f.name] ?? f.default;
   $('#main').innerHTML = `
     <div class="row"><h1>${esc(code)} <span class="muted">frame</span></h1><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a>
       <select id="fcard">${st.cards_detail.map(x => `<option ${x.name === F.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="panel" style="margin-bottom:16px">
+      <h2>frame knobs</h2>
+      <div class="knobs">${knobs.map(f => `<label title="${esc(FIELD_HELP[f.name] || '')}"><span class="${kv(f) !== f.default ? 'changed' : ''}">${esc(f.name)}</span>
+          <input type="range" data-fk="${f.name}" min="0" max="1" step="0.05" value="${kv(f)}"><output>${kv(f)}</output></label>`).join('')}</div>
+      <div class="toolbar"><span class="muted">each a strength, 0 = off; saved to the set's frame block as you let go, and a proof shows them. The css below can still override any (<span class="mono">--art-bevel</span> and so on)</span>
+        <button id="knobreset" class="small" ${knobs.every(f => kv(f) === f.default) ? 'disabled' : ''}>reset to defaults</button></div>
+    </div>
     <div class="frame-tools">
       <div class="panel">
         <h2>set css <span class="muted mono" style="text-transform:none">${esc(code.toLowerCase())}.css</span></h2>
@@ -1004,6 +1014,12 @@ function frame() {
       </div>
     </div>`;
   $('#fcard').onchange = e => { F.name = e.target.value; frame(); };
+  const putFrame = body => api(`/api/sets/${code}/frame`, {method: 'PUT', body}).then(d => { st.frame = d; toast('frame knobs saved'); frame(); }).catch(e => toast(e.message, true));
+  document.querySelectorAll('[data-fk]').forEach(el => {
+    el.oninput = () => { el.nextElementSibling.textContent = el.value; };
+    el.onchange = () => putFrame({[el.dataset.fk]: +el.value});
+  });
+  $('#knobreset').onclick = () => putFrame(Object.fromEntries(knobs.map(f => [f.name, f.default])));
   const saveCss = () => api(`/api/sets/${code}/css`, {method: 'PUT', body: {css: $('#css').value}}).then(() => { F.css = $('#css').value; st.css = F.css; toast('css saved'); });
   $('#savecss').onclick = () => saveCss().catch(e => toast(e.message, true));
   $('#proof').onclick = () => saveCss().then(() => submit({kind: 'render', set: code, names: [F.name], styled: false, dpi: 300, sub: 'proof'}, `${code} frame page`)).catch(e => toast(e.message, true));
@@ -1028,6 +1044,10 @@ const FIELD_HELP = {
   repose_strength: 'repose only: how hard the OpenPose skeleton is held (0-1)', repose_end: 'repose only: the fraction of the steps the skeleton is held for',
   inspire_weight: 'inspire only: the reference image\'s weight against the words (0-2; 0.6-0.8 on base-SDXL checkpoints, 0.35-0.5 on Pony, which burns above that)', inspire_end: 'inspire only: the fraction of the steps the image is read for',
   inspire_type: 'inspire only: standard; prompt first (the words settle the composition before the image weighs in); style (its look, not its subject)',
+  // the frame's dressing (sets.Frame)
+  watermark: 'the set symbol, faint, behind the rules text', art_bevel: 'a dark line and a light pinline around the art window',
+  box_grain: 'linen grain over the bars and the text box; 1 is the text box\'s old look', foil_stamp: 'the holofoil oval under the text box, on rares and mythics',
+  rarity_tint: 'the title and type bars tinted with the rarity\'s colour: silver, gold, orange',
 };
 function fieldInput(f, v) {
   if (f.choices) return `<select data-f="${f.name}">${f.choices.map(c => `<option ${v === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
