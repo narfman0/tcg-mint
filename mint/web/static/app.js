@@ -695,6 +695,9 @@ function columns(c) {
   return groups;
 }
 const allColumns = c => columns(c).flatMap(g => g.cols);
+/* the bin: an inline icon, the same on every delete button */
+const TRASH = '<svg class="trash" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M6 4V2.5h4V4M3.5 4l.8 9.5h7.4l.8-9.5M6.5 7v4.5M9.5 7v4.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const trashBtn = (act, arg, title) => `<button class="small bin" data-act="${act}" data-arg="${esc(arg)}" title="${esc(title)}">${TRASH}</button>`;
 function columnHtml(x, c) {
   const ab = state.ab, tags = [];
   if (x.styled) tags.push(['accent', x.picked ? 'styled art · picked' : 'styled art']);
@@ -709,12 +712,13 @@ function columnHtml(x, c) {
       ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="${x.key}">enhance</button>`}
       ${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this'],
               ...(x.recipe?.seed != null && c.entry.seed !== x.recipe.seed ? [['pin', x.recipe.seed, `pin its seed ${x.recipe.seed}`]] : []),
-              ['promote', x.key, 'make the set style from this'], ['delete', x.key, 'delete']])}`;
+              ['promote', x.key, 'make the set style from this']])}
+      ${trashBtn('delete', x.key, 'delete this image')}`;
   else if (x.kind === 'crop') acts = `
       ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="crop">enhance</button>`}
       ${menu([['base', 'crop', 'restyle / inspire from this'], ['pose', 'crop', 'repose from this']])}`;
-  else if (x.kind === 'enhance') acts = menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this'], ['delete', x.key, 'delete']]);
-  else acts = `<button class="small" data-act="render-${x.which}" data-arg="">re-render</button><button class="small" data-act="delete-render" data-arg="${esc(x.file)}">delete</button>`;
+  else if (x.kind === 'enhance') acts = `${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this']])}${trashBtn('delete', x.key, 'delete this image')}`;
+  else acts = `<button class="small" data-act="render-${x.which}" data-arg="">re-render</button>${trashBtn('delete-render', x.file, 'delete this render')}`;
   return `
       <div class="col ${x.styled ? 'styled' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
         <div class="pic ${x.kind === 'card' ? 'card' : ''}" data-open="${esc(x.path)}"><img loading="lazy" src="${img(x.path, 640)}">
@@ -805,7 +809,7 @@ async function card(r) {
     <section class="sect">
       <h2>images</h2>
       ${A && B ? abPanel(A, B) : `<p class="muted">Pick <b>A</b> and <b>B</b> on two images to wipe between them.</p>`}
-      <div class="groups">${groups.filter(g => !g.renders && g.cols.length).map(g => `<div class="group"><h3>${esc(g.title)}</h3><div class="cols">${g.cols.map(x => columnHtml(x, c)).join('')}</div></div>`).join('')
+      <div class="groups">${groups.filter(g => !g.renders && g.cols.length).map(g => `<div class="group"><h3>${esc(g.title)}${g.cols.some(x => x.kind !== 'crop') ? trashBtn('delete-group', g.title, g.title === 'source' ? 'delete the enhances of the crop' : `delete every image in ${g.title}`) : ''}</h3><div class="cols">${g.cols.map(x => columnHtml(x, c)).join('')}</div></div>`).join('')
         || '<div class="empty">no images yet: fetch the crop (mint art) or generate one</div>'}</div>
     </section>
     <section class="sect">
@@ -890,6 +894,16 @@ async function card(r) {
     else if (act === 'delete-render') {
       if (!confirm(`Delete the render ${arg}? The PNG is removed from out/${code.toLowerCase()}/; re-render makes it again.`)) return;
       api(`/api/sets/${code}/renders/${encodeURIComponent(arg)}`, {method: 'DELETE'}).then(() => { toast(`deleted ${arg}`); refresh(); }).catch(e => toast(e.message, true));
+    }
+    else if (act === 'delete-group') {
+      const hashes = (groups.find(g => g.title === arg)?.cols || []).filter(x => x.kind !== 'crop').map(x => x.key);
+      if (!hashes.length) return;
+      if (!confirm(`Delete all ${hashes.length} image(s) in ${arg}? The files are removed; a restyle makes them again.`)) return;
+      try {
+        for (const h of hashes) await api(`/api/sets/${code}/cards/${encodeURIComponent(c.name)}/variants/${h}`, {method: 'DELETE'});
+        toast(`deleted ${hashes.length} image(s) from ${arg}`);
+      } catch (e) { toast(e.message, true); }
+      refresh();
     }
     else if (act === 'delete') {
       const v = c.variants.find(x => x.hash === arg);

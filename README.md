@@ -91,7 +91,7 @@ A set is a JSON file (see `sets/bls1.json`):
   on the real cards: marbled parchment on white, wet glass on blue, fissured
   stone on black, crackle on red, a cell network on green, brushed metal on
   artifacts and gold, sand on lands, grain on colorless; generated, not
-  copied), `art_bevel` (a dark line and a light pinline around the art),
+  copied), `art_bevel` (the black line around the art),
   `box_grain` (linen grain over the bars and text box), `foil_stamp` (the
   holofoil oval under the text box on rares and mythics) and `rarity_tint`
   (the bars tinted silver, gold or orange by rarity). The defaults are the
@@ -200,8 +200,10 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   uses — with the renders and their buttons.
   A restyled variant offers *keep* — it becomes the card's styled art (the
   entry's `pick`), whatever the recipe says — and *enhance*; a menu on every
-  image holds *restyle / inspire from this*, *repose from this*, *pin its seed*,
-  *make the set style from this* and *delete*.
+  image holds *restyle / inspire from this*, *repose from this*, *pin its seed*
+  and *make the set style from this*. A bin on every image deletes it, and a
+  bin beside each group's heading empties the group (the source group's takes
+  only the crop's enhances; the crop itself is fetched, not made).
 - **Edit** — the set file as a form: its own fields (code, name, size, note,
   art filter, restyle base), the style block (edit the knobs, replace it
   from a template, save it as one, remove it) and the card list — every

@@ -125,6 +125,12 @@ details.menu > div button:hover { background: var(--accent-dim); }
 .col .recipe { font-size: .8em; color: var(--ink-2); font-family: var(--mono); line-height: 1.35; max-height: 7.5em; overflow: auto; }
 .col .recipe i { color: var(--accent-ink); font-style: normal; }
 .col .acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
+/* the bin: always in view, at the end of the row; on a group heading, beside the title */
+.trash { width: 1em; height: 1em; vertical-align: -0.15em; }
+button.bin { margin-left: auto; padding: .1em .45em; color: var(--ink-2); }
+button.bin:hover { color: var(--bad); border-color: var(--bad); }
+.group h3 { display: flex; align-items: center; gap: 8px; }
+.group h3 button.bin { margin-left: 0; text-transform: none; letter-spacing: 0; font-size: 1.1em; }
 
 /* A/B panel */
 .ab-panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; margin-bottom: 14px; }
