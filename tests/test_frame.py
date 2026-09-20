@@ -165,3 +165,14 @@ def test_frame_knobs_reach_the_page_as_custom_properties(card, art):
     assert "--art-bevel: 0;" in html and 'class="stamp"' not in html      # a common: no foil stamp
     rare = frame.build_html({**card, "rarity": "mythic"}, symbols=NoSymbols(), art_url="file://" + art)
     assert 'class="stamp"' in rare and "--rarity-hi: #f7a23c" in rare and "--art-bevel: 1.0;" in rare
+
+
+def test_mono_colour_lands_take_their_colours_pinline():
+    """A land making one colour of mana (a basic, Boseiju) keeps the land band but its pinline and crown are
+    the colour's, and its bar and box a greyed tint of the colour's; other lands stay plain."""
+    forest = synthetic_card(colors=[], type_line="Basic Land — Forest", produced_mana=["G"])
+    assert frame.land_tint(forest) == "G"
+    assert frame.land_tint(synthetic_card(colors=[], type_line="Land", produced_mana=["W", "U", "B", "R", "G"])) is None
+    assert frame.land_tint(synthetic_card(colors=[], type_line="Land", produced_mana=["C"])) is None
+    assert frame.land_tint(synthetic_card(colors=["G"], type_line="Creature — Elf")) is None
+    assert frame.mix("#000000", "#ffffff", 0.5) == "#808080"

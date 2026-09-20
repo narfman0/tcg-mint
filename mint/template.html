@@ -11,14 +11,15 @@ $local_fonts
   --bar: $bar;              /* title / type bar fill */
   --bar-edge: $bar_edge;
   --box: $box;              /* text box fill */
-  --ink: #111;
+  --pinline: $pinline;      /* the flat colour inside the textured band: outlines every element, fills the gaps */
+  --ink: #000;
   --title-font: $title_font;
   --body-font: $body_font;
   /* text position inside its bar, calibrated against Scryfall scans with
      calibrate.py: real title text sits ~0.6 below the bar's geometric centre,
      type-line text ~1.1 below. Positive = down. */
-  --title-dy: 1.1px;
-  --type-dy: 1.1px;
+  --title-dy: 0.7px;
+  --type-dy: 0.7px;
   --pt-dy: 0.6px;
   --rarity-hi: $rarity_hi;  /* the rarity's highlight colour, for --rarity-tint */
 }
@@ -27,45 +28,73 @@ $frame_vars
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .card { position: absolute; left: 11px; top: 11px; width: 250px; height: 350px;
-  background: #000; border-radius: 9px; overflow: hidden; color: var(--ink); }
+  background: #120d0c; border-radius: 10.5px; overflow: hidden; color: var(--ink); }  /* the cards' border is a warm near-black */
 /* Geometry below is measured off Scryfall's 745x1040 scans (mint/calibrate.py):
    border 10, title bar 17-36.6, art 38.5-195, type bar 196.5-216, text box
    218.5-322.5, P/T box 313-333, collector text 329-339, bottom border from 324.
-   Two deliberate departures: the art, type bar and text box sit edge to edge
-   (the real cards leave a 2-unit strip of frame between them), and the bars
-   reach 1.5 past the art on each side with 5-unit ends, as the real bars do. */
+   Re-measured at 1/10 unit by six independent passes over five scans: border
+   10; textured band 10-12.8 (crisp edge, no bevel); pinline 2 wide around the
+   perimeter, 1.2-1.7 in the gaps; bars' outline 14.8-235 (title 17-37.2, type
+   197-217); art line 18.6-19.6, image 19.6-230.2 x 39.7-193.7; text box face
+   18.6-231.4 x 218.4-322. A pinline plate under everything casts a 2-unit
+   shadow to its left and a pale ridge above and to its right (light from the
+   upper right). At 1200 dpi Chromium snaps edges to whole units, so the
+   values that matter sit on whole numbers. */
 /* the band ends at 314.5 under the text box, which overhangs it by 8, and its bottom corners are 20-unit arcs
    (traced off the scans: the band leaves the sides at 294 and meets the text box's edge at 309) */
-.frame { position: absolute; left: 9.5px; top: 9.5px; right: 9.5px; bottom: 35.5px; border-radius: 5px 5px 20px 20px; isolation: isolate;
-  background:
-    url("$noise"),
-    linear-gradient(90deg, var(--frame-dark) 0%, var(--frame) 12%, var(--frame) 88%, var(--frame-dark) 100%); }
-/* the colour's painted texture (frame.TEXTURES), a grey tile overlaid on the flat fill and faded by its knob;
-   then the dark edge and the light pinline just inside it: the bevel that reads as a crisp perimeter */
-.frame::before, .frame::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
-.frame::before { background: url("$texture"); background-size: 128px 128px; opacity: var(--frame-texture); }
-.frame::after { box-shadow: inset 0 0 0 0.8px rgba(0,0,0,.6), inset 0 0 0 1.7px rgba(255,255,255,.28),
-  inset 0 0 1.6px 2.2px rgba(255,255,255,calc($sheen * var(--frame-texture))); }  /* the sheen: a soft light ring mid-band */
+.frame { position: absolute; left: 10px; top: 10px; right: 10px; bottom: 36.5px; border-radius: 5px 5px 22px 22px; isolation: isolate;
+  background: var(--frame); }
+/* a legendary card's crown stands against black: the band starts under the crown, so the valleys show the border */
+.legendary .frame { top: 15px; border-top-left-radius: 0; border-top-right-radius: 0; }
+.legendary .pl-title { display: none; }  /* the crown meets the bar's outline directly */
+/* the flat pinline is a stroke, not a backdrop: a 1.8-unit band of the colour around the perimeter of each element,
+   following its shape (the bars' arcs, the text box's chamfered top corners), the strokes merging across the gaps;
+   the textured band shows everywhere outside them. They are one layer, painted before every element, so no element's
+   line can cover another's pinline and the band is the same width all round; the elements sit on this plate and it,
+   not they, casts the shadow (to the left: the light comes from the right on the real cards). */
+/* the plate is painted twice, its shade under its light, so neither shadow is a copy of the other: chained
+   drop-shadows had the white one bleeding under the black and the black one dipping into the ridge */
+.pinlines { position: absolute; inset: 0; }
+.pinlines.shade { filter: drop-shadow(-1.5px 0.6px 0.4px rgba(0,0,0,.85)); }
+.pinlines.light { filter: drop-shadow(0.9px -1.1px 0.3px rgba(255,255,255,.18)); }
+.pl-title, .pl-type { box-shadow: 1.2px 0 .3px rgba(255,255,255,.16); }  /* the ridge is strongest beside the arcs */
+.pinline { position: absolute; background: var(--pinline); }
+/* (named pl-*, not after the elements: a piece called "art" would match the art window's own rule); 2 outside each
+   element on the perimeter, meeting across the 1.2-1.7 gaps */
+.pl-title { left: 12.8px; top: 15px; width: 224.4px; height: 23.4px; border-radius: 8px / 50%; }
+.pl-type { left: 12.8px; top: 195px; width: 224.4px; height: 23.4px; border-radius: 8px / 50%; }
+.pl-art { left: 16.6px; top: 37.4px; width: 216.8px; height: 159px; }
+.pl-text { left: 16.6px; top: 217px; width: 216.8px; height: 106.6px;
+  clip-path: polygon(2.4px 0, calc(100% - 2.4px) 0, 100% 2.4px, 100% 100%, 0 100%, 0 2.4px); }
+/* the colour's painted texture (frame.TEXTURES), light veins and tinted shadows over the flat fill, faded by its knob.
+   The band's edge is a crisp step, as on the cards: no bevel line, no ring */
+.frame::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: url("$texture"); background-size: 128px 128px; opacity: var(--frame-texture); }
 /* the legendary crown: its shape is the traced profile frame.CROWN, set on each element as an inline clip path
    in card units (the elements span the card), the black outline a copy pushed out 1.3 */
-.crown-o, .crown { position: absolute; left: 0; top: 0; width: 250px; height: 44px; }
-.crown-o { background: #000; }
-.crown { background: linear-gradient(color-mix(in srgb, var(--bar) 70%, var(--frame)) 0, color-mix(in srgb, var(--bar) 25%, var(--frame)) 30%, var(--frame) 60%, color-mix(in srgb, var(--frame) 65%, #000) 100%); }
-/* the bars reach 1.5 past the art on each side, 21.5 tall with their outline as the real ones, ends full arcs;
-   a 3D bevel: black outline, a light rim along the top and left, shade along the bottom and right, a shadow under.
-   Art, type bar and text box sit edge to edge. */
-.bar { position: absolute; left: 12.5px; width: 225px; height: 21.5px; padding: 0 6px;
+.crown-o, .crown { position: absolute; left: 0; top: 0; width: 250px; height: 60px; }
+/* the badge is the pinline colour, whitened toward the centre, brighter than everything around it; the outline
+   layer is its shadow, black around the top and fading out down the tongue's side */
+.crown-o { background: linear-gradient(180deg, #000 0, #000 48px, rgba(0,0,0,0) 60px); }
+.crown { background: linear-gradient(90deg, var(--pinline) 25%, color-mix(in srgb, var(--pinline) 60%, #fff) 50%, var(--pinline) 75%); }
+/* the bars span 14.8-235 outline included, 4.8 past the art on each side, 20 tall, their ends arcs 6 deep;
+   the fill is flat (the bottom shade is the bevel's), the bevel lit from the upper right */
+.bar { position: absolute; left: 14.8px; width: 220.2px; height: 20.2px; padding: 0 5.2px;
   display: flex; align-items: center; justify-content: space-between;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bar) 92%, #fff), var(--bar) 35%, var(--bar) 70%, color-mix(in srgb, var(--bar) 86%, var(--frame-dark)));
-  border: 1.7px solid #000; border-radius: 4px / 10.75px;
-  box-shadow: inset 0 1.6px 0 rgba(255,255,255,.85), inset 1.5px 0 0 rgba(255,255,255,.45),
-    inset 0 -1.8px 0 rgba(0,0,0,.34), inset -1.3px 0 0 rgba(0,0,0,.2), 0 0.9px 1.4px rgba(0,0,0,.6); }
-.titlebar { top: 15px; }
-.typebar { top: 194.5px; }
-.name { font-family: var(--title-font); font-size: 13.5px; font-weight: 700; white-space: nowrap; letter-spacing: .005em;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bar) 94%, #fff) 0, var(--bar) 12%, var(--bar) 100%);
+  border: 0.5px solid #000; border-radius: 6px / 50%;
+  /* the bevel inside, lit from the upper right like everything else: the top and right edges catch the light, the
+     bottom and left edges fall dark; no shadow of its own -- the pinline plate under it casts one */
+  box-shadow: inset 0 1px 1.2px rgba(255,255,255,.6), inset -1.2px 0 0 rgba(255,255,255,.35),
+    inset 0 -1.6px 0 rgba(0,0,0,.6), inset 2px 0 1.5px rgba(0,0,0,.4); }
+.titlebar { top: 17px; padding-right: 4.5px; }
+.typebar { top: 197px; height: 20px; padding: 0 4px 0 5px; }
+.name { font-family: var(--title-font); font-size: 13.1px; font-weight: 700; white-space: nowrap; letter-spacing: .012em; word-spacing: .04em;
   position: relative; top: var(--title-dy); }
-.type { font-family: var(--title-font); font-size: 10.8px; font-weight: 700; white-space: nowrap; position: relative; top: var(--type-dy); }
-.cost { display: flex; gap: 1px; flex: none; margin-left: 4px; }
+.type { font-family: var(--title-font); font-size: 11.3px; font-weight: 700; white-space: nowrap; position: relative; top: var(--type-dy); }
+/* the pips sit 1.1 above the bar's geometric centre: the bar's dark bottom bevel and each disc's shadow crescent
+   both weigh the eye downward, and the real cards' discs clear the face top and bottom by the same 2.2 */
+.cost { display: flex; gap: 1px; flex: none; margin-left: 4px; position: relative; top: -1.1px; }
 /* Pip shadow: a black disc behind the symbol, offset for a light at ~75 degrees
    upper-right (mostly down, a little left). Not drop-shadow(): Chromium floors
    its offsets to whole CSS px, which at 100 px/in turns (-0.24, 0.88) into (-1, 0). */
@@ -73,55 +102,63 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .pip::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #000;
   transform: translate(-0.24px, 0.88px); }
 .pip img { position: relative; height: 12px; width: 12px; display: block; }
-.setsym { height: 13px; width: 13px; }
-.art { position: absolute; left: 16.5px; top: 36.5px; width: 217px; height: 158px;
+.setsym { height: 14px; width: 14px; }
+/* the art window: the image spans 19.6-230.2 x 39.7-193.7, its one black line drawn just outside it */
+.art { position: absolute; left: 19.6px; top: 39.7px; width: 210.6px; height: 154px;
   background: #222 center / cover no-repeat; background-image: url("$art");
-  filter: $art_filter; box-shadow: inset 0 0 0 0.8px rgba(0,0,0,.7); }
-.textbox { position: absolute; left: 16.5px; top: 216px; width: 217px; height: 106.5px; padding: 4px 5px;
+  filter: $art_filter; }
+/* the text box face 18.6-231.4 x 218.4-322; recessed with hard edges: a thin fall-off on the right wall, a light
+   rim along the bottom. Rules text is MPlantin at 12.6 on a 0.98 pitch, the gaps in em so they scale with a fit */
+.textbox { position: absolute; left: 18.6px; top: 218.4px; width: 212.8px; height: 103.6px; padding: 1.5px 3.4px 2px;
   background: var(--box);
-  border: 1px solid var(--bar-edge);
-  font-family: var(--body-font); font-size: 11.6px; line-height: 1.15;
+  /* a dark wall along the top and right (the light is from the upper right), a light rim along the bottom */
+  box-shadow: inset 0 1.2px 0 rgba(0,0,0,.43), inset -1.8px 0 .6px rgba(0,0,0,.5), inset 0 -1.3px 0 rgba(255,255,255,.7);
+  clip-path: polygon(.5px 0, calc(100% - .5px) 0, 100% .5px, 100% 100%, 0 100%, 0 .5px);
+  font-family: var(--body-font); font-size: 12.6px; line-height: .98; word-spacing: .03em;
   display: flex; flex-direction: column; justify-content: safe center; overflow: hidden; }
-.textbox.has-pt { padding-bottom: 12px; }
-.textbox p { margin-bottom: 3.5px; }
+.textbox p { margin-bottom: .3em; }
+.textbox.centred { text-align: center; }  /* a lone single line sits centred, as on the real cards */
 .textbox p:last-child { margin-bottom: 0; }
-.textbox img.sym { height: .82em; width: .82em; vertical-align: -0.06em; margin: 0 .03em; }
+.textbox img.sym { height: .78em; width: .78em; vertical-align: -0.06em; margin: 0 .03em; }
 .textbox .reminder, .textbox .ability, .flavor { font-style: italic; }
 .flavor .upright { font-style: normal; }
 .textbox .big-sym { display: flex; justify-content: center; }
 .textbox .big-sym .pip, .textbox .big-sym .pip img { width: 58px; height: 58px; }
 .textbox .big-sym .pip::before { background: rgba(0,0,0,.55); transform: translate(-1.2px, 4.4px); }
 .textbox .nowrap { white-space: nowrap; }
-.flavor { margin-top: 2px; padding-top: 3.5px; position: relative; }
-.flavor::before { content: ""; position: absolute; left: 12%; right: 12%; top: 0; height: 0.7px;
-  background: linear-gradient(90deg, transparent, rgba(0,0,0,.55), transparent); }
-/* the P/T plate: 47 x 21 with arc ends and the bars' bevel */
-.pt { position: absolute; right: 12px; top: 311.5px; min-width: 47px; height: 21px; padding: 0 7px;
+/* the flavour divider: a full-width debossed groove, a soft shade above a hairline highlight */
+.flavor { margin-top: -1px; padding-top: 8px; position: relative; }
+.flavor::before { content: ""; position: absolute; left: 2px; right: 2px; top: 0; height: 1.4px;
+  background: rgba(0,0,0,.22); box-shadow: 0 .4px 0 rgba(255,255,255,.6); }
+/* the P/T plate (frame.pt_plate draws it as an inline SVG: bowed ends, sloped walls lit from the upper right, a
+   flat face): the box sits at 310.5 with its right edge at 235.7, raised off the card by a lift shadow, the number
+   centred on the face and nudged down to sit where the real one does */
+.pt { position: absolute; right: 14.3px; top: 310.5px; height: 20px;
   display: flex; align-items: center; justify-content: center;
-  --plate: color-mix(in srgb, var(--bar) 45%, #ccd2d4);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--plate) 82%, #fff), var(--plate) 35%, var(--plate) 65%, color-mix(in srgb, var(--plate) 78%, #000));
-  border: 1.7px solid #000; border-radius: 5px / 10.5px;
-  box-shadow: inset 0 1.6px 0 rgba(255,255,255,.85), inset 1.5px 0 0 rgba(255,255,255,.45),
-    inset 0 -1.8px 0 rgba(0,0,0,.34), inset -1.3px 0 0 rgba(0,0,0,.2), 0 0.9px 1.4px rgba(0,0,0,.6);
-  font-family: var(--title-font); font-size: 13.2px; font-weight: 700; text-align: center; }
-.pt span { position: relative; top: var(--pt-dy); display: block; line-height: 1; }
-/* the dressing, each drawn by its knob: the art window's bevel; linen grain and a rarity tint over the
+  --plate: color-mix(in srgb, var(--bar) 92%, #8c9296); --face: var(--bar);
+  filter: drop-shadow(-0.9px 0.7px 1px rgba(0,0,0,.55));
+  font-family: var(--title-font); font-size: 13.4px; font-weight: 700; text-align: center; }
+.pt .plate { position: absolute; inset: 0; height: 20px; }
+.pt span { position: relative; z-index: 1; top: calc(var(--pt-dy) + 1.4px); display: block; line-height: 1; }
+/* the dressing, each drawn by its knob: the art window's black line; linen grain and a rarity tint over the
    bars and text box (behind their text: the boxes isolate, the layers sit at z -1); the set symbol as
    a watermark behind the rules text; the holofoil oval under the text box on rares and mythics */
 .art::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: var(--art-bevel);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.85), inset 0 0 0 1.8px rgba(255,255,255,.4), inset 0 1.5px 3px rgba(0,0,0,.5); }
+  box-shadow: 0 0 0 1px #000; }
 .bar, .textbox { isolation: isolate; }
 .bar::after, .textbox::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
-  background: url("$noise"); opacity: var(--box-grain); }
+  background: url("$noise"); mix-blend-mode: overlay; opacity: var(--box-grain); }
 .bar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
   background: var(--rarity-hi); mix-blend-mode: soft-light; opacity: var(--rarity-tint); }
 .textbox::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: url("$watermark") center / 64px no-repeat; opacity: calc(var(--watermark) * .16); }
-.stamp { position: absolute; left: 50%; top: 320.5px; width: 24px; height: 12px; margin-left: -12px; border-radius: 50%;
+.stamp { position: absolute; left: 50%; top: 319.2px; width: 21.6px; height: 11px; margin-left: -10.8px; border-radius: 50%;
   opacity: var(--foil-stamp);
-  background: radial-gradient(ellipse at 35% 30%, rgba(255,255,255,.75), transparent 45%),
-    linear-gradient(120deg, #cdb8ff, #9fe0ff 28%, #ffe9a6 52%, #ffb3c6 76%, #b8f2cf);
-  box-shadow: 0 0 0 0.9px #000, inset 0 0 0 0.6px rgba(0,0,0,.35); }
+  background: radial-gradient(ellipse at 40% 35%, #e8e8e8, #9a9a9a 60%, #6f6f6f);
+  box-shadow: inset 0 0 0 .6px rgba(255,255,255,.5); }
+/* on a stamped card the text box's bottom edge is bitten by a 21-unit arc around the stamp, its pinline following */
+.stamped .textbox { clip-path: path('M.5 0 H212.3 L212.8 .5 V103.6 H119.6 A21 21 0 0 0 93.2 103.6 H0 V.5 Z'); }
+.stamped .pl-text { clip-path: path('M2.4 0 H214.4 L216.8 2.4 V106.6 H125.6 A22.6 22.6 0 0 0 91.2 106.6 H0 V2.4 Z'); }
 /* --- the other layouts. Everything above is the normal frame; each of these moves its parts. --- */
 /* double-faced: the face's icon before its name, and the other face named at the foot of the text box */
 .dfc { display: inline-block; font-size: .8em; margin-right: 3px; opacity: .8; }
@@ -141,8 +178,8 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   font-size: 12px; text-align: center; line-height: 21px; background: #1a1a1a; box-shadow: inset 0 0 0 0.9px #b9b9b9;
   clip-path: polygon(0 20%, 50% 0, 100% 20%, 100% 70%, 50% 100%, 0 70%); }
 /* saga: chapters down the left, the art the full height on the right, the type line under both */
-.saga .art { left: 125px; top: 36.5px; width: 108.5px; height: 264px; }
-.saga .textbox { left: 16.5px; top: 36.5px; width: 108.5px; height: 264px; padding: 5px 4px; font-size: 9.6px; justify-content: flex-start; }
+.saga .art { left: 125.6px; top: 38.7px; width: 109px; height: 262px; }
+.saga .textbox { left: 15.4px; top: 38.7px; width: 109px; height: 262px; padding: 5px 4px; font-size: 9.6px; justify-content: flex-start; }
 .saga .typebar { top: 302px; }
 .saga .textbox p.reminder { font-style: italic; font-size: .82em; color: rgba(0,0,0,.75); margin-bottom: 4px; }
 .saga .textbox p.chapter { display: flex; gap: 4px; align-items: flex-start; padding: 3px 0; border-top: 0.7px solid rgba(0,0,0,.25); margin: 0; }
@@ -150,8 +187,8 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .saga .numeral b { display: block; width: 15px; height: 13px; line-height: 13px; text-align: center; font-family: var(--title-font); font-size: 8.5px;
   color: #fff; background: #222; clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%); }
 /* class: the mirror of a saga -- art on the left, the levels on the right */
-.class .art { left: 16.5px; top: 36.5px; width: 108.5px; height: 264px; }
-.class .textbox { left: 125px; top: 36.5px; width: 108.5px; height: 264px; padding: 4px; font-size: 9.6px; justify-content: flex-start; }
+.class .art { left: 15.4px; top: 38.7px; width: 109px; height: 262px; }
+.class .textbox { left: 125.6px; top: 38.7px; width: 109px; height: 262px; padding: 4px; font-size: 9.6px; justify-content: flex-start; }
 .class .typebar { top: 302px; }
 .class .textbox p.reminder { font-style: italic; font-size: .82em; color: rgba(0,0,0,.75); }
 .class .textbox p.level { display: flex; justify-content: space-between; align-items: center; margin: 4px -4px 3px; padding: 1px 4px;
@@ -191,26 +228,24 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   clip-path: polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%); }
 /* collector info: two rows on the left (number, then set/language/artist); the mint credit
    only on the bottom row, on the right, so it stays below the P/T box (which ends at 333) */
-.footer { position: absolute; left: 12px; right: 12px; bottom: 8px; color: rgba(255,255,255,.8);
+.footer { position: absolute; left: 16.5px; right: 17.5px; bottom: 10px; color: #fff;
   font-family: var(--body-font); font-size: 5.8px; line-height: 1.2; white-space: nowrap;
-  display: flex; justify-content: space-between; align-items: flex-start; letter-spacing: .02em; }
-.footer.has-pt { align-items: flex-end; }  /* the P/T box takes the top right, so the credit drops to the bottom line */
+  display: flex; justify-content: space-between; align-items: baseline; letter-spacing: .02em; }
+.footer.has-pt { align-items: last baseline; }  /* the P/T plate takes the top right, so the credit drops to the bottom line */
 /* the collector block: a wide geometric sans in caps, as on the real cards; the artist in the title face as small caps */
-.footer .collector { font-family: 'Montserrat', 'Liberation Sans', sans-serif; font-weight: 700; font-size: 6.3px; line-height: 1.12;
+.footer .collector { font-family: 'Montserrat', 'Liberation Sans', sans-serif; font-weight: 700; font-size: 5.7px; line-height: 1.25;
   letter-spacing: .1em; text-transform: uppercase; color: #fff; }
 .footer .collector b { font-weight: 700; color: #fff; }
-.footer .artist { font-family: var(--title-font); font-variant: small-caps; font-weight: 700; font-size: 7px;
-  letter-spacing: .03em; text-transform: none; vertical-align: -0.2px; }
-.footer .brush { width: 8px; height: 4px; margin: 0 1px 0 2px; vertical-align: 0.1px; }
-.footer .credit { padding-bottom: 0.3px; }
+.footer .artist { font-family: var(--title-font); font-variant: small-caps; font-weight: 700; font-size: 6px;
+  letter-spacing: .03em; text-transform: none; vertical-align: baseline; }
+.footer .brush { width: 6.5px; height: 4px; margin: 0 1.3px 0 3.5px; vertical-align: baseline; }
 </style>
 <style>
 /* per-set frame identity: sets/<code>.css, injected last so it can override any rule above */
 $set_css
 </style>
-<div class="card $layout">
+<div class="card $layout$legendary$stamped">
   <div class="frame"></div>
-  $crown
   $body
   $stamp
   $footer
@@ -226,6 +261,19 @@ window.fit = () => {
     t.style.fontSize = '';
     let f = parseFloat(getComputedStyle(t).fontSize);
     while (t.scrollHeight > t.clientHeight && f > 6) { f -= 0.2; t.style.fontSize = f + 'px'; }
+    // the P/T plate overlaps the box's bottom right: the last line keeps clear of it, as on the real cards
+    const pt = document.querySelector('.pt');
+    if (pt && t.id === 'text') {
+      const pr = pt.getBoundingClientRect();
+      const last = () => { const r = document.createRange(); r.selectNodeContents(t); const rs = r.getClientRects(); return rs[rs.length - 1]; };
+      let lr = last();
+      while (lr && lr.right > pr.left - 2 && lr.bottom > pr.top - 1 && f > 6) { f -= 0.2; t.style.fontSize = f + 'px'; lr = last(); }
+    }
+    // a lone single line of rules text, no flavour, sits centred
+    if (t.id === 'text' && t.querySelectorAll('p').length === 1 && !t.querySelector('.flavor')) {
+      const r = document.createRange(); r.selectNodeContents(t);
+      if (r.getClientRects().length <= 2) t.classList.add('centred');
+    }
     fs = Math.min(fs, f);
   }
   // long names shrink until name + cost fit the title bar, as on the real cards

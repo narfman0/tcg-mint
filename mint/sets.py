@@ -137,7 +137,7 @@ class Frame:
     custom property of the same name (--art-bevel ...), so a set's css can still override any."""
     watermark: float = 0.0     # the set symbol, faint, behind the rules text
     frame_texture: float = 1.0  # the coloured frame's painted texture (marble, stone, brushed metal ... by colour)
-    art_bevel: float = 1.0     # a dark line and a light pinline around the art window
+    art_bevel: float = 1.0     # the black line around the art window
     box_grain: float = 1.0     # linen grain over the bars and the text box (1 = the text box's old look)
     foil_stamp: float = 1.0    # the holofoil oval under the text box, on rares and mythics
     rarity_tint: float = 0.0   # the bars tinted with the rarity's colour
