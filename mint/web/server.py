@@ -255,18 +255,7 @@ def create_app(ws):
             sets.save(st.path, st)
         return set_detail(S, st)
 
-    @app.delete("/api/sets/{code}/cards/{name}")
-    def delete_card(code: str, name: str):
-        st = S.find_set(code)
-        with S.lock:
-            if name not in st.cards:
-                raise HTTPException(404, f"{name} is not in {st.code}")
-            del st.cards[name]
-            st.size = len(st.cards)
-            sets.save(st.path, st)
-        return set_detail(S, st)
-
-    @app.post("/api/sets/{code}/cards/{name}/rename")
+    @app.post("/api/sets/{code}/cards/{name:path}/rename")
     def rename_card(code: str, name: str, body: dict):
         """Change which card an entry names (a typo, a different face), keeping its place and edits."""
         st = S.find_set(code)
@@ -348,7 +337,7 @@ def create_app(ws):
             p = style.delete(ws, name)
         return {"deleted": str(p)}
 
-    @app.put("/api/sets/{code}/cards/{name}")
+    @app.put("/api/sets/{code}/cards/{name:path}")
     def put_card(code: str, name: str, body: dict):
         st = S.find_set(code)
         with S.lock:
@@ -408,7 +397,7 @@ def create_app(ws):
             sets.save(st.path, st)
         return set_detail(S, st)
 
-    @app.delete("/api/sets/{code}/cards/{name}/variants/{h}")
+    @app.delete("/api/sets/{code}/cards/{name:path}/variants/{h}")
     def delete_variant(code: str, name: str, h: str):
         """Remove one variant (image + sidecar). A card entry that named it as its base or pick goes back to the default."""
         st = S.find_set(code)
@@ -441,12 +430,7 @@ def create_app(ws):
             m.save()
         return card_detail(S, st, name) if name else {"ok": True}
 
-    @app.get("/api/sets/{code}/cards/{name}")
-    def get_card(code: str, name: str):
-        st = S.find_set(code)
-        return card_detail(S, st, name)
-
-    @app.get("/api/sets/{code}/cards/{name}/printings")
+    @app.get("/api/sets/{code}/cards/{name:path}/printings")
     def printings(code: str, name: str):
         st = S.find_set(code)
         entry = st.card({"name": name})
@@ -462,7 +446,7 @@ def create_app(ws):
                         "selected": entry.printing == f"{c['set']}:{c['collector_number']}"})
         return out
 
-    @app.get("/api/sets/{code}/cards/{name}/printings/{printing}/crop")
+    @app.get("/api/sets/{code}/cards/{name:path}/printings/{printing}/crop")
     def printing_crop(code: str, name: str, printing: str, w: int = 320):
         """A printing's art crop as a thumbnail, fetched from Scryfall on first sight (for the picker)."""
         S.find_set(code)  # 404 for an unknown set
@@ -473,12 +457,29 @@ def create_app(ws):
             raise HTTPException(502, f"could not fetch the crop: {e}") from None
         return FileResponse(thumbnail(ws, str(crop), w), headers={"Cache-Control": "max-age=3600"})
 
-    @app.post("/api/sets/{code}/cards/{name}/scan")
+    @app.post("/api/sets/{code}/cards/{name:path}/scan")
     def scan(code: str, name: str):
         """Fetch Scryfall's full-card scan (for the calibration overlay)."""
         st = S.find_set(code)
         card = S.cards().find(name, st.card({"name": name}).printing)
         return {"path": str(S.art.scan(card))}
+
+    # the card itself, after its sub-routes: {name:path} is greedy (a double-faced name holds a slash)
+    @app.get("/api/sets/{code}/cards/{name:path}")
+    def get_card(code: str, name: str):
+        st = S.find_set(code)
+        return card_detail(S, st, name)
+
+    @app.delete("/api/sets/{code}/cards/{name:path}")
+    def delete_card(code: str, name: str):
+        st = S.find_set(code)
+        with S.lock:
+            if name not in st.cards:
+                raise HTTPException(404, f"{name} is not in {st.code}")
+            del st.cards[name]
+            st.size = len(st.cards)
+            sets.save(st.path, st)
+        return set_detail(S, st)
 
     # --- jobs ---------------------------------------------------------------------------------
     @app.get("/api/jobs")
@@ -637,8 +638,9 @@ def renders_for(S, st, name, want=None):
     out = {}
     m = Manifest(S.out_dir(st))
     fh = frame_hash(st.css, frame.frame_css(st.frame))
+    mine = {name, name.split(" // ")[0]}  # a double-faced card's render is filed under its front face's name
     for fn, e in m.entries.items():
-        if e.get("card") != name:
+        if e.get("card") not in mine:
             continue
         p = S.out_dir(st) / fn
         if not p.exists():
