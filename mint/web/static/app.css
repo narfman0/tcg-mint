@@ -73,6 +73,13 @@ h2 { font-size: 1.05rem; margin: 1.4rem 0 .5rem; color: var(--ink-2); text-trans
 .tile .name { font-size: .88em; line-height: 1.2; display: flex; justify-content: space-between; gap: 6px; }
 .tile .name b { font-weight: 600; }
 .tile .badges { display: flex; flex-wrap: wrap; gap: 3px; min-height: 1em; }
+/* two looks on one tile, and the dense sheet */
+.tile .pics { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.grid:has(.tile.two) { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.grid.sheet { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 4px; }
+.grid.sheet:has(.tile.two) { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.grid.sheet .tile { padding: 2px; gap: 0; }
+.grid.sheet .tile .name, .grid.sheet .tile .badges { display: none; }
 
 /* compare */
 /* card detail: the card, the generate panel, the images */

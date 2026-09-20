@@ -17,7 +17,10 @@ const REMIX_BADGE = {repose: 'repose', new: 'new scene', inspire: 'inspired'};
 /* mode: plain or styled art on a board tile; show: the art alone or the whole rendered card (when
    there is one); style: which restyle label a styled tile shows ('current' = the set's own recipe,
    else any label the art cache holds); q: the board's search text. */
+/* style2: a second look shown beside the first on every tile (the set-level A/B); sort: number | name |
+   colour (the shown image's hue, measured in the browser); sheet: tiles without names and badges, tighter */
 const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
+               style2: '', sort: 'number', sheet: false, colours: {},
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
                takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false};
 
@@ -78,13 +81,16 @@ function templates(redraw) {
    holds (with how many cards have it); a template not run yet is listed too. A styled tile shows the
    look, the board's filter finds cards without it, and restyle makes it -- when it is runnable: the
    set's recipe or a template (a lab label has no template to run; save one, or promote it). */
-function lookPicker(id, cards, setStyle, all = false) {
+/* [value, text] for every look: the set's recipe, each label the art cache holds, each template not run yet */
+function lookOptions(cards, setStyle, all = false) {
   const labels = styleLabels(cards), have = new Set(labels.map(([l]) => l));
   const tpls = templates(() => go()).filter(t => !have.has(t.name) && t.name !== setStyle?.name);
+  return [['current', all ? "each set's recipe" : setStyle ? `set's recipe: ${setStyle.name}` : "set's recipe (none)"],
+          ...labels.map(([l, k]) => [l, `${l} (${k})`]), ...tpls.map(t => [t.name, `${t.name} (template)`])];
+}
+function lookPicker(id, cards, setStyle, all = false) {
   return `<select id="${id}" title="the look: what a styled tile shows, and what restyle makes. The set's recipe, any restyle in the art cache, or a template not run yet">
-    <option value="current">${all ? "each set's recipe" : setStyle ? `set's recipe: ${esc(setStyle.name)}` : 'set\'s recipe (none)'}</option>
-    ${labels.map(([l, k]) => `<option value="${esc(l)}" ${state.style === l ? 'selected' : ''}>${esc(l)} (${k})</option>`).join('')}
-    ${tpls.map(t => `<option value="${esc(t.name)}" ${state.style === t.name ? 'selected' : ''}>${esc(t.name)} (template)</option>`).join('')}</select>`;
+    ${lookOptions(cards, setStyle, all).map(([v, t]) => `<option value="${esc(v)}" ${state.style === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
 }
 /* How many takes a restyle makes per card: each from its own random seed, to choose between. */
 const takesPicker = () => `<label class="takes" title="takes per card: each a variant from its own random seed, side by side in Compare. More than one = drafts without the ESRGAN pass (a large share of a take\'s time); enhance the one you keep"><span class="muted">×</span><input type="number" id="takes" min="1" max="16" value="${state.takes}"></label>`;
@@ -226,34 +232,61 @@ function variantFor(c, label) {
 }
 /* The image a card shows for the current mode / show / style: {path, card: bool, what} or {none: why}.
    "card" wants the render; without one the art stands in (the tile's shape says which). */
-function shown(c) {
+function shown(c, style = state.style) {
   const m = state.mode;
-  if (state.show === 'card' && state.style === 'current') {
+  if (state.show === 'card' && style === 'current') {
     const r = c.renders?.[m];
     if (r) return {path: r.path, card: true, what: `render · ${m} · ${r.dpi || '?'} dpi`};
   }
-  if (m === 'styled' && state.style !== 'current') {
-    const v = variantFor(c, state.style);
-    return v ? {path: v.path, what: `${v.label}-${v.hash}`} : {none: `no ${state.style}`};
+  if (m === 'styled' && style !== 'current') {
+    const v = variantFor(c, style);
+    return v ? {path: v.path, what: `${v.label}-${v.hash}`} : {none: `no ${style}`};
   }
   const src = c[m];
   return src ? {path: src.path, what: src.label ? `${src.label}-${src.hash}` : src.kind} : {none: m === 'styled' ? 'no restyle yet' : 'crop not fetched'};
 }
-function tilePic(c) {
-  const s = shown(c);
+function tilePic(c, style = state.style) {
+  const s = shown(c, style);
   if (s.none) return `<div class="pic art"><div class="none">${esc(s.none)}</div></div>`;
   return `<div class="pic ${s.card ? '' : 'art'}"><img loading="lazy" src="${img(s.path, 320)}"></div>`;
 }
+/* The shown image's colour, measured in the browser from its thumbnail: (hue, saturation, lightness),
+   cached by path. The colour sort waits for every card's, then redraws. */
+function colourOf(path) {
+  if (state.colours[path]) return Promise.resolve(state.colours[path]);
+  return new Promise(res => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 8;
+      const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, 8, 8);
+      const d = cx.getImageData(0, 0, 8, 8).data; let r = 0, g = 0, b = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+      r /= 64 * 255; g /= 64 * 255; b /= 64 * 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, dlt = max - min;
+      const s = dlt === 0 ? 0 : dlt / (1 - Math.abs(2 * l - 1));
+      let h = 0;
+      if (dlt) h = max === r ? ((g - b) / dlt) % 6 : max === g ? (b - r) / dlt + 2 : (r - g) / dlt + 4;
+      res(state.colours[path] = {h: (h * 60 + 360) % 360, s, l});
+    };
+    im.onerror = () => res(state.colours[path] = {h: 0, s: 0, l: 0.5});
+    im.src = img(path, 320);
+  });
+}
+const colourKey = c => { const p = shown(c).path, k = p && state.colours[p]; return !k ? [2, 0] : k.s < 0.12 ? [1, k.l] : [0, k.h, k.l]; };
 function boardCards() {
   const st = state.set, filt = state.filter || '', q = (state.q || '').toLowerCase();
   const hit = c => !q || [c.name, c.card?.type_line, c.inSet, c.card?.artist, String(c.number ?? '')].some(v => (v || '').toLowerCase().includes(q));
-  return st.cards_detail.filter(c => hit(c) && (!filt || badges(c).includes(`>${filt}<`) || (filt === 'no restyle' && !c.current && !c.picked)
+  const cs = st.cards_detail.filter(c => hit(c) && (!filt || badges(c).includes(`>${filt}<`) || (filt === 'no restyle' && !c.current && !c.picked)
     || (filt === `no ${state.style}` && !variantFor(c, state.style))));
+  if (state.sort === 'name') cs.sort((a, b) => a.name.localeCompare(b.name));
+  else if (state.sort === 'colour') cs.sort((a, b) => { const x = colourKey(a), y = colourKey(b); for (let i = 0; i < 3; i++) { const d = (x[i] ?? 0) - (y[i] ?? 0); if (d) return d; } return 0; });
+  return cs;
 }
 function tileHtml(c) {
+  const two = state.style2 && state.mode === 'styled';
   return `
-      <div class="tile ${state.sel.has(c.name) ? 'sel' : ''}" data-name="${esc(c.name)}" data-set="${esc(setOf(c))}">
-        ${tilePic(c)}
+      <div class="tile ${state.sel.has(c.name) ? 'sel' : ''} ${two ? 'two' : ''}" data-name="${esc(c.name)}" data-set="${esc(setOf(c))}">
+        ${two ? `<div class="pics">${tilePic(c)}${tilePic(c, state.style2)}</div>` : tilePic(c)}
         <div class="name"><b>${esc(c.name)}</b><span class="muted mono">${state.set.all ? esc(c.inSet) + ' ' : ''}${c.number ?? ''}</span></div>
         <div class="badges">${badges(c)}</div>
       </div>`;
@@ -349,7 +382,10 @@ function board() {
       <span class="seg">${['plain', 'styled'].map(m => `<button data-mode="${m}" class="${state.mode === m ? 'on' : ''}">${m}</button>`).join('')}</span>
       <span class="seg" title="the art alone, or the whole rendered card where there is one">${[['art', 'art'], ['card', 'card']].map(([m, t]) => `<button data-show="${m}" class="${state.show === m ? 'on' : ''}">${t}</button>`).join('')}</span>
       ${lookPicker('style', st.cards_detail, st.style, all)}
+      ${state.mode === 'styled' ? `<select id="style2" title="a second look beside the first on every tile: the set-level A/B"><option value="">vs —</option>${lookOptions(st.cards_detail, st.style, all).filter(([v]) => v !== state.style).map(([v, t]) => `<option value="${esc(v)}" ${state.style2 === v ? 'selected' : ''}>vs ${esc(t)}</option>`).join('')}</select>` : ''}
       <span class="sep"></span>
+      <select id="sort" title="the order of the tiles: by number, by name, or by the shown image's colour, so a take that wandered off the set's palette stands out"><option value="number" ${state.sort === 'number' ? 'selected' : ''}>by number</option><option value="name" ${state.sort === 'name' ? 'selected' : ''}>by name</option><option value="colour" ${state.sort === 'colour' ? 'selected' : ''}>by colour</option></select>
+      <span class="seg" title="tiles with their names and badges, or a dense sheet of pictures alone">${[['tiles', false], ['sheet', true]].map(([t, v]) => `<button data-sheet="${v}" class="${state.sheet === v ? 'on' : ''}">${t}</button>`).join('')}</span>
       <input type="text" id="q" placeholder="search name, type, artist${all ? ', set' : ''}" value="${esc(state.q || '')}">
       <select id="filter"><option value="">all cards</option>${filters.map(f => `<option ${filt === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
       ${filt || state.q ? `<button id="selshown" class="small" title="select the ${cards.length} card(s) shown, so the jobs below run on just them">select shown</button>` : ''}
@@ -369,12 +405,19 @@ function board() {
       <label class="missing" title="each job skips the cards that already have its product: an enhance of the crop, art in the look, a plain or styled render that is not stale. The count is what it would make"><input type="checkbox" id="missing" ${state.missing ? 'checked' : ''}> only what's missing</label>
       ${n ? '<button id="clearsel" class="small">clear selection</button>' : ''}
     </div>
-    <div class="grid"></div>`;
+    <div class="grid ${state.sheet ? 'sheet' : ''}"></div>`;
   const grid = () => {
     $('.grid').innerHTML = boardCards().map(tileHtml).join('') || '<div class="empty">nothing matches</div>';
     document.querySelectorAll('.tile').forEach(bindTile);
   };
   grid();
+  if (state.sort === 'colour') {  // measure what is not measured yet, then lay the tiles out again
+    const paths = boardCards().map(c => shown(c).path).filter(p => p && !state.colours[p]);
+    if (paths.length) Promise.all(paths.map(colourOf)).then(() => { if (state.set === st && $('.grid')) grid(); });
+  }
+  if ($('#style2')) $('#style2').onchange = e => { state.style2 = e.target.value; board(); };
+  $('#sort').onchange = e => { state.sort = e.target.value; board(); };
+  document.querySelectorAll('[data-sheet]').forEach(b => b.onclick = () => { state.sheet = b.dataset.sheet === 'true'; board(); });
   $('#gallery').onclick = () => { const cs = boardCards(); if (!cs.length) return toast('nothing to show'); V.fromPage = true; location.hash = viewHash(setOf(cs[0]), cs[0].name); };
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; board(); });
   document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { state.show = b.dataset.show; board(); });

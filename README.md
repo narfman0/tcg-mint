@@ -161,7 +161,11 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   plain render, or just the art), with badges from the render manifest: no restyle for the current
   recipe, not rendered, stale render (the frame or the art changed since), rules text shrunk,
   Universes Beyond art, own art. *only what's missing* counts a stale render as missing.
-  A search box matches name, type and artist.
+  A search box matches name, type and artist. Order the tiles by number,
+  name or *colour* (the shown image's hue, measured in the browser, so a
+  take that wandered off the set's palette stands out); *sheet* drops the
+  names and badges for a dense look at the pictures; *vs* puts a second look
+  beside the first on every tile, the set-level A/B.
   Shift-click to select cards (or turn *select* on in the toolbar, or long-press
   a tile on a phone); render, enhance or restyle the selection.
   *all* in the nav puts every set on one board.
