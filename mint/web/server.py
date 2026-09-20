@@ -705,13 +705,13 @@ def submit_printrun(S, st, names, body):
         raise HTTPException(400, f"stock is one of {', '.join(sorted(printing.STOCKS))}")
     out_dir = S.out_dir(st)
     key = "styled" if styled else "plain"
-    stamp = time.strftime("%Y%m%d-%H%M")
-    pdf = out_dir / "print" / f"{st.code}-{key}-{stamp}.pdf"
     title = f"print run: {st.code} {key}, {len(names)} card(s) on {paper}" + (f", {copies}x on {stock}" if stock else ", PDF only")
     what = (f"renders the {len(names)} card(s) whose {key} render is missing or stale at {dpi} dpi, lays them out 3x3 on "
-            f"{paper} with {bleed}in bleed at {sheet_dpi} dpi into {pdf.name}" + (f", and prints {copies} copy(ies) on {stock} to {S.ws.printer}" if stock else ""))
+            f"{paper} with {bleed}in bleed at {sheet_dpi} dpi into out/{st.code.lower()}/print/" + (f", and prints {copies} copy(ies) on {stock} to {S.ws.printer}" if stock else ""))
 
     def run(job):
+        # named when it runs, with the job's id: two runs queued in the same minute keep their own files
+        pdf = out_dir / "print" / f"{st.code}-{key}-{time.strftime('%Y%m%d-%H%M')}-{job.id[:4]}.pdf"
         need = [n for n in names if not (r := renders_for(S, st, n, want_for(S, st, n)).get(key)) or r.get("stale")]
         job.step(0, len(need) + 2)
         done = 0
@@ -743,7 +743,7 @@ def submit_printrun(S, st, names, body):
         job.step(len(need) + 2)
         return {"pdf": str(pdf), "pages": pages, "rendered": need}
     return S.jobs.submit("printrun", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi, "paper": paper,
-                                             "stock": stock, "copies": copies, "what": what, "dest": str(pdf.parent)}, run)
+                                             "stock": stock, "copies": copies, "what": what, "dest": str(out_dir / "print")}, run)
 
 
 def want_for(S, st, name):
