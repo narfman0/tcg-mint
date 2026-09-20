@@ -8,7 +8,7 @@ directory). They are picked up by filename: `Beleren-Bold.ttf`,
 | face | role | where to find it |
 |---|---|---|
 | Beleren 2016 Bold | title, type line, P/T (M15 frame) | https://github.com/Saeris/typeface-beleren-bold — `Beleren2016-Bold.ttf`, save as `Beleren-Bold.ttf` |
-| MPlantin | rules and flavor text | https://github.com/AlexandreArpin/mtg-font — `fonts/Mplantin.ttf` |
+| MPlantin | rules and flavor text | https://github.com/narfman0/mtg-font branch `fix/empty-glyphs` — `fonts/Mplantin.ttf` (a fork of AlexandreArpin/mtg-font with the repair below already applied) |
 | Matrix Bold | title face of the 2003–2014 frame; fallback for Beleren | same repo — `fonts/Matrix-Bold.ttf` |
 
 These are Wizards of the Coast / Monotype / Emigre property; use them for
@@ -18,21 +18,24 @@ closest open faces, which ship with the package under `mint/fonts/`
 so a render never needs the network for fonts. A face you put here always
 wins over the packaged one of the same family.
 
-## If Chromium refuses a font
+## Repairing a community copy
 
-Some of the community copies are old Mac conversions that Chromium's font
-sanitizer (OTS) rejects — the render then silently uses the fallback and
-`mint fonts` still says "ok". A round-trip through fontTools rebuilds the
-table directory and fixes it:
+The copies in circulation are old Mac conversions with two faults. Chromium's
+font sanitizer (OTS) rejects the table directory of some, and the render then
+silently uses the fallback while `mint fonts` still says "ok". And many
+characters are mapped to empty glyphs — in MPlantin the middle dot and the
+whole Latin Extended-A block (Ć, Š, ł…), in Matrix Bold the backslash, pipe
+and tilde — which draw as nothing: the browser sees a glyph, so it never
+falls back for that character. Separators vanish from the collector line and
+"Ćeran" prints as " eran".
 
 ```sh
-pip install fonttools
-python - <<'EOF'
-from fontTools.ttLib import TTFont
-for fn in ["fonts/Mplantin.ttf", "fonts/Matrix-Bold.ttf"]:
-    t = TTFont(fn, recalcBBoxes=False)
-    for tab in t["cmap"].tables:
-        tab.language = 0
-    t.save(fn + ".new"); import os; os.replace(fn + ".new", fn)
-EOF
+pip install -e '.[fonts]'
+mint fonts --repair
 ```
+
+rewrites every font in `fonts/` in place: the table directory is rebuilt and
+the empty-glyph mappings are dropped, so the fallback face (Liberation Serif)
+supplies exactly those characters. Outlines are untouched; a repaired file is
+repaired again without harm. The fork linked above carries the repaired
+`.ttf` files, so from there nothing needs running.
