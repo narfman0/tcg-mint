@@ -69,7 +69,9 @@
       "number": 18
     },
     "Faerie Mastermind": {
-      "number": 19
+      "number": 19,
+      "base": "6828e835",
+      "pose": "6828e835"
     },
     "Heroic Intervention": {
       "number": 20
