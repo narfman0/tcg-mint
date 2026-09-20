@@ -199,10 +199,12 @@ class SetFile:
             return style.seed * 1000 + self.position(name)
         return style.seed * 1000 + zlib.crc32(illustration_id.encode()) % 1000
 
-    def recipe(self, record, style=None, art=None, seed=None):
+    def recipe(self, record, style=None, art=None, seed=None, remix=None):
         """The effective restyle recipe for one card, as a plain dict, or None without a style.
         With the art cache, a base named by label becomes that card's newest variant's hash.
-        `seed` overrides for a one-off run (an unpinned "generate" rolls one) without touching the file."""
+        `seed` overrides for a one-off run (an unpinned "generate" rolls one) without touching the
+        file, and `remix` likewise names the mode for this run alone (a `new` scene from a
+        describer-written subject, whatever the style and the entry say)."""
         style = style or self.style
         if style is None:
             return None
@@ -215,7 +217,7 @@ class SetFile:
             del r["refine"], r["refine_scale"]
         if not r.get("color_match"):
             del r["color_match"]
-        remix = entry.remix or style.remix
+        remix = remix or entry.remix or style.remix
         if remix not in REMIX:
             raise SetError(f"{record['name']}: remix must be one of {', '.join(REMIX)}, not {remix!r}")
         if remix == "restyle":

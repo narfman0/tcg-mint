@@ -3,16 +3,17 @@
     mint doctor
 
 One line per check: the workspace and its card file, the fonts, a Chromium
-launch, ComfyUI and the nodes each remix mode uses, and every model file the
+launch, ComfyUI and the nodes each remix mode uses, every model file the
 sets' styles and the templates name -- checkpoint, ControlNet, upscaler,
-LoRAs -- against what that ComfyUI actually has. Exits 1 when something a
+LoRAs -- against what that ComfyUI actually has, and whether the describer
+behind `mint describe` could take a call. Exits 1 when something a
 job would need is missing; a warning (an old card file, a font substituted)
 is reported and not counted.
 """
 import datetime as dt
 import sys
 
-from . import comfy, fonts, frame, sets, style, workspace
+from . import comfy, describe, fonts, frame, sets, style, workspace
 from .errors import MintError
 
 # what each remix mode (restyle.py) asks ComfyUI for, beyond the core nodes
@@ -128,6 +129,23 @@ def check_comfy(ws, r, styles):
             (r.ok if have else r.fail)(f"lora {lora['name']}", "" if have else f"not in ComfyUI; wanted by {where}")
 
 
+def check_describer(ws, r):
+    """Whether `mint describe` could go out: a key for claude, a reachable Ollama otherwise. A
+    describer nobody set up is a warning: no render or restyle needs it."""
+    try:
+        d = describe.Describer.from_workspace(ws)
+    except MintError as e:
+        r.warn("describer", str(e))
+        return
+    ok, why = d.ready()
+    if not ok:
+        r.warn("describer", f"{d.kind}: {why}")
+    elif not d.alive():
+        r.warn("describer", f"nothing answers at {d.url}; start Ollama, or set ollama_url")
+    else:
+        r.ok("describer", f"{d.kind} ({d.model})")
+
+
 def check_sets(r, styles):
     for where, st in styles:
         if st is None:
@@ -147,6 +165,7 @@ def main(argv=None):
     check_sets(r, styles)
     check_chromium(r)
     check_comfy(ws, r, styles)
+    check_describer(ws, r)
     print(f"\n{r.failed} thing(s) a job would miss" if r.failed else "\neverything a job needs is here")
     return 1 if r.failed else 0
 

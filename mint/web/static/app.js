@@ -362,9 +362,14 @@ function board() {
   const anyStyle = all ? st.sets.some(x => x.style) : !!st.style;
   const styledOk = anyStyle && lookIsRecipe;
   // "only what's missing": each job narrows to the cards without its product
+  const describer = state.ws?.describer || {ready: false, hint: ''};
+  const lookLabel = all ? null : lookTemplate(st.style) || st.style?.name;  // the label a new scene lands under
+  const hasNew = c => (c.variants || []).some(v => v.kind === 'restyle' && v.recipe?.remix === 'new' &&
+                                                 (lookLabel ? v.label === lookLabel : true));
   const lacks = {
     'enhance': c => !c.plain || c.plain.kind === 'crop',
     'restyle': c => lookIsRecipe ? !hasStyled(c) : !variantFor(c, state.style),
+    'newcards': c => !c.entry.subject || !hasNew(c),
     'render-plain': c => !c.renders?.plain || !!c.renders.plain.stale,
     'render-styled': c => !c.renders?.styled || !!c.renders.styled.stale,
   };
@@ -396,6 +401,7 @@ function board() {
       <span class="stage" title="art jobs write variants to the art cache; nothing is rendered"><span class="lbl">art</span>
         <button data-job="enhance" title="an ESRGAN pass on each card's crop, the plain art; the plain render picks it up">enhance crop${count('enhance')}</button>
         <button data-job="restyle" ${all ? (st.sets.some(x => x.style) || lookTemplate(null) ? '' : 'disabled') : lookTemplate(st.style) === null ? 'disabled' : ''} title="${esc(all ? 'each set in the look picked' : lookTitle(st.style))}">restyle as ${esc(lookName)}${count('restyle')}</button>${takesPicker()}
+        <button data-job="newcards" ${!describer.ready || (all ? !(st.sets.some(x => x.style) || lookTemplate(null)) : lookTemplate(st.style) === null) ? 'disabled' : ''} title="${esc(!describer.ready ? `no describer: ${describer.hint}` : `net-new art: ${describer.kind} reads each card's base image and text and writes its subject line (cards that have one keep it), then a new scene from it in ${lookName} -- the new mode whatever the style says`)}">new cards as ${esc(lookName)}${count('newcards')}</button>
       </span>
       <span class="stage" title="card jobs compose the frame, text and art into out/; they use the art that exists and make none"><span class="lbl">cards</span>
         <button data-job="render-plain" title="each card with its plain art: the crop, or its enhance">render plain${count('render-plain')}</button>
@@ -455,6 +461,7 @@ function board() {
         'render-styled': styled && {kind: 'render', set: s, names: list, styled: true, dpi},
         'enhance': {kind: 'enhance', set: s, names: list, base: 'crop'},
         'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
+        'newcards': lookTemplate(styled) !== null && {kind: 'describe', set: s, names: list, generate: true, template: lookTemplate(styled)},
         'printrun': {kind: 'printrun', set: s, names: list, styled: state.mode === 'styled', dpi, paper: state.paper || 'letter', stock: state.stock || null},
       };
       const origin = `${all ? 'all-sets board' : code + ' board'}: ${n ? `${n} selected` : 'all cards'}${state.missing ? ', only what\'s missing' : ''}${all ? ` (${s})` : ''}`;
@@ -745,7 +752,7 @@ function generatePanel(c, cols) {
         <span title="the image whose OpenPose skeleton the new picture takes; only the joints are kept">pose</span><span class="row"><select id="posesel">${imgOpts(isPath(e.pose) ? 'path' : e.pose || '', ['', `the from image: ${from}`])}<option value="path" ${isPath(e.pose) ? 'selected' : ''}>an image file…</option></select>
           <input type="text" id="posepath" value="${isPath(e.pose) ? esc(e.pose) : ''}" placeholder="path to any image" style="width:20em" ${isPath(e.pose) ? '' : 'hidden'}></span>`
     : `
-        <span>scene</span><span class="muted">the prompt alone; the subject line above is the only thread back to the card${e.subject ? '' : ' (none set: its name and type line stand in)'}</span>`;
+        <span>scene</span><span class="muted">the prompt alone; the subject line above is the only thread back to the card${e.subject ? '' : ' (none set: its name and type line stand in; "from the picture" writes one)'}</span>`;
   return `
     <details class="sect gen" id="gen" ${state.genOpen ? 'open' : ''}>
       <summary><h2>generate</h2><span class="muted">${esc(mode)} as ${esc(lookName || '?')}${overrides.length ? ` · this card's own ${overrides.join(', ')}` : ''}</span></summary>
@@ -770,6 +777,7 @@ async function card(r) {
   const A = find(ab.a), B = find(ab.b);
   const styledV = c.entry.pick ? c.picked : c.current;  // the variant the styled render uses, if made
   const styledCol = styledV && find(styledV.hash);
+  const describer = state.ws?.describer || {ready: false, hint: 'the workbench has not said who describes'};
   const styledLine = styledV
     ? `<span class="badge accent">${esc(styledV.label)}-${styledV.hash}</span> <span class="muted">${c.entry.pick ? 'picked' : "the recipe's"}${styledCol?.enhanced?.length ? ' · enhanced' : ''}</span>
        ${styledCol?.enhanced?.length ? '' : `<button class="small" data-cjob="enhance-styled" title="an ESRGAN pass on it; the render picks the enhance up">enhance</button>`}
@@ -786,7 +794,9 @@ async function card(r) {
           <span>printing</span><span class="printing"><button class="small" id="printing" title="which Scryfall printing's art this card starts from">
             ${c.entry.printing ? esc(c.entry.printing.toUpperCase()) : `${esc(c.card.set.toUpperCase())} ${esc(c.card.collector_number)} · default`} ▾</button>
             <span class="muted" id="printing-n"></span><div class="printings" id="printings" hidden></div></span>
-          <span>subject</span><span><input type="text" id="subject" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene"></span>
+          <span>subject</span><span class="row"><input type="text" id="subject" style="width:36em;max-width:100%" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene">
+            <button class="small" id="describe" ${describer.ready ? '' : 'disabled'} title="${esc(describer.ready ? `${describer.kind} (${describer.model}) reads the ${esc(c.entry.base || st.base || 'crop')} image and the card's text and writes the subject line${c.entry.subject ? ', replacing this one' : ''}` : `no describer: ${describer.hint}`)}">from the picture</button></span>
+          ${c.described ? `<span title="what the describer read in the picture the subject was written from">picture</span><span class="muted" style="font-size:.85em">${esc(c.described.description)} <span class="mono">· ${esc(c.described.model)}${c.described.base && c.described.base !== 'crop' ? ` · ${esc(c.described.base)}` : ''}</span></span>` : ''}
           ${(c.warnings || []).map(w => `<span>warning</span><span class="warn">${esc(w)}</span>`).join('')}
         </div></div>
       <div class="row" style="margin-left:auto"><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a><a class="pill" href="#/set/${esc(code)}/lab">lab</a></div>
@@ -833,6 +843,7 @@ async function card(r) {
   document.querySelectorAll('details.menu').forEach(d => d.onclick = e => e.stopPropagation());
   document.onkeydown = e => { if (e.key === 'Escape' && $('#printings') && !$('#printings').hidden) { $('#printings').hidden = true; e.preventDefault(); } };
   $('#subject').onchange = e => put({subject: e.target.value || null});
+  $('#describe').onclick = () => submit({kind: 'describe', set: code, names: [c.name], force: true}, `card page: ${c.name}`);
   $('#dpi').onchange = e => { state.dpi = +e.target.value; };
   // the generate panel
   $('#gen').ontoggle = e => { state.genOpen = e.target.open; };
@@ -1507,6 +1518,7 @@ async function jobs() {
 /* One thing a job made: a link to that image on the card page, the picture itself on hover. */
 function itemHtml(it) {
   if (it.kind === 'pdf') return `<a class="it" href="#/set/${esc(it.set)}/pdfs/${encodeURIComponent(it.file)}">${esc(it.file)} <span class="mono muted">${esc(it.name)}</span></a>`;
+  if (it.kind === 'subject') return `<a class="it" href="#/set/${esc(it.set)}/card/${encodeURIComponent(it.name)}" title="${esc(it.label)}">${esc(it.name)} <span class="muted">subject: ${esc(it.label.length > 60 ? it.label.slice(0, 60) + '…' : it.label)}</span></a>`;
   const href = it.key ? colHash(it.set, it.name, it.key) : `#/set/${esc(it.set)}/card/${encodeURIComponent(it.name)}`;
   const what = it.label ? `${it.label}-${it.key}` : it.file || it.kind || '';
   return `<a class="it ${it.kind === 'render' || it.kind === 'theme' ? 'card' : ''}" href="${href}" ${it.path ? `data-src="${img(it.path, 320)}"` : ''}>

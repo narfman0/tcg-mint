@@ -98,8 +98,9 @@ A set is a JSON file (see `sets/bls1.json`):
   textures, bar shapes, anything.
 
 Unknown keys are errors (`mint check` finds them), so a typo in a recipe never
-passes silently. Who you are on the cards, the ComfyUI address, the printer
-and where the workbench exports a PDF to live in `mint.toml` in the workspace:
+passes silently. Who you are on the cards, the ComfyUI address, the printer,
+where the workbench exports a PDF to, and who reads a card's picture for
+`mint describe` live in `mint.toml` in the workspace:
 
 ```toml
 maker = "narfman0"
@@ -107,6 +108,9 @@ maker_code = "BLS"
 comfy_url = "http://127.0.0.1:8188"
 printer = "EPSON_ET_8500"
 export_dir = "~/Desktop"
+describer = "claude"          # or "ollama"; claude reads ANTHROPIC_API_KEY from the environment
+describe_model = ""           # empty = the describer's default (claude-sonnet-5 / qwen2.5vl)
+ollama_url = "http://127.0.0.1:11434"
 ```
 
 ## Commands
@@ -116,6 +120,7 @@ export_dir = "~/Desktop"
 | `mint newset` | start a set file from a decklist (commander first); `--style` seeds a style block from a template or a built-in; `--private` keeps the set out of git |
 | `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet; `--faces` the backs of double-faced cards too |
 | `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
+| `mint describe` | a vision model reads each card's picture and text and writes its `subject` line; `--generate` then makes each card's `new` scene from it |
 | `mint upscale` | 4× ESRGAN the art (or any variant, `--base HASH`) through a local ComfyUI; renders pick the result up automatically |
 | `mint check` | validate set files and say which image each card renders with, plain and styled |
 | `mint style` | save a set's art style as a template in `styles/` for other sets to start from; `list` and `show` them |
@@ -168,7 +173,11 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   names and badges for a dense look at the pictures; *vs* puts a second look
   beside the first on every tile, the set-level A/B.
   Shift-click to select cards (or turn *select* on in the toolbar, or long-press
-  a tile on a phone); render, enhance or restyle the selection.
+  a tile on a phone); render, enhance or restyle the selection. *new cards
+  as …* is net-new art for the selection: the describer writes each card's
+  subject line from its picture and text (cards that have one keep it), then
+  a `new` scene follows from it in the look (below, "Subjects from the
+  pictures").
   *all* in the nav puts every set on one board.
 - **Viewer** (click a card) — the tile's image large: ← → or a swipe steps
   through the board in its current order, wheel / pinch / drag zoom and pan,
@@ -357,6 +366,34 @@ A card entry can add `"subject": "a red dragon with a blue-finned crest,
 wings spread"` — prepended to the prompt so the style can't drift a character
 into someone else (without it, the stained-glass Niv-Mizzet came out as an
 art-nouveau woman). Commanders and named characters want one.
+
+### Subjects from the pictures
+
+A `new` scene has nothing but the subject line to tie it to the card, and
+writing one for every card of a set is the slow part. `mint describe` does
+it: a vision model reads the card's base image (the crop, or whatever its
+restyles start from) with the card's name, type line and rules text,
+describes what the picture shows, and writes a subject line from the three
+— the figure's identity and look from the picture, the action from what the
+card does, a scene that may be new, and no medium or palette words, which
+the style prompt supplies. The subject goes into the set file like a
+hand-written one (cards that already have one are kept unless `--force`);
+the description sits beside the image (`art/<id>/described.json`) and the
+card page shows it under the subject, with a *from the picture* button that
+writes one card's line. `--generate` — or *new cards as …* on the board —
+then makes each card's `new` scene in the set's style, the `new` mode over
+whatever the style or the card says, so the variant lands beside the others
+and *keep*, or a style whose `remix` is `new`, makes it the card's art.
+
+```sh
+mint describe --set sets/sat.json                    # every card without a subject
+mint describe --set sets/sat.json --force "Satoru"   # rewrite one
+mint describe --set sets/sat.json --generate         # and each card's new scene
+```
+
+The describer is `claude` (the Anthropic API; `ANTHROPIC_API_KEY` in the
+environment, about a cent a card) or `ollama` (a local Ollama with a vision
+model such as `qwen2.5vl`); `mint doctor` says whether it could take a call.
 
 ```sh
 mint newset --code SAT --name "Satoru, ..." --style neon decks/satoru.txt   # sets/sat.json

@@ -200,13 +200,14 @@ def restyle_file(server, src, dest, recipe, prefix="tcg-mint/restyle", upscale=T
     return server.run_to_file(workflow(name, recipe, prefix, upscale), str(dest), timeout=900)
 
 
-def restyle(server, art, card, st, style=None, force=False, upscale=True, seed=None):
+def restyle(server, art, card, st, style=None, force=False, upscale=True, seed=None, remix=None):
     """Make (or find) the variant of `card` for the set's style (or `style`, a sets.Style,
-    to try a recipe that is not the set's). `seed` forces a one-off seed. Returns (Variant, made)."""
+    to try a recipe that is not the set's). `seed` forces a one-off seed and `remix` a one-off
+    mode. Returns (Variant, made)."""
     style = style or st.style
     if style is None:
         raise SetError(f"{st.path or st.code} has no `style` block")
-    recipe = st.recipe(card, style, art, seed=seed)
+    recipe = st.recipe(card, style, art, seed=seed, remix=remix)
     h = sets.recipe_hash(recipe)
     if not force:
         v = art.variant(card, h)

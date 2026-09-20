@@ -10,7 +10,7 @@ import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from .. import PKG, comfy, frame, impose, newset, printing, render, restyle, sets, style, upscale
+from .. import PKG, comfy, describe, frame, impose, newset, printing, render, restyle, sets, style, upscale
 from ..art import Art
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
@@ -29,6 +29,7 @@ class State:
         self.art = Art(ws.art)
         self._comfy = (0.0, False)
         self._nodes = (0.0, set())
+        self._describer = (0.0, None)
         self.lock = threading.Lock()  # around set-file writes
 
     def cards(self):
@@ -51,6 +52,25 @@ class State:
             nodes = self.comfy().nodes() if self.comfy_alive() else set()
             self._nodes = (time.time(), nodes)
         return nodes
+
+    def describer(self):
+        return describe.Describer.from_workspace(self.ws)
+
+    def describer_info(self):
+        """Who would read a card's picture, and whether they could now; asked at most every 30 s
+        (an Ollama check is a request)."""
+        t, info = self._describer
+        if info is None or time.time() - t > 30:
+            try:
+                d = self.describer()
+                ok, why = d.ready()
+                alive = ok and d.alive()
+                info = {"kind": d.kind, "model": d.model, "ready": alive,
+                        "hint": why or ("" if alive else f"nothing answers at {d.url}; start Ollama, or set ollama_url")}
+            except MintError as e:
+                info = {"kind": self.ws.describer, "model": "", "ready": False, "hint": str(e)}
+            self._describer = (time.time(), info)
+        return info
 
     def set_paths(self):
         return self.ws.set_files()
@@ -98,7 +118,7 @@ def card_summary(card):
 
 def create_app(ws):
     app = FastAPI(title="tcg-mint workbench")
-    S = State(ws)
+    S = app.state.S = State(ws)  # on the app too, for tests to reach the caches
 
     @app.exception_handler(MintError)
     async def mint_error(request, exc):
@@ -171,6 +191,8 @@ def create_app(ws):
                           # what the inspire mode needs: the ComfyUI_IPAdapter_plus node pack
                           "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes()},
                 "cards": {"path": str(ws.cards_file), "count": count},
+                # who writes subject lines from pictures (describe.py), and whether they could now
+                "describer": S.describer_info(),
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
                 "style_fields": style_fields(), "frame_fields": frame_fields(),
                 "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
@@ -536,7 +558,7 @@ def create_app(ws):
         st = S.find_set(body["set"]) if body.get("set") else None
         names = body.get("names") or (st.names() if st else [])
         submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes,
-                  "printrun": submit_printrun}.get(kind)
+                  "printrun": submit_printrun, "describe": submit_describe}.get(kind)
         if not submit:
             raise HTTPException(400, f"unknown job kind {kind!r}")
         job = submit(S, st, names, body)
@@ -648,6 +670,7 @@ def card_detail(S, st, name, cards=None):
     crop = art.crop(card, fetch=False)
     info["crop"] = str(crop) if crop.exists() else None
     info["variants"] = [variant_dict(v) for v in art.variants(card)]
+    info["described"] = art.described(card)  # the describer's reading of the base, if one was asked
     if st.style:
         recipe = st.recipe(card, art=art)
         info["style_hash"] = sets.recipe_hash(recipe)
@@ -844,6 +867,69 @@ def submit_enhance(S, st, names, body):
             "a new enhance variant each")
     return S.jobs.submit("enhance", title, {"set": st.code if st else None, "names": names, "base": base, "model": model,
                                             "what": what, "dest": str(S.art.dir)}, run)
+
+
+def submit_describe(S, st, names, body):
+    """A describe job: a vision model reads each card's base image and its text and writes its
+    subject line into the set file (cards that have one are kept unless `force`); with `generate`,
+    each card's `new` scene follows in the set's style (or `template`), the one-off mode over
+    whatever the style and the entry say, so the variant lands beside the others."""
+    force, generate, template = bool(body.get("force")), bool(body.get("generate")), body.get("template")
+    info = S.describer_info()
+    if not info["ready"]:
+        raise HTTPException(400, f"the {info['kind']} describer is not set up: {info['hint']}")
+    sty = st.style
+    if generate:
+        if template:
+            sty, _ = style.load(S.ws, template)
+        elif sty is None:
+            raise HTTPException(400, f"{st.code} has no style block; pick a template to generate as")
+    up = bool(body.get("upscale", True))
+    per = 2 if generate else 1  # steps per card
+
+    def run(job):
+        describer = S.describer()
+        server = None
+        if generate:
+            server = S.comfy()
+            server.require()
+        cards = S.cards()
+        job.step(0, len(names) * per)
+        written, made = [], []
+        for i, name in enumerate(names):
+            entry = st.card({"name": name})
+            card = cards.find(name, entry.printing)
+            if entry.subject and not force:
+                job.say(f"kept {name}: {entry.subject}")
+            else:
+                d = describe.describe_card(describer, S.art, card, st, entry)
+                with S.lock:  # the set file may have moved on since the job was queued: re-read, write one key
+                    cur = sets.load(st.path)
+                    if name in cur.cards:
+                        keep = {k: v for k, v in dataclasses.asdict(cur.cards[name]).items() if v is not None}
+                        keep["subject"] = d["subject"]
+                        cur.cards[name] = sets.from_dict({"code": "x", "cards": {name: keep}}).cards[name]
+                        sets.save(cur.path, cur)
+                        st.cards[name] = cur.cards[name]
+                job.say(f"described {name}: {d['subject']}")
+                written.append(name)
+                job.made(set=st.code, name=name, kind="subject", label=d["subject"])
+            job.step(i * per + 1)
+            if generate:
+                v, did = restyle.restyle(server, S.art, card, st, style=sty, upscale=up, remix="new")
+                job.say(f"{'new scene' if did else 'cached'} {name} -> {v.label}-{v.hash}")
+                made.append(v.hash)
+                job.made(set=st.code, name=name, kind=v.kind, key=v.hash, label=v.label, path=str(v.path))
+                job.step(i * per + 2)
+        return {"subjects": written, "variants": made}
+    title = (f"new cards: {len(names)} card(s) as {sty.name}" if generate else f"describe {len(names)} card(s)") + \
+            (", rewriting subjects" if force else "")
+    what = (f"{info['kind']} ({info['model']}) reads each card's base image and text and writes its subject line into "
+            f"{st.code}'s file" + (" (cards with one are kept)" if not force else "") +
+            (f"; then a new scene from it in the look {sty.name}, whatever mode the style or the card says" if generate else ""))
+    params = {"set": st.code, "names": names, "force": force, "generate": generate, "template": template,
+              "label": sty.name if sty else None, "what": what, "dest": str(st.path)}
+    return S.jobs.submit("describe", title, params, run)
 
 
 def submit_restyle(S, st, names, body):

@@ -21,6 +21,11 @@ the printer -- and the environment overrides it:
     maker_code = "BLS"          # studio code; set codes default to <code>1
     comfy_url = "http://127.0.0.1:8188"
     printer = "EPSON_ET_8500"   # CUPS queue for `mint print`
+    describer = "claude"        # who reads a card's picture for `mint describe`: claude | ollama
+    describe_model = ""         # its model; empty = the describer's default (describe.py)
+    ollama_url = "http://127.0.0.1:11434"
+
+ANTHROPIC_API_KEY in the environment is what the claude describer sends.
 """
 import os
 from dataclasses import dataclass
@@ -36,9 +41,12 @@ class Workspace:
     comfy_url: str = "http://127.0.0.1:8188"
     printer: str = "EPSON_ET_8500"
     export_dir: str = "~/Desktop"  # where the workbench's pdf page exports a PDF to, for another app to print
+    describer: str = "claude"      # the vision model behind `mint describe`: claude (the API) or ollama (local)
+    describe_model: str = ""       # its model name; empty = the describer's default
+    ollama_url: str = "http://127.0.0.1:11434"
 
     CONFIG = "mint.toml"
-    KEYS = ("maker", "maker_code", "comfy_url", "printer", "export_dir")
+    KEYS = ("maker", "maker_code", "comfy_url", "printer", "export_dir", "describer", "describe_model", "ollama_url")
 
     @classmethod
     def from_env(cls, home=None):

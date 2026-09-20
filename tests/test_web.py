@@ -225,3 +225,49 @@ def test_pdfs_list_export_delete(client, tmp_path, monkeypatch):
     assert client.delete("/api/sets/TST/pdfs/nope.pdf").status_code == 400
     assert client.delete("/api/sets/TST/pdfs/TST-plain-1.pdf").status_code == 200
     assert [p["file"] for p in client.get("/api/sets/TST/pdfs").json()["pdfs"]] == ["tst.pdf"]
+
+
+def test_describe_job_needs_a_describer_then_writes_the_subject(client, art, monkeypatch):
+    """The describe job: refused with the reason while no describer is set up; with one, the
+    worker reads the crop, writes the subject into the set file, and reports it as an item."""
+    import time
+
+    from mint.describe import Describer
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha", "Beta"], "style": "look"})
+    info = client.get("/api/workspace").json()["describer"]
+    assert info["kind"] == "claude" and not info["ready"] and "ANTHROPIC_API_KEY" in info["hint"]
+    r = client.post("/api/jobs", json={"kind": "describe", "set": "TST", "names": ["Alpha"]})
+    assert r.status_code == 400 and "ANTHROPIC_API_KEY" in r.json()["detail"]
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    client.app.state.S._describer = (0.0, None)  # the readiness check is cached for 30 s: ask again
+    monkeypatch.setattr(Describer, "_ask", lambda self, data, mime_type, text:
+                        '{"description": "a fixture on a plinth", "subject": "a bronze fixture on a plinth, humming"}')
+    ws = client.ws
+    ws.art.mkdir(exist_ok=True)
+    for i in (1, 2):
+        (ws.art / f"{i:08d}-0000-0000-0000-000000000000.jpg").write_bytes(open(art, "rb").read())
+    client.put("/api/sets/TST/cards/Beta", json={"subject": "by hand"})
+    r = client.post("/api/jobs", json={"kind": "describe", "set": "TST", "names": ["Alpha", "Beta"], "force": False})
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "describe 2 card(s)" and r.json()["params"]["generate"] is False
+    jid = r.json()["id"]
+    for _ in range(100):
+        j = next(x for x in client.get("/api/jobs").json() if x["id"] == jid)
+        if j["state"] in ("done", "failed", "cancelled"):
+            break
+        time.sleep(0.05)
+    assert j["state"] == "done", j
+    st = sets.load(ws.sets / "tst.json")
+    assert st.cards["Alpha"].subject == "a bronze fixture on a plinth, humming" and st.cards["Beta"].subject == "by hand"
+    assert [it["kind"] for it in j["items"]] == ["subject"] and j["items"][0]["name"] == "Alpha"
+    c = client.get("/api/sets/TST/cards/Alpha").json()
+    assert c["described"]["description"] == "a fixture on a plinth" and c["entry"]["subject"].startswith("a bronze")
+    # with generate, the job is a "new cards" one in the look
+    r = client.post("/api/jobs", json={"kind": "describe", "set": "TST", "names": ["Alpha"], "generate": True})
+    assert r.status_code == 200 and r.json()["title"] == "new cards: 1 card(s) as look"
+    client.put("/api/sets/TST/style", json={})
+    assert client.post("/api/jobs", json={"kind": "describe", "set": "TST", "generate": True}).status_code == 400
+    body = {"kind": "describe", "set": "TST", "generate": True, "template": "look"}
+    assert client.post("/api/jobs", json=body).status_code == 200

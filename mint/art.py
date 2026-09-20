@@ -6,6 +6,7 @@ printings is fetched and processed once:
     art/<id>.jpg                         Scryfall's art crop (~626x457), fetched on demand
     art/scan_<id>.png                    Scryfall's full-card scan, for `mint calibrate`
     art/<id>/<label>-<hash>.png + .json  a *variant*: something ComfyUI made from another image
+    art/<id>/described.json              what a describer read in the card's base image (describe.py)
 
 A variant's sidecar records what it is: its kind (`restyle` or `enhance`),
 the recipe that made it, and the image it started from (`base`: "crop" or
@@ -29,6 +30,7 @@ from . import scryfall
 from .errors import MintError
 
 HASH = re.compile(r"^[0-9a-f]{8}$")
+DESCRIBED = "described.json"  # not a variant: the describer's reading of the card's base image
 
 
 @dataclass
@@ -104,6 +106,8 @@ class Art:
             return []
         out = []
         for sc in d.glob("*.json"):
+            if sc.name == DESCRIBED:
+                continue
             try:
                 v = self._read(sc)
             except (json.JSONDecodeError, KeyError, TypeError):
@@ -142,6 +146,25 @@ class Art:
         variant.path.parent.mkdir(parents=True, exist_ok=True)
         variant.sidecar.write_text(json.dumps(variant.to_dict(), indent=1))
         return variant
+
+    # --- descriptions -------------------------------------------------------
+    def described(self, card):
+        """The describer's newest reading of this card's base image ({description, subject, model,
+        base, created}), or None. One record per illustration: a new reading replaces the old."""
+        fn = self.variant_dir(card) / DESCRIBED
+        if not fn.exists():
+            return None
+        try:
+            return json.loads(fn.read_text())
+        except json.JSONDecodeError:
+            return None
+
+    def describe(self, card, record):
+        """Write a describer's reading beside the card's images; returns it with `created` set."""
+        d = dict(record, card=card["name"], created=dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"))
+        self.variant_dir(card).mkdir(parents=True, exist_ok=True)
+        (self.variant_dir(card) / DESCRIBED).write_text(json.dumps(d, indent=1))
+        return d
 
     def enhanced(self, card, of="crop"):
         """The newest enhance variant made from `of` ("crop" or a variant hash), or None."""
