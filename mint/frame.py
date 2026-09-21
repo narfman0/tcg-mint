@@ -683,7 +683,8 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
                 f'<span class="cost">{mana(symbols, c.get("mana_cost"))}</span></div>')
 
     def typebar(c):
-        return f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{set_symbol(card["rarity"], set_icon)}</div>'
+        symbol = set_symbol(card["rarity"], set_icon)
+        return f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{symbol}</div>'
 
     other = ""
     if other_face:

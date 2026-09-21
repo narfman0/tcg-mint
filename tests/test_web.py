@@ -316,6 +316,7 @@ def test_img_revalidates_so_a_rewritten_render_shows(client, art):
     a thumbnail for an hour: the thumbnail's key is the ETag, a match is a 304, a rewritten file is new."""
     import os
     import shutil
+
     from PIL import Image
     p = client.ws.home / "out" / "render.png"
     p.parent.mkdir()

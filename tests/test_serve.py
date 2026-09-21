@@ -30,7 +30,8 @@ def test_stop_drops_a_stale_record(ws, capsys):
 def test_stop_ends_the_recorded_process(ws, capsys):
     # detached through a shell, as `nohup mint serve &` leaves it: init reaps it, so it is not a
     # zombie of this process (which os.kill(pid, 0) would still count as alive)
-    pid = int(subprocess.check_output(["sh", "-c", f"{sys.executable} -c 'import time; time.sleep(60)' >/dev/null 2>&1 & echo $!"]))
+    sleeper = f"{sys.executable} -c 'import time; time.sleep(60)' >/dev/null 2>&1 & echo $!"
+    pid = int(subprocess.check_output(["sh", "-c", sleeper]))
     assert serve.alive(pid)
     ws.cache.mkdir()
     serve.pidfile(ws).write_text(f"{pid} 8300\n")
