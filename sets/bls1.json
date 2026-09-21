@@ -1,6 +1,6 @@
 {
-  "code": "BLS1",
-  "name": "Blasted Studios, Set One",
+  "code": "BLS",
+  "name": "Blasted Studios",
   "size": 47,
   "note": "Test set: the priciest cards across satoru, niv and meren, numbered by price rank. Custom 'flavor' entries are placeholders to rewrite; delete a card's 'flavor' key to keep the printed one.",
   "frame": {
@@ -9,23 +9,19 @@
   },
   "cards": {
     "Imperial Seal": {
-      "number": 1,
-      "flavor": "The seal is small. What it opens is not."
+      "number": 1
     },
     "Ancient Tomb": {
-      "number": 2,
-      "flavor": "Every step down costs a little of you. Every step down is worth it."
+      "number": 2
     },
     "The One Ring": {
       "number": 3
     },
     "Deflecting Swat": {
-      "number": 4,
-      "flavor": "Not today. Not you. Not here."
+      "number": 4
     },
     "Rhystic Study": {
-      "number": 5,
-      "flavor": "Are you paying? No? Then I'll take the lesson."
+      "number": 5
     },
     "Demonic Tutor": {
       "number": 6
@@ -40,8 +36,7 @@
       "number": 9
     },
     "Mana Drain": {
-      "number": 10,
-      "flavor": "It wasn't countered. It was collected."
+      "number": 10
     },
     "Ancient Silver Dragon": {
       "number": 11
@@ -53,8 +48,7 @@
       "number": 13
     },
     "Cyclonic Rift": {
-      "number": 14,
-      "flavor": "Everyone back to where you started. Except me."
+      "number": 14
     },
     "Blightsteel Colossus": {
       "number": 15
