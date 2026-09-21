@@ -162,6 +162,7 @@ mint print   -p matte proofs/bls1.pdf
 pip install -e '.[web]'
 mint serve --open          # http://127.0.0.1:8300
 mint serve --host 0.0.0.0  # reachable from a phone on the same network
+mint serve --stop          # end the one running for this workspace (Ctrl-C in its terminal also works)
 ```
 
 A local page over the workspace, for comparing and deciding. It fits a phone
