@@ -3,8 +3,9 @@
 Layout is HTML/CSS (template.html) rendered by headless Chromium, so text
 wrapping, italic reminder text and inline mana symbols come for free and the
 frame is vector down to the last pixel. Everything here is pure: no browser,
-no card file, and no network except the mana-symbol SVGs, which are fetched
-into symbols/ once and inlined as data URIs.
+no card file, and no network except the mana and expansion symbols and the
+set lists behind the collector line, fetched into symbols/ once (Symbols, Sets)
+and inlined as data URIs.
 
 Fonts: drop Wizards' faces into fonts/ (Beleren-Bold.ttf, Mplantin.ttf,
 Matrix-Bold.ttf ...) and the "wizards" theme picks them up by filename. The
@@ -184,6 +185,69 @@ class Symbols:
         for a, b in self.DISC.items():
             svg = re.sub(re.escape(a), b, svg, flags=re.I)
         return "data:image/svg+xml;base64," + base64.b64encode(svg).decode()
+
+
+# --- sets ------------------------------------------------------------------
+class Sets:
+    """Scryfall's set list and expansion symbols, cached beside the mana symbols: symbols/sets.json
+    is the whole list in one request, symbols/sets/<code>.svg each icon as it is first needed.
+    Offline, what is not cached comes back None (the footer prints '?', the typebar the burst)
+    rather than failing a render whose art is already on disk.
+
+    The size a card prints after the slash is the main set's, not the count with every variant
+    sheet; Scryfall's `printed_size` has it for a few sets, MTGJSON's `baseSetSize` (one more list,
+    symbols/setlist.json) for nearly all, and `card_count` is the last resort."""
+
+    MTGJSON = "https://mtgjson.com/api/v5/SetList.json"
+
+    def __init__(self, directory):
+        self.dir = Path(directory)
+        self._table = None
+        self._base = None
+        self.offline = False
+
+    def _fetch(self, url, dest):
+        if self.offline:
+            return False
+        try:
+            scryfall.fetch(url, dest)
+        except OSError:
+            self.offline = True
+        return not self.offline
+
+    def table(self):
+        if self._table is None:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            idx = self.dir / "sets.json"
+            if not idx.exists() and not self._fetch(scryfall.API + "/sets", idx):
+                return {}
+            self._table = {s["code"]: s for s in json.loads(idx.read_text())["data"]}
+        return self._table
+
+    def base_sizes(self):
+        """MTGJSON's baseSetSize by lower-case set code; empty when the list is not to be had."""
+        if self._base is None:
+            self.dir.mkdir(parents=True, exist_ok=True)
+            fn = self.dir / "setlist.json"
+            if not fn.exists() and not self._fetch(self.MTGJSON, fn):
+                return {}
+            self._base = {s["code"].lower(): s.get("baseSetSize") or 0 for s in json.loads(fn.read_text())["data"]}
+        return self._base
+
+    def size(self, code):
+        """What the card prints after the slash, or None for a set nobody lists."""
+        s = self.table().get(code) or {}
+        return s.get("printed_size") or self.base_sizes().get(code) or s.get("card_count") or None
+
+    def icon(self, code):
+        """The set's expansion symbol as SVG text, or None for a set without one."""
+        s = self.table().get(code)
+        if not s or not s.get("icon_svg_uri"):
+            return None
+        fn = self.dir / "sets" / f"{code}.svg"
+        if not fn.exists() and not self._fetch(s["icon_svg_uri"], fn):
+            return None
+        return fn.read_text()
 
 
 # --- fonts ----------------------------------------------------------------
@@ -413,17 +477,34 @@ def _burst():
     return " ".join(pts)
 
 
-def set_symbol(rarity):
-    """The burst filled by rarity like a real expansion symbol."""
+def _icon_parts(icon_svg):
+    """(viewBox, inner markup) of a Scryfall set icon: black paths in an 800-unit box."""
+    m = re.search(r'viewBox="([^"]+)"', icon_svg)
+    inner = re.sub(r"^.*?<svg[^>]*>|</svg>\s*$", "", icon_svg, flags=re.S)
+    return (m.group(1) if m else "0 0 800 800"), inner
+
+
+def set_symbol(rarity, icon_svg=None):
+    """The expansion symbol filled by rarity: the set's own icon when we have it (Sets.icon),
+    the burst -- 'blasted' -- when we don't."""
     edge, hi = RARITY.get(rarity, RARITY["common"])
-    return (f'<svg class="setsym" viewBox="0 0 24 24"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">'
-            f'<stop offset="0" stop-color="{edge}"/><stop offset=".5" stop-color="{hi}"/><stop offset="1" stop-color="{edge}"/>'
-            f'</linearGradient></defs><polygon points="{_burst()}" fill="url(#g)" stroke="#000" stroke-width="1"/></svg>')
+    grad = (f'<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{edge}"/>'
+            f'<stop offset=".5" stop-color="{hi}"/><stop offset="1" stop-color="{edge}"/></linearGradient></defs>')
+    if icon_svg:  # the icon's paths take the gradient and a thin black edge, as the printed symbol has
+        box, inner = _icon_parts(icon_svg)
+        inner = re.sub(r"<path\b", '<path fill="url(#g)" stroke="#000" stroke-width="14" paint-order="stroke"', inner)
+        return f'<svg class="setsym" viewBox="{box}">{grad}{inner}</svg>'
+    return (f'<svg class="setsym" viewBox="0 0 24 24">{grad}'
+            f'<polygon points="{_burst()}" fill="url(#g)" stroke="#000" stroke-width="1"/></svg>')
 
 
-def watermark_uri():
-    """The burst in flat black, as a data URI: the text box's watermark, faded by the knob."""
-    svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><polygon points="{_burst()}" fill="#000"/></svg>'
+def watermark_uri(icon_svg=None):
+    """The symbol in flat black, as a data URI: the text box's watermark, faded by the knob."""
+    if icon_svg:
+        box, inner = _icon_parts(icon_svg)
+    else:
+        box, inner = "0 0 24 24", f'<polygon points="{_burst()}" fill="#000"/>'
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{box}">{inner}</svg>'
     return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
 
 
@@ -572,7 +653,7 @@ PINLINES = "".join(f'<div class="pinlines {layer}">'
                    + "</div>" for layer in ("shade", "light"))
 
 
-def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer="", crown=""):
+def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer="", crown="", set_icon=None):
     """The markup inside .card for a layout: the bars, the art window, the text box and its
     companions. Split builds two half cards; battle and split lie sideways (the .turn box)."""
     ident = card.get("layout"), card.get("face_index", 0)
@@ -582,7 +663,7 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
                 f'<span class="cost">{mana(symbols, c.get("mana_cost"))}</span></div>')
 
     def typebar(c):
-        return f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{set_symbol(card["rarity"])}</div>'
+        return f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{set_symbol(card["rarity"], set_icon)}</div>'
 
     other = ""
     if other_face:
@@ -620,13 +701,19 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
             f'<div class="textbox {cls}" id="text">{text}{other}</div>{pt_html}')
 
 
-def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=1, set_code="SET", set_size=1,
-               flavor=None, art_filter=None, set_css="", frame_vars=None, maker="", maker_code="", year="",
-               other_face=None):
+def collector_number(card):
+    """The number as the card prints it: three digits for a plain number, as-is for A1 or 12★."""
+    n = card["collector_number"]
+    return f"{int(n):03d}" if n.isdigit() else esc(n)
+
+
+def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_size=None, set_icon=None,
+               flavor=None, art_filter=None, set_css="", frame_vars=None, maker="", year="", other_face=None):
     """The whole page for one card. `art_url` is the file:// URL of the image to show;
-    `fonts_css` the @font-face rules for local faces (frame.local_fonts); `frame_vars` the frame
-    knobs as css (frame_css), the defaults when None; `other_face` the record of a double-faced
-    card's other side, named at the foot of the text box."""
+    `fonts_css` the @font-face rules for local faces (frame.local_fonts); `set_size` and `set_icon`
+    the card's own set's printed size and expansion symbol SVG (frame.Sets), unknown when None;
+    `frame_vars` the frame knobs as css (frame_css), the defaults when None; `other_face` the
+    record of a double-faced card's other side, named at the foot of the text box."""
     title, body = THEMES[theme]
     kind = frame_kind(card)
     frame, frame_dark, bar, bar_edge, box, pinline = FRAMES[kind]
@@ -650,14 +737,15 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
     layout = layout_of(card)
     pt = pt_plate(f'{card["power"]}/{card["toughness"]}') if card.get("power") is not None else ""
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
-    # the collector line as the real cards set it: the number and set in a wide sans, the artist in the
-    # title face as small caps after a brush; the credit line on the right stays in the rules serif
+    # the collector line carried through from the printed card: its number and set in a wide sans, the
+    # artist in the title face as small caps after a brush; the studio's credit on the right, in the rules
+    # serif, where the real cards put the year and the publisher
     footer_cls = " has-pt" if pt else ""  # the credit line drops to the bottom line beside a P/T box
     footer = (f'<div class="footer{footer_cls}"><span class="collector">'
-              f'<b>{number:03d}/{set_size} {card["rarity"][0].upper()}</b><br>'
-              f'{esc(set_code)} • EN {BRUSH}<span class="artist">{esc(card["artist"])}</span></span>'
-              f'<span class="credit">{esc(maker_code)} · {esc(maker)} · {year} · '
-              f'{card["set"].upper()} {card["collector_number"]}</span></div>')
+              f'<b>{collector_number(card)}/{set_size or "?"} {card["rarity"][0].upper()}</b><br>'
+              f'{esc(card["set"].upper())} • {esc(card.get("lang", "en").upper())} '
+              f'{BRUSH}<span class="artist">{esc(card["artist"])}</span></span>'
+              f'<span class="credit">{year} · {esc(maker)}</span></div>')
     turned = layout in ("split", "battle")  # sideways: no stamp or crown; a battle's footer rides inside the turned box
     stamped = rarity in ("rare", "mythic") and not turned
     tpl = string.Template((PKG / "template.html").read_text())
@@ -670,10 +758,10 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
         legendary=" legendary" if legendary and not turned else "",
         pair=(" pair hybrid" if kind_b != kind else " pair") if pair else "",
         frame_vars=frame_vars or frame_css(),
-        watermark=watermark_uri(), rarity_hi=rarity_hi, layout=layout,
+        watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout,
         stamp='<div class="stamp"></div>' if stamped else "", stamped=" stamped" if stamped else "",
         body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else "",
-                       crown=crown_html() if legendary and not turned else ""),
+                       crown=crown_html() if legendary and not turned else "", set_icon=set_icon),
         footer="" if layout == "battle" else footer,
         art=art_url, art_filter=art_filter or "none",
     )

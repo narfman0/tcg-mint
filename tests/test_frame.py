@@ -1,4 +1,6 @@
 """Pure functions of the frame: no browser, no network, no card file."""
+import base64
+import json
 import re
 
 from mint import frame
@@ -126,10 +128,64 @@ def test_render_text_escapes_markup():
 
 
 def test_build_html_substitutes_everything(card, art):
-    html = frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, number=7, set_code="TST", set_size=12,
-                            maker="me", maker_code="ME", year="2026")
+    html = frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, set_size=12, maker="me", year="2026")
     assert "${" not in html and "$name" not in html
-    assert "Test Subject" in html and "007/12 R" in html and "2/3" in html and "ME · me · 2026" in html
+    assert "Test Subject" in html and "001/12 R" in html and "TST • EN" in html and "2/3" in html
+    assert "2026 · me" in html
+
+
+def test_footer_carries_the_printed_card_through(art):
+    """The collector line is the original printing's: its number, its set, its language; an unknown
+    set size prints '?', and a non-numeric number is left as it is."""
+    card = synthetic_card(set="rvr", collector_number="40", lang="de")
+    html = frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, maker="me", year="2026")
+    assert "040/? R" in html and "RVR • DE" in html
+    assert frame.collector_number(synthetic_card(collector_number="A1")) == "A1"
+    assert frame.collector_number(synthetic_card(collector_number="12★")) == "12★"
+
+
+ICON = '<svg version="1.0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800"><path d="M0 0h800v800H0z"/></svg>'
+
+
+def test_set_symbol_is_the_icon_when_we_have_it():
+    burst = frame.set_symbol("rare")
+    assert "<polygon" in burst and 'viewBox="0 0 24 24"' in burst
+    real = frame.set_symbol("rare", ICON)
+    assert "<polygon" not in real and 'viewBox="0 0 800 800"' in real
+    assert '<path fill="url(#g)" stroke="#000"' in real and frame.RARITY["rare"][1] in real
+    assert "<polygon" in frame.set_symbol("rare", None)
+    # the watermark is the same shape in flat black
+    mark = base64.b64decode(frame.watermark_uri(ICON).split(",", 1)[1]).decode()
+    assert "M0 0h800v800H0z" in mark and "url(#g)" not in mark
+
+
+def test_sets_cache_reads_from_disk_and_degrades_offline(tmp_path, monkeypatch):
+    asked = []
+
+    def unplugged(url, dest, timeout=300):
+        asked.append(url)
+        raise OSError("no network")
+    monkeypatch.setattr(frame.scryfall, "fetch", unplugged)
+    (tmp_path / "sets.json").write_text(json.dumps({"data": [
+        {"code": "blb", "card_count": 398, "icon_svg_uri": "https://svgs.invalid/blb.svg"},
+        {"code": "rvr", "card_count": 531, "icon_svg_uri": "https://svgs.invalid/rvr.svg"},
+        {"code": "uma", "card_count": 254, "printed_size": 254},
+        {"code": "h2r", "card_count": 16},
+    ]}))
+    # MTGJSON knows the main set's size where Scryfall's printed_size is missing; 0 means it doesn't
+    (tmp_path / "setlist.json").write_text(json.dumps({"data": [
+        {"code": "RVR", "baseSetSize": 291, "totalSetSize": 531}, {"code": "H2R", "baseSetSize": 0, "totalSetSize": 16}]}))
+    (tmp_path / "sets").mkdir()
+    (tmp_path / "sets" / "rvr.svg").write_text(ICON)
+    s = frame.Sets(tmp_path)
+    assert s.size("rvr") == 291 and s.size("uma") == 254 and s.size("h2r") == 16 and s.size("blb") == 398
+    assert s.size("tst") is None and not asked
+    assert s.icon("rvr") == ICON and s.icon("tst") is None
+    assert s.icon("blb") is None and s.offline and asked == ["https://svgs.invalid/blb.svg"]
+    assert s.icon("blb") is None and len(asked) == 1  # a failed fetch is not retried
+    assert s.size("rvr") == 291  # what is on disk still answers
+    bare = frame.Sets(tmp_path / "nowhere")  # no list at all: one attempt, then nothing known
+    assert bare.size("blb") is None and bare.icon("blb") is None and len(asked) == 2
 
 
 def test_ability_words_are_italic():

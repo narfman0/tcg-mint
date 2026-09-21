@@ -94,8 +94,7 @@ def render(name, art, tmp_path, browser):
     card = synthetic_card(**CARDS[name])
     fonts_css = frame.local_fonts(tmp_path / "no-workspace-fonts")  # only the packaged faces, never the user's
     html = frame.build_html(card, symbols=DotSymbols(), art_url="file://" + art, theme="wizards", fonts_css=fonts_css,
-                            number=list(CARDS).index(name) + 1, set_code="TST", set_size=len(CARDS),
-                            maker="tester", maker_code="TS", year="2026")
+                            set_size=len(CARDS), maker="tester", year="2026")
     assert "fonts.googleapis.com" not in html  # the wizards theme is fully offline
     assert str(frame.FONTS) in html
     out = tmp_path / f"{name}.png"

@@ -8,9 +8,10 @@ reminder text, inline mana symbols and shrink-to-fit come for free, and the
 whole frame is vector down to the last pixel — 1200 DPI costs nothing but
 disk. The default frame reproduces the modern (M15) Magic layout, with its
 geometry and text placement measured off Scryfall's scans rather than
-eyeballed (`mint calibrate` shows the numbers). Cards carry your own collector
-line: your set code and numbering, your name, the mint date, and a pointer
-back to the original printing.
+eyeballed (`mint calibrate` shows the numbers). Cards keep the printed card's
+collector line and expansion symbol — its number and set size, set code,
+language and artist, the set's own icon in the type bar — and carry your name
+and the mint year on the right, where the real cards put the publisher.
 
 Beyond the normal card the frame knows the other shapes a deck holds:
 planeswalkers (loyalty badges per ability, the loyalty shield), sagas
@@ -75,8 +76,9 @@ A set is a JSON file (see `sets/bls1.json`):
 }
 ```
 
-- `number` is the card's collector number in *your* set; the footer also
-  records the original printing (`RVR 40`) so the mapping runs both ways.
+- `number` is the card's collector number in *your* set: it orders the set,
+  names the output file (`BLS1-014_...png`) and keys the manifest. The card
+  itself prints the original printing's number and set (`040/291 RVR`).
 - `flavor` replaces the printed flavor text; omit the key to keep the original.
 - `art` points at your own image; otherwise Scryfall's art crop is used.
 - `printing` (`"rvr:40"`) renders a specific printing when the card file holds
@@ -90,7 +92,7 @@ A set is a JSON file (see `sets/bls1.json`):
   whose palette drifts (a red seal gone brown). Off by default, and off
   keeps out of the recipe hash.
 - A `frame` block holds the frame's dressing, each knob a strength from 0
-  (off) to 1: `watermark` (the set symbol, faint, behind the rules text),
+  (off) to 1: `watermark` (the expansion symbol, faint, behind the rules text),
   `frame_texture` (the coloured frame's painted texture, one per colour as
   on the real cards: marbled parchment on white, wet glass on blue, fissured
   stone on black, crackle on red, a cell network on green, brushed metal on
