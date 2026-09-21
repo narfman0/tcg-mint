@@ -39,8 +39,16 @@ def test_page_html_places_nine_cards_on_letter():
 
 
 def test_page_html_fewer_cards_and_a4():
+    # two cards in the top row: lines for two columns and one row, each only as long as the cards
     html = impose.page_html(["/a.png", "/b.png"], "a4", 0.0)
-    assert len(IMG.findall(html)) == 2 and html.count("<i ") == 36
+    cw, ch = impose.CARD
+    pw, ph = impose.PAPER["a4"]
+    x0, y0 = (pw - 3 * cw) / 2, (ph - 3 * ch) / 2
+    assert len(IMG.findall(html)) == 2 and html.count("<i ") == 18
+    assert html.count('<i class="v g"') == 4 and html.count('<i class="h g"') == 2
+    assert f'<i class="v g" style="left:{x0 + cw}in;top:{y0}in;height:{ch}in"></i>' in html
+    assert f'<i class="h g" style="top:{y0}in;left:{x0}in;width:{2 * cw}in"></i>' in html
+    assert f'<i class="h" style="top:{y0}in;left:{x0 + 2 * cw}in;width:{impose.MARK}in"></i>' in html
 
 
 def test_page_html_rejects_bleed_that_does_not_fit():

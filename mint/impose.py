@@ -60,20 +60,26 @@ def page_html(paths, paper, bleed):
         c, r = k % COLS, k // COLS
         parts.append(f'<img src="file://{p}" style="left:{x0 + c * cw}in;top:{y0 + r * ch}in;width:{cw}in;height:{ch}in">')
     # cut lines on the 2.5x3.5 grid (i.e. inset by the bleed): a black tick in each margin,
-    # and a bright green line across the whole block so the cut is visible where the cards'
-    # black bleeds meet -- the way Proxxied does it. Vertical, then horizontal.
-    xs = [x0 + c * cw + (bleed if edge == 0 else -bleed) for c in range(COLS + 1) for edge in (0, 1)
-          if not (c == 0 and edge == 1 or c == COLS and edge == 0)]
-    ys = [y0 + r * ch + (bleed if edge == 0 else -bleed) for r in range(ROWS + 1) for edge in (0, 1)
-          if not (r == 0 and edge == 1 or r == ROWS and edge == 0)]
-    for x in xs:
-        parts.append(f'<i class="v" style="left:{x}in;top:{y0 - MARK}in;height:{MARK}in"></i>')
-        parts.append(f'<i class="v" style="left:{x}in;top:{y0 + ROWS * ch}in;height:{MARK}in"></i>')
-        parts.append(f'<i class="v g" style="left:{x}in;top:{y0}in;height:{ROWS * ch}in"></i>')
-    for y in ys:
-        parts.append(f'<i class="h" style="top:{y}in;left:{x0 - MARK}in;width:{MARK}in"></i>')
-        parts.append(f'<i class="h" style="top:{y}in;left:{x0 + COLS * cw}in;width:{MARK}in"></i>')
-        parts.append(f'<i class="h g" style="top:{y}in;left:{x0}in;width:{COLS * cw}in"></i>')
+    # and a bright green line across the cards so the cut is visible where the cards' black
+    # bleeds meet -- the way Proxxied does it. On a partial page the lines only run as far
+    # as there are cards. Vertical, then horizontal.
+    n = len(paths)
+    rows_in = [-(-(n - c) // COLS) for c in range(COLS)]      # cards in each column
+    cols_in = [min(COLS, n - r * COLS) for r in range(ROWS)]  # cards in each row
+    for c in range(COLS):
+        if not rows_in[c]:
+            break
+        for x in (x0 + c * cw + bleed, x0 + (c + 1) * cw - bleed):
+            parts.append(f'<i class="v" style="left:{x}in;top:{y0 - MARK}in;height:{MARK}in"></i>')
+            parts.append(f'<i class="v" style="left:{x}in;top:{y0 + rows_in[c] * ch}in;height:{MARK}in"></i>')
+            parts.append(f'<i class="v g" style="left:{x}in;top:{y0}in;height:{rows_in[c] * ch}in"></i>')
+    for r in range(ROWS):
+        if cols_in[r] <= 0:
+            break
+        for y in (y0 + r * ch + bleed, y0 + (r + 1) * ch - bleed):
+            parts.append(f'<i class="h" style="top:{y}in;left:{x0 - MARK}in;width:{MARK}in"></i>')
+            parts.append(f'<i class="h" style="top:{y}in;left:{x0 + cols_in[r] * cw}in;width:{MARK}in"></i>')
+            parts.append(f'<i class="h g" style="top:{y}in;left:{x0}in;width:{cols_in[r] * cw}in"></i>')
     parts.append("</div>")
     return "\n".join(parts)
 
