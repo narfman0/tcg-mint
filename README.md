@@ -19,7 +19,11 @@ mirror, level bands on the right), adventures (the adventure in its own box
 beside the creature's text), split cards and battles (sideways, two half
 cards or the art beside the text), and both faces of transform and modal
 double-faced cards, each marked with its icon and naming the other face at
-the foot of the text box (`--faces` renders the backs).
+the foot of the text box (`--faces` renders the backs). Colour follows the
+real cards too: a land that makes one colour takes that colour's pinline,
+and a two-colour card — a dual land, a fetch land by the basic types it
+finds, a spell whose every coloured pip is hybrid — runs its left colour
+into its right across the pinline, the text box and (on a spell) the frame.
 
 Output is 2.72 × 3.72 in with bleed — MakePlayingCards' template size, and
 what any imposer wants.

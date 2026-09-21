@@ -58,6 +58,15 @@ FRAMES = {
     "C": ("#e2dad6", "#9a9591", "#bcb3ae", "#767b71", "#b3afad", "#cfd0ce"),
 }
 
+# The two-colour frame (frame_pair): the pinline and text box run the left colour into the right, the bars
+# a flat neutral grey whatever the pair. A dual land keeps the land band and takes these text-box tints, deeper
+# than a mono land's grey (land_tint) -- medians off the RVR shocks and MH2 fetches, each colour from two or
+# three scans; a hybrid spell's text box is the colour's own. The bar is the median of ten scans (#d1cac5 on
+# RVR, #dbcfd3 on MH2, #d9d4d2 on UMA).
+PAIR_BAR = "#d3cbc7"
+DUAL_BOX = {"W": "#f5e4ba", "U": "#b2cde8", "B": "#aba2a3", "R": "#eb9f83", "G": "#bdd6c2"}
+BASIC_TYPES = {"Plains": "W", "Island": "U", "Swamp": "B", "Mountain": "R", "Forest": "G"}
+
 # set symbol fill by rarity: (edge colour, highlight colour)
 RARITY = {
     "common": ("#000000", "#000000"),
@@ -249,6 +258,33 @@ def land_tint(card):
         return None
     made = [c for c in (card.get("produced_mana") or []) if c in "WUBRG"]
     return made[0] if len(made) == 1 else None
+
+
+def frame_pair(card):
+    """The two colours of a card that takes the two-colour frame, left then right, else None: a land that makes
+    exactly two colours (a dual), a fetch land that finds two basic types, or a spell whose every coloured pip
+    is hybrid. Left to right runs the short way round the colour wheel, as the guilds are named (WU, UB ... GW
+    allied; WB, UR, BG, RW, GU enemy): Breeding Pool is green into blue, Watery Grave blue into black."""
+    kind = frame_kind(card)
+    if kind == "land":
+        made = {c for c in (card.get("produced_mana") or []) if c in "WUBRG"}
+        if len(made) != 2:
+            m = re.search(r"search your library for an? (\w+) or (\w+) card", card.get("oracle_text") or "", re.I)
+            if not m or any(w not in BASIC_TYPES for w in m.groups()):
+                return None
+            made = {BASIC_TYPES[w] for w in m.groups()}
+            if len(made) != 2:
+                return None
+    elif kind == "gold":
+        made = set(card["colors"])
+        pips = re.findall(r"\{([^}]*)\}", card.get("mana_cost") or "")
+        coloured = [p for p in pips if any(c in p for c in "WUBRG")]
+        if len(made) != 2 or not coloured or any("/" not in p for p in coloured):
+            return None
+    else:
+        return None
+    a, b = sorted(made, key="WUBRG".index)
+    return (a, b) if ("WUBRG".index(b) - "WUBRG".index(a)) % 5 <= 2 else (b, a)
 
 
 def mix(a, b, t):
@@ -598,6 +634,17 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
     if tint:  # measured off Boseiju (NEO): bar #c2cacc and box #bececa against green's #b8cdc3 / #d3e5da
         _, _, tbar, bar_edge, tbox, pinline = FRAMES[tint]
         bar, box = mix(tbar, "#ccc9c9", 0.5), mix(tbox, "#adb4b4", 0.5)
+    pair = frame_pair(card)
+    frame_b, box_b, pinline_b, kind_b = frame, box, pinline, kind  # the right-hand colour: the left's, off a pair
+    if pair:
+        a, b = pair
+        bar, bar_edge, pinline, pinline_b = PAIR_BAR, mix(FRAMES[a][3], FRAMES[b][3], 0.5), FRAMES[a][5], FRAMES[b][5]
+        if kind == "land":
+            box, box_b = DUAL_BOX[a], DUAL_BOX[b]
+        else:  # a hybrid spell: the band itself blends, its two textures cross-fading
+            kind, kind_b = a, b
+            frame, frame_b, box, box_b = FRAMES[a][0], FRAMES[b][0], FRAMES[a][4], FRAMES[b][4]
+            frame_dark = mix(FRAMES[a][1], FRAMES[b][1], 0.5)
     rarity = card["rarity"]
     rarity_hi = RARITY[rarity][1] if rarity in ("uncommon", "rare", "mythic") else "transparent"
     layout = layout_of(card)
@@ -618,7 +665,10 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", number=
         font_link=font_link(title + body), local_fonts=fonts_css,
         title_font=stack(title), body_font=stack(body),
         frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box, pinline=pinline,
-        noise=NOISE_URI, texture=texture_uri(kind), set_css=set_css, legendary=" legendary" if legendary and not turned else "",
+        frame_b=frame_b, box_b=box_b, pinline_b=pinline_b,
+        noise=NOISE_URI, texture=texture_uri(kind), texture_b=texture_uri(kind_b), set_css=set_css,
+        legendary=" legendary" if legendary and not turned else "",
+        pair=(" pair hybrid" if kind_b != kind else " pair") if pair else "",
         frame_vars=frame_vars or frame_css(),
         watermark=watermark_uri(), rarity_hi=rarity_hi, layout=layout,
         stamp='<div class="stamp"></div>' if stamped else "", stamped=" stamped" if stamped else "",

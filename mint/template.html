@@ -12,6 +12,9 @@ $local_fonts
   --bar-edge: $bar_edge;
   --box: $box;              /* text box fill */
   --pinline: $pinline;      /* the flat colour inside the textured band: outlines every element, fills the gaps */
+  --frame-b: $frame_b;      /* the right-hand colour of a two-colour card (.pair); the left's on any other */
+  --box-b: $box_b;
+  --pinline-b: $pinline_b;
   --ink: #000;
   --title-font: $title_font;
   --body-font: $body_font;
@@ -80,6 +83,20 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
    layer is its shadow, black around the top and fading out down the tongue's side */
 .crown-o { background: linear-gradient(180deg, #000 0, #000 48px, rgba(0,0,0,0) 60px); }
 .crown { background: linear-gradient(90deg, var(--pinline) 25%, color-mix(in srgb, var(--pinline) 60%, #fff) 50%, var(--pinline) 75%); }
+/* two-colour cards (frame.frame_pair): the pinline and text box run the left colour into the right across the
+   middle, the bars staying a flat grey; a hybrid spell's band blends too, its two textures cross-fading, where a
+   dual land keeps the land band. Every element is centred on the card, so each blends about its own middle.
+   Measured off ten scans (RVR shocks, MH2 fetches, UMA / RVR / MKC hybrids): the pinline blends over 102-148,
+   the text box 105-140, the band 100-160 */
+.pair .pinline { background: linear-gradient(90deg, var(--pinline) calc(50% - 23px), var(--pinline-b) calc(50% + 23px)); }
+.pair .textbox { background: linear-gradient(90deg, var(--box) calc(50% - 18px), var(--box-b) calc(50% + 18px)); }
+.hybrid .frame { background: linear-gradient(90deg, var(--frame) calc(50% - 30px), var(--frame-b) calc(50% + 30px)); }
+.hybrid .frame::before { mask-image: linear-gradient(90deg, #000 calc(50% - 30px), transparent calc(50% + 30px)); }
+.hybrid .frame::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: url("$texture_b"); background-size: 128px 128px; opacity: var(--frame-texture);
+  mask-image: linear-gradient(90deg, transparent calc(50% - 30px), #000 calc(50% + 30px)); }
+.pair .crown { background: linear-gradient(90deg, var(--pinline) 25%,
+  color-mix(in srgb, color-mix(in srgb, var(--pinline) 50%, var(--pinline-b)) 60%, #fff) 50%, var(--pinline-b) 75%); }
 /* the bars span 14.8-235 outline included, 4.8 past the art on each side, 20 tall, their ends arcs 6 deep;
    the fill is flat (the bottom shade is the bevel's), the bevel lit from the upper right */
 .bar { position: absolute; left: 14.8px; width: 220.2px; height: 20.2px; padding: 0 5.2px;
@@ -247,7 +264,7 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 /* per-set frame identity: sets/<code>.css, injected last so it can override any rule above */
 $set_css
 </style>
-<div class="card $layout$legendary$stamped">
+<div class="card $layout$legendary$stamped$pair">
   <div class="frame"></div>
   $body
   $stamp

@@ -176,3 +176,47 @@ def test_mono_colour_lands_take_their_colours_pinline():
     assert frame.land_tint(synthetic_card(colors=[], type_line="Land", produced_mana=["C"])) is None
     assert frame.land_tint(synthetic_card(colors=["G"], type_line="Creature — Elf")) is None
     assert frame.mix("#000000", "#ffffff", 0.5) == "#808080"
+
+
+def test_two_colour_frames():
+    """A dual land, a fetch land and an all-hybrid spell take the two-colour frame, left to right the short way
+    round the wheel; a three-colour land, a fetch for any basic, a gold spell and a mono land stay as they were."""
+    land = dict(colors=[], type_line="Land")
+    assert frame.frame_pair(synthetic_card(**land, produced_mana=["G", "U"])) == ("G", "U")
+    assert frame.frame_pair(synthetic_card(**land, produced_mana=["B", "U"])) == ("U", "B")
+    assert frame.frame_pair(synthetic_card(**land, produced_mana=["B", "W"])) == ("W", "B")
+    assert frame.frame_pair(synthetic_card(**land, produced_mana=["R", "W"])) == ("R", "W")
+    assert frame.frame_pair(synthetic_card(**land, produced_mana=["B", "G", "U"])) is None
+    assert frame.frame_pair(synthetic_card(**land, produced_mana=["G"])) is None
+    fetch = ("{T}, Pay 1 life, Sacrifice this land: Search your library for a Swamp or Forest card, "
+             "put it onto the battlefield, then shuffle.")
+    assert frame.frame_pair(synthetic_card(**land, oracle_text=fetch)) == ("B", "G")
+    assert frame.frame_pair(synthetic_card(**land, oracle_text=fetch.replace("a Swamp or Forest", "a basic land"))) is None
+    assert frame.frame_pair(synthetic_card(**land, oracle_text=fetch.replace("Swamp or Forest", "Forest or Forest"))) is None
+    assert frame.frame_pair(synthetic_card(colors=["G", "W"], mana_cost="{1}{G/W}{G/W}")) == ("G", "W")
+    assert frame.frame_pair(synthetic_card(colors=["B", "G"], mana_cost="{B/G}")) == ("B", "G")
+    assert frame.frame_pair(synthetic_card(colors=["R", "W"], mana_cost="{R/W}{R}")) is None   # a plain pip: gold
+    assert frame.frame_pair(synthetic_card(colors=["U", "R"], mana_cost="{U}{R}")) is None
+    assert frame.frame_pair(synthetic_card(colors=["G"], mana_cost="{G/U}")) is None            # one colour
+    assert frame.frame_pair(synthetic_card(colors=["B", "G", "U"], mana_cost="{B/G}{G/U}")) is None
+
+
+def test_two_colour_frames_in_the_page(art):
+    dual = synthetic_card(colors=[], type_line="Land", produced_mana=["G", "U"], power=None)
+    html = frame.build_html(dual, symbols=NoSymbols(), art_url="file://" + art)
+    assert 'class="card normal stamped pair"' in html
+    assert f"--pinline: {frame.FRAMES['G'][5]}" in html and f"--pinline-b: {frame.FRAMES['U'][5]}" in html
+    assert f"--box: {frame.DUAL_BOX['G']}" in html and f"--box-b: {frame.DUAL_BOX['U']}" in html
+    assert f"--bar: {frame.PAIR_BAR}" in html
+    assert f"--frame: {frame.FRAMES['land'][0]}" in html and f"--frame-b: {frame.FRAMES['land'][0]}" in html
+    class DotSymbols:
+        def data_uri(self, sym):
+            return "data:,"
+    hybrid = synthetic_card(colors=["G", "W"], mana_cost="{G/W}")
+    html = frame.build_html(hybrid, symbols=DotSymbols(), art_url="file://" + art)
+    assert 'class="card normal stamped pair hybrid"' in html
+    assert f"--frame: {frame.FRAMES['G'][0]}" in html and f"--frame-b: {frame.FRAMES['W'][0]}" in html
+    assert f"--box: {frame.FRAMES['G'][4]}" in html and f"--box-b: {frame.FRAMES['W'][4]}" in html
+    assert html.count("data:image/svg+xml;base64,") >= 2  # the two textures
+    plain = frame.build_html(synthetic_card(), symbols=NoSymbols(), art_url="file://" + art)
+    assert " pair" not in plain and f"--frame-b: {frame.FRAMES['U'][0]}" in plain
