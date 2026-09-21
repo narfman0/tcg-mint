@@ -22,7 +22,8 @@ const REMIX_BADGE = {repose: 'repose', new: 'new scene', inspire: 'inspired'};
 const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
                style2: '', sort: 'number', sheet: false, colours: {}, paper: 'letter', stock: '',
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
-               takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false};
+               takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false,
+               motion: {loop: '', length: 0, takes: 1}};  // the card page's animate knobs for this run ('' / 0 = the block's)
 
 async function api(path, opts = {}) {
   if (STATIC) {
@@ -493,7 +494,7 @@ function boardSlides() {
 }
 function columnSlides(c) {
   const code = state.set.code;
-  return allColumns(c).map(x => ({key: x.key, path: x.path, card: x.kind === 'card', what: x.sub, c,
+  return allColumns(c).map(x => ({key: x.key, path: x.path, video: x.video, card: x.kind === 'card', what: x.sub, c,
                                  title: `${c.name} · ${x.title}`, sub: '', recipe: x.recipe,
                                  badges: (x.styled ? '<span class="badge accent">styled art</span>' : '') + (x.key === (c.entry.base || state.set.base) ? '<span class="badge accent">from</span>' : ''),
                                  hash: colHash(code, c.name, x.key)}));
@@ -578,7 +579,8 @@ function drawViewer() {
       <button class="small" data-v="close" title="close (Esc)">✕</button>
     </div>
     <div class="vstage ${s.card ? 'card' : ''}" id="vstage">
-      ${s.path ? `<img id="vimg" src="${file(s.path)}" draggable="false" alt="">` : `<div class="none">${esc(s.none || 'no image')}</div>`}
+      ${s.video && !STATIC ? `<video id="vimg" src="${file(s.video)}" poster="${file(s.path)}" autoplay loop muted playsinline draggable="false"></video>`
+        : s.path ? `<img id="vimg" src="${file(s.path)}" draggable="false" alt="">` : `<div class="none">${esc(s.none || 'no image')}</div>`}
       <button class="vnav prev" data-v="prev" title="previous (←)">‹</button><button class="vnav next" data-v="next" title="next (→)">›</button>
     </div>
     <div class="vbottom">
@@ -666,12 +668,21 @@ const isPath = s => !!s && (s.includes('/') || /\.(png|jpe?g|webp)$/i.test(s));
 function columns(c) {
   const vs = c.variants || [], cur = c.current?.hash, pick = c.entry.pick, styled = pick || cur;
   const enhOf = h => vs.filter(v => v.kind === 'enhance' && v.base === h).sort(newest);
+  const clipsOf = h => vs.filter(v => v.kind === 'motion' && v.base === h).sort(newest);
   const col = (v, extra) => ({key: v.hash, title: v.label, sub: v.hash, path: v.path, kind: v.kind, recipe: v.recipe, v,
                               styled: v.hash === styled, ...extra});
+  // a clip: its poster is the still, the webm plays over it; the sub says what it was made of and how long
+  const clipCol = (m, of) => col(m, {title: m.label, video: m.videos?.[0], videos: m.videos || [], current: m.hash === c.motion_hash,
+                                     sub: `${m.hash} · of ${of} · ${m.recipe?.length ?? '?'}f ${m.recipe?.loop || ''}`.trim()});
+  // an image and everything made straight from it: its enhances (each with its own clips), then its clips
+  const after = (h, cols) => {
+    enhOf(h).forEach(e => { cols.push(col(e, {title: 'enhance', sub: `${e.hash} · of ${h === 'crop' ? 'the crop' : h}`})); clipsOf(e.hash).forEach(m => cols.push(clipCol(m, e.hash))); });
+    clipsOf(h).forEach(m => cols.push(clipCol(m, h === 'crop' ? 'the crop' : h)));
+  };
   const groups = [], src = [];
   if (c.crop) src.push({key: 'crop', title: 'crop', sub: `${c.card.set.toUpperCase()} ${c.card.collector_number} · ${c.card.artist}`,
                         path: c.crop, kind: 'crop', enhanced: enhOf('crop')});
-  enhOf('crop').forEach(e => src.push(col(e, {title: 'enhance', sub: `${e.hash} · of the crop`})));
+  after('crop', src);
   groups.push({title: 'source', cols: src});
   const labels = [...new Set(vs.filter(v => v.kind === 'restyle').map(v => v.label))].sort();
   for (const l of labels) {
@@ -679,12 +690,17 @@ function columns(c) {
     for (const v of vs.filter(x => x.kind === 'restyle' && x.label === l).sort(newest)) {
       cols.push(col(v, {current: v.hash === cur, picked: v.hash === pick, enhanced: enhOf(v.hash),
                         sub: v.hash + (v.base !== 'crop' ? ` · from ${isPath(v.base) ? v.base.split('/').pop() : v.base}` : '')}));
-      enhOf(v.hash).forEach(e => cols.push(col(e, {title: 'enhance', sub: `${e.hash} · of ${v.hash}`})));
+      after(v.hash, cols);
     }
     groups.push({title: l, cols});
   }
-  const orphans = vs.filter(v => v.kind === 'enhance' && v.base !== 'crop' && !vs.some(x => x.hash === v.base));
+  const words = clipsOf('none');  // clips from the words alone start from no image
+  if (words.length) groups.push({title: 'motion · from words', cols: words.map(m => clipCol(m, 'nothing'))});
+  const gone = v => v.base !== 'crop' && v.base !== 'none' && !vs.some(x => x.hash === v.base);
+  const orphans = vs.filter(v => v.kind === 'enhance' && gone(v));
   if (orphans.length) groups.push({title: 'enhance · source deleted', cols: orphans.map(e => col(e, {title: 'enhance', sub: `${e.hash} · of ${e.base}`}))});
+  const lost = vs.filter(v => v.kind === 'motion' && gone(v));
+  if (lost.length) groups.push({title: 'motion · source deleted', cols: lost.map(m => clipCol(m, m.base))});
   const renders = [];
   for (const k of ['plain', 'styled']) {
     const r = c.renders?.[k];
@@ -701,30 +717,40 @@ const trashBtn = (act, arg, title) => `<button class="small bin" data-act="${act
 function columnHtml(x, c) {
   const ab = state.ab, tags = [];
   if (x.styled) tags.push(['accent', x.picked ? 'styled art · picked' : 'styled art']);
-  else if (x.current) tags.push(['', "the recipe's"]);
+  else if (x.current && x.kind !== 'motion') tags.push(['', "the recipe's"]);
   if (x.key === (c.entry.base || state.set.base)) tags.push(['accent', 'from']);
   if (x.key === c.entry.pose) tags.push(['accent', 'pose']);
   if (x.enhanced?.length) tags.push(['good', 'enhanced']);
+  if (x.kind === 'motion') tags.push(['accent', x.current ? 'clip · the recipe\'s' : 'clip']);
   const menu = items => items.length ? `<details class="menu"><summary>…</summary><div>${items.map(([a, arg, t]) => `<button data-act="${a}" data-arg="${esc(arg)}">${t}</button>`).join('')}</div></details>` : '';
+  const wan = state.ws?.comfy?.wan || {ready: false, hint: 'the workbench has not said whether Wan is there'};
+  const animateBtn = key => `<button class="small" data-act="animate" data-arg="${esc(key)}" ${wan.ready ? '' : 'disabled'} title="${esc(wan.ready ? 'a short seamless clip of this image through Wan 2.2, with the motion line above; about a minute' : `cannot animate: ${wan.hint}`)}">animate</button>`;
   let acts = '';
   if (x.kind === 'restyle') acts = `
       <button class="small ${x.picked ? 'on' : ''}" data-act="${x.picked ? 'unpick' : 'keep'}" data-arg="${x.key}" title="${x.picked ? 'back to whatever the recipe makes' : 'make this the card\'s styled art, whatever the recipe says'}">${x.picked ? 'kept ✓' : 'keep'}</button>
       ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="${x.key}">enhance</button>`}
+      ${animateBtn(x.key)}
       ${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this'],
               ...(x.recipe?.seed != null && c.entry.seed !== x.recipe.seed ? [['pin', x.recipe.seed, `pin its seed ${x.recipe.seed}`]] : []),
               ['promote', x.key, 'make the set style from this']])}
       ${trashBtn('delete', x.key, 'delete this image')}`;
   else if (x.kind === 'crop') acts = `
       ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="crop">enhance</button>`}
+      ${animateBtn('crop')}
       ${menu([['base', 'crop', 'restyle / inspire from this'], ['pose', 'crop', 'repose from this']])}`;
-  else if (x.kind === 'enhance') acts = `${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this']])}${trashBtn('delete', x.key, 'delete this image')}`;
+  else if (x.kind === 'enhance') acts = `${animateBtn(x.key)}${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this']])}${trashBtn('delete', x.key, 'delete this image')}`;
+  else if (x.kind === 'motion') acts = `${x.videos.map(p => `<a class="pill" href="${file(p)}" target="_blank" title="the clip file in a new tab">${esc(p.split('.').pop())}</a>`).join('')}${trashBtn('delete', x.key, 'delete this clip')}`;
   else acts = `<button class="small" data-act="render-${x.which}" data-arg="">re-render</button>${trashBtn('delete-render', x.file, 'delete this render')}`;
+  // a clip plays in place, muted, over its poster; the page's still and the viewer show the poster
+  const pic = x.video && !STATIC
+    ? `<video autoplay loop muted playsinline preload="metadata" poster="${img(x.path, 640)}" src="${file(x.video)}"></video>`
+    : `<img loading="lazy" src="${img(x.path, 640)}">`;
   return `
       <div class="col ${x.styled ? 'styled' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
-        <div class="pic ${x.kind === 'card' ? 'card' : ''}" data-open="${esc(x.path)}"><img loading="lazy" src="${img(x.path, 640)}">
+        <div class="pic ${x.kind === 'card' ? 'card' : ''}" data-open="${esc(x.path)}">${pic}
           <div class="ab"><b data-ab="a">A</b><b data-ab="b">B</b></div></div>
         <div class="title"><span>${esc(x.title)} ${tags.map(([k, t]) => `<span class="badge ${k}">${esc(t)}</span>`).join(' ')}</span><small>${esc(x.sub)}</small></div>
-        ${x.recipe ? `<div class="recipe">${recipeDiff(x.recipe, c.recipe)}</div>` : ''}
+        ${x.recipe ? `<div class="recipe">${recipeDiff(x.recipe, x.kind === 'motion' ? c.motion_recipe : c.recipe)}</div>` : ''}
         <div class="acts">${acts}</div>
       </div>`;
 }
@@ -770,6 +796,21 @@ function generatePanel(c, cols) {
       </div>
     </details>`;
 }
+/* The motion row on the card page: this card's own line for what moves (in place of the motion
+   block's prompt), and the run's loop and length over the block's. Where the clip starts from is
+   the image whose `animate` button is pressed; the styled-art line's button takes the styled art. */
+function motionRow(c) {
+  const st = state.set, k = st.motion_knobs || {}, m = state.motion, wan = state.ws?.comfy?.wan || {ready: false, hint: ''};
+  const loops = state.ws?.loops || ['pingpong', 'crossfade', 'none'];
+  const lengths = [...new Set([k.length || 49, 25, 49, 81])].sort((a, b) => a - b);
+  return `
+          <span title="animate: what moves in this card's clip, in place of the motion block's prompt. Say what moves and what stays still; 'cinematic' and 'camera pans' get a music video">motion</span><span class="row"><input type="text" id="motion" style="width:36em;max-width:100%" value="${esc(c.entry.motion || '')}" placeholder="${esc(k.prompt || '')}">
+            <select id="mloop" title="how the clip is made seamless: pingpong plays it forward then back; crossfade dissolves the tail into the head; none as generated">${[['', `${k.loop || 'pingpong'} (the block's)`], ...loops.map(l => [l, l])].map(([v, t]) => `<option value="${v}" ${m.loop === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
+            <select id="mlength" title="frames at ${k.fps || 24} fps: 49 is two seconds, 81 about three and a half">${[[0, `${k.length || 49} frames (the block's)`], ...lengths.map(l => [l, `${l} frames`])].map(([v, t]) => `<option value="${v}" ${m.length === v ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
+            <label class="takes" title="clips per press, each from its own random seed"><span class="muted">×</span><input type="number" id="mtakes" min="1" max="8" value="${m.takes}"></label>
+            ${c.motion_hash ? `<span class="muted mono" title="the clip the motion recipe names now, from ${esc(c.motion_recipe?.base || '')}">${(c.variants || []).some(v => v.hash === c.motion_hash) ? 'made' : 'would make'} ${c.motion_hash}</span>` : ''}
+            ${wan.ready ? '' : `<span class="warn" title="${esc(wan.hint)}">animate is off: ${esc(wan.hint)}</span>`}</span>`;
+}
 async function card(r) {
   const c = cardOf(r.name);
   const code = state.set.code, st = state.set;
@@ -785,6 +826,7 @@ async function card(r) {
   const styledLine = styledV
     ? `<span class="badge accent">${esc(styledV.label)}-${styledV.hash}</span> <span class="muted">${c.entry.pick ? 'picked' : "the recipe's"}${styledCol?.enhanced?.length ? ' · enhanced' : ''}</span>
        ${styledCol?.enhanced?.length ? '' : `<button class="small" data-cjob="enhance-styled" title="an ESRGAN pass on it; the render picks the enhance up">enhance</button>`}
+       <button class="small" data-cjob="animate-styled" ${state.ws?.comfy?.wan?.ready ? '' : 'disabled'} title="${esc(state.ws?.comfy?.wan?.ready ? `a short seamless clip of the styled art (its enhance if it has one) through Wan 2.2, with the motion line above; about a minute` : `cannot animate: ${state.ws?.comfy?.wan?.hint || ''}`)}">animate</button>
        ${c.entry.pick ? '<button class="small" data-act="unpick" data-arg="">unpick</button>' : ''}`
     : c.entry.pick ? `<span class="warn">picked ${c.entry.pick}, which is gone</span> <button class="small" data-act="unpick" data-arg="">unpick</button>`
     : c.style_hash ? `<span class="muted">none yet: the recipe would make <span class="mono">${c.style_hash}</span>; generate one below, or keep any variant</span>`
@@ -800,6 +842,7 @@ async function card(r) {
             <span class="muted" id="printing-n"></span><div class="printings" id="printings" hidden></div></span>
           <span>subject</span><span class="row"><input type="text" id="subject" style="width:36em;max-width:100%" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene">
             <button class="small" id="describe" ${describer.ready ? '' : 'disabled'} title="${esc(describer.ready ? `${describer.kind} (${describer.model}) reads the ${esc(c.entry.base || st.base || 'crop')} image and the card's text and writes the subject line${c.entry.subject ? ', replacing this one' : ''}` : `no describer: ${describer.hint}`)}">from the picture</button></span>
+          ${motionRow(c)}
           ${c.described ? `<span title="what the describer read in the picture the subject was written from">picture</span><span class="muted" style="font-size:.85em">${esc(c.described.description)} <span class="mono">· ${esc(c.described.model)}${c.described.base && c.described.base !== 'crop' ? ` · ${esc(c.described.base)}` : ''}</span></span>` : ''}
           ${(c.warnings || []).map(w => `<span>warning</span><span class="warn">${esc(w)}</span>`).join('')}
         </div></div>
@@ -847,6 +890,18 @@ async function card(r) {
   document.querySelectorAll('details.menu').forEach(d => d.onclick = e => e.stopPropagation());
   document.onkeydown = e => { if (e.key === 'Escape' && $('#printings') && !$('#printings').hidden) { $('#printings').hidden = true; e.preventDefault(); } };
   $('#subject').onchange = e => put({subject: e.target.value || null});
+  $('#motion').onchange = e => put({motion: e.target.value || null});
+  $('#mloop').onchange = e => { state.motion.loop = e.target.value; };
+  $('#mlength').onchange = e => { state.motion.length = +e.target.value; };
+  $('#mtakes').onchange = e => { state.motion.takes = Math.max(1, Math.min(8, +e.target.value || 1)); e.target.value = state.motion.takes; };
+  // an animate job: from `base` (a hash, 'crop', or null for the styled art), with the row's knobs for this run
+  const animateFrom = base => {
+    const m = state.motion, motion = {};
+    if (m.loop) motion.loop = m.loop;
+    if (m.length) motion.length = m.length;
+    submit({kind: 'animate', set: code, names: [c.name], base, motion, takes: m.takes,
+            seed: c.entry.seed == null && m.takes === 1 ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined}, `card page: ${c.name} (animate)`);
+  };
   $('#describe').onclick = () => submit({kind: 'describe', set: code, names: [c.name], force: true}, `card page: ${c.name}`);
   $('#dpi').onchange = e => { state.dpi = +e.target.value; };
   // the generate panel
@@ -878,6 +933,7 @@ async function card(r) {
                                  upscale: state.takes > 1 ? state.upscale : undefined,
                                  seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined}, origin + ' (generate)');
     else if (j === 'enhance-styled') submit({kind: 'enhance', set: code, names, base: styledV.hash}, origin);
+    else if (j === 'animate-styled') animateFrom(null);
     else if (j === 'render-plain') render(false);
     else if (j === 'render-styled') render(true);
   });
@@ -888,6 +944,7 @@ async function card(r) {
     if (act === 'keep') put({pick: arg});
     else if (act === 'unpick') put({pick: null});
     else if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg}, origin);
+    else if (act === 'animate') animateFrom(arg);
     else if (act === 'base') put({base: arg === 'crop' ? null : arg});
     else if (act === 'pose') put({pose: arg});
     else if (act === 'pin') put({seed: +arg});

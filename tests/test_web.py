@@ -271,3 +271,41 @@ def test_describe_job_needs_a_describer_then_writes_the_subject(client, art, mon
     assert client.post("/api/jobs", json={"kind": "describe", "set": "TST", "generate": True}).status_code == 400
     body = {"kind": "describe", "set": "TST", "generate": True, "template": "look"}
     assert client.post("/api/jobs", json=body).status_code == 200
+
+
+def test_animate_job_and_the_card_page_show_clips(client, art):
+    """The animate job takes the row's knobs over the set's block and the image to start from; the
+    card page lists a clip's videos beside its poster and the recipe the block names now."""
+    from mint.art import Art
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"], "style": "look"})
+    ws = client.ws
+    card = json.loads(ws.cards_file.read_text().splitlines()[0])
+    cache = Art(ws.art)
+    crop = cache.crop(card, fetch=False)
+    crop.parent.mkdir(parents=True, exist_ok=True)
+    crop.write_bytes(open(art, "rb").read())
+    r = client.get("/api/workspace").json()
+    assert "ready" in r["comfy"]["wan"] and r["loops"] == ["pingpong", "crossfade", "none"]
+    r = client.get("/api/sets/TST").json()
+    assert r["motion_knobs"]["length"] == 49 and "motion" not in r  # the defaults; no block in the file
+    r = client.put("/api/sets/TST/cards/Alpha", json={"motion": "the dog's ears twitch"})
+    assert r.status_code == 200 and r.json()["motion_recipe"]["prompt"] == "the dog's ears twitch"
+    assert r.json()["motion_recipe"]["base"] == "crop" and len(r.json()["motion_hash"]) == 8
+
+    r = client.post("/api/jobs", json={"kind": "animate", "set": "TST", "names": ["Alpha"], "base": "crop", "takes": 2,
+                                       "motion": {"loop": "none", "length": 81}})
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "animate 1 card(s) x 2 takes" and "81-frame" in r.json()["params"]["what"]
+    bad = {"kind": "animate", "set": "TST", "names": ["Alpha"], "motion": {"length": 50}}
+    assert client.post("/api/jobs", json=bad).status_code == 400
+
+    v = cache.new_variant(card, "motion", "motion", {"length": 49, "loop": "pingpong", "base": "crop"}, "crop", "abcdef12")
+    v.path.parent.mkdir(parents=True, exist_ok=True)
+    v.path.write_bytes(b"png")
+    v.path.with_suffix(".webm").write_bytes(b"webm")
+    cache.record(v)
+    c = client.get("/api/sets/TST/cards/Alpha").json()
+    m = next(x for x in c["variants"] if x["kind"] == "motion")
+    assert m["videos"] == [str(v.path.with_suffix(".webm"))]
+    assert client.delete("/api/sets/TST/cards/Alpha/variants/abcdef12").status_code == 200
+    assert not v.path.with_suffix(".webm").exists()

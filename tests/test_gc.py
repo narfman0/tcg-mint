@@ -82,3 +82,25 @@ def test_collect_keeps_the_right_variants_and_finds_stale_renders(ws):
     assert not (ws.art / beta["illustration_id"]).exists()
     assert not (out / "TST-001_Alpha.styled.png").exists() and not (out / "stray.png").exists()
     assert set(Manifest(out).entries) == {"TST-001_Alpha.png"}
+
+
+def test_a_clip_of_a_kept_image_stays_and_goes_with_its_files(ws):
+    st = sets.from_dict({"code": "TST", "name": "t", "style": {"name": "look", "prompt": "p"}, "cards": {"Alpha": {"number": 1}}})
+    sets.save(ws.sets / "tst.json", st)
+    st = sets.load(ws.sets / "tst.json")
+    art = Art(ws.art)
+    card = json.loads(ws.cards_file.read_text().splitlines()[0])
+    art.crop(card, fetch=False).parent.mkdir(parents=True, exist_ok=True)
+    art.crop(card, fetch=False).write_bytes(b"jpg")
+    old = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=30)).isoformat(timespec="seconds")
+    cur = sets.recipe_hash(st.recipe(card, art=art))
+    variant(art, card, "look", cur, created=old, recipe=st.recipe(card, art=art))
+    kept = variant(art, card, "motion", "11111111", kind="motion", base=cur, created=old)    # a clip of the current
+    stray = variant(art, card, "motion", "22222222", kind="motion", base="deadbeef", created=old)  # a clip of nothing kept
+    for v in (kept, stray):
+        v.path.with_suffix(".webm").write_bytes(b"webm" * 100)
+    r = gc.collect(ws, keep_days=3)
+    assert {v.hash for _, _, v in r["variants"]} == {"22222222"}
+    assert gc.files_of(stray) == [stray.path, stray.path.with_suffix(".webm")]
+    gc.main(["--delete"])
+    assert not stray.path.with_suffix(".webm").exists() and kept.path.with_suffix(".webm").exists()

@@ -5,15 +5,16 @@
 One line per check: the workspace and its card file, the fonts, a Chromium
 launch, ComfyUI and the nodes each remix mode uses, every model file the
 sets' styles and the templates name -- checkpoint, ControlNet, upscaler,
-LoRAs -- against what that ComfyUI actually has, and whether the describer
-behind `mint describe` could take a call. Exits 1 when something a
+LoRAs -- against what that ComfyUI actually has, the Wan files and ffmpeg
+that `mint animate` needs when a set has a motion block, and whether the
+describer behind `mint describe` could take a call. Exits 1 when something a
 job would need is missing; a warning (an old card file, a font substituted)
 is reported and not counted.
 """
 import datetime as dt
 import sys
 
-from . import comfy, describe, fonts, frame, sets, style, workspace
+from . import comfy, describe, fonts, frame, loop, sets, style, wan, workspace
 from .errors import MintError
 
 # what each remix mode (restyle.py) asks ComfyUI for, beyond the core nodes
@@ -129,6 +130,46 @@ def check_comfy(ws, r, styles):
             (r.ok if have else r.fail)(f"lora {lora['name']}", "" if have else f"not in ComfyUI; wanted by {where}")
 
 
+def motions_in_use(ws):
+    """[(where, Motion)] for every set's motion block."""
+    out = []
+    for p in ws.set_files():
+        try:
+            st = sets.load(p)
+        except MintError:
+            continue
+        if st.motion:
+            out.append((f"set {st.code}", st.motion))
+    return out
+
+
+def check_motion(ws, r, motions):
+    """What `mint animate` needs, asked only when a set has a motion block: the Wan nodes, each
+    model file the blocks name (with where to fetch a missing one), and ffmpeg."""
+    if not motions:
+        return
+    server = comfy.Comfy(ws.comfy_url)
+    if server.alive():
+        have = server.nodes()
+        missing = [n for n in wan.NODES if n not in have]
+        (r.ok if not missing else r.fail)("nodes: animate (Wan)", "missing " + ", ".join(missing) if missing else "")
+        for knob, (node, inp, folder) in wan.FILES.items():
+            avail = server.options(node, inp)
+            if avail is None:
+                r.warn("models: " + knob, f"{node} not there to ask")
+                continue
+            wanted = {}
+            for where, m in motions:
+                wanted.setdefault(getattr(m, knob), []).append(where)
+            for fn, wheres in sorted(wanted.items()):
+                if fn in avail:
+                    r.ok(f"{knob} {fn}")
+                else:
+                    r.fail(f"{knob} {fn}", f"not in ComfyUI models/{folder}; wanted by {', '.join(wheres)}; "
+                                           f"fetch {wan.url(knob, fn)}")
+    (r.ok if loop.have_ffmpeg() else r.fail)("ffmpeg", "" if loop.have_ffmpeg() else "not on PATH; animate encodes with it")
+
+
 def check_describer(ws, r):
     """Whether `mint describe` could go out: a key for claude, a reachable Ollama otherwise. A
     describer nobody set up is a warning: no render or restyle needs it."""
@@ -165,6 +206,7 @@ def main(argv=None):
     check_sets(r, styles)
     check_chromium(r)
     check_comfy(ws, r, styles)
+    check_motion(ws, r, motions_in_use(ws))
     check_describer(ws, r)
     print(f"\n{r.failed} thing(s) a job would miss" if r.failed else "\neverything a job needs is here")
     return 1 if r.failed else 0

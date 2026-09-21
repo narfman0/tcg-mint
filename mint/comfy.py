@@ -106,6 +106,21 @@ class Comfy:
         self.fetch(images[0], dest)
         return dest
 
+    def run_to_frames(self, workflow, directory, timeout=1800):
+        """Run a workflow whose SaveImage output is a batch of frames; save them as
+        directory/0000.png, 0001.png, ... in order. Returns the list of paths."""
+        outputs = self.run(workflow, timeout)
+        images = [im for node in outputs.values() for im in node.get("images", [])]
+        if not images:
+            raise ComfyError("workflow produced no frames")
+        os.makedirs(directory, exist_ok=True)
+        paths = []
+        for i, im in enumerate(images):
+            dest = os.path.join(directory, f"{i:04d}.png")
+            self.fetch(im, dest)
+            paths.append(dest)
+        return paths
+
 
 def upscale_workflow(image_name, model, prefix):
     """LoadImage -> UpscaleModelLoader -> ImageUpscaleWithModel -> SaveImage."""

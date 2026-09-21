@@ -10,7 +10,7 @@ import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from .. import PKG, comfy, describe, frame, impose, newset, printing, render, restyle, sets, style, upscale
+from .. import PKG, animate, comfy, describe, frame, impose, loop, newset, printing, render, restyle, sets, style, upscale, wan
 from ..art import Art
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
@@ -29,6 +29,7 @@ class State:
         self.art = Art(ws.art)
         self._comfy = (0.0, False)
         self._nodes = (0.0, set())
+        self._wan = (0.0, None)
         self._describer = (0.0, None)
         self.lock = threading.Lock()  # around set-file writes
 
@@ -52,6 +53,41 @@ class State:
             nodes = self.comfy().nodes() if self.comfy_alive() else set()
             self._nodes = (time.time(), nodes)
         return nodes
+
+    def wan_info(self):
+        """Whether `animate` could run now: ComfyUI up with the Wan nodes and every file the sets'
+        motion blocks (or the defaults) name, and ffmpeg on PATH; else why not, in one line."""
+        t, info = self._wan
+        if time.time() - t > 60 or info is None:
+            info = self._wan_check()
+            self._wan = (time.time(), info)
+        return info
+
+    def _wan_check(self):
+        if not loop.have_ffmpeg():
+            return {"ready": False, "hint": "no ffmpeg on PATH; animate encodes the clip with it"}
+        if not self.comfy_alive():
+            return {"ready": False, "hint": "ComfyUI is down"}
+        nodes = self.comfy_nodes()
+        missing = [n for n in wan.NODES if n not in nodes]
+        if missing:
+            return {"ready": False, "hint": f"ComfyUI lacks the Wan nodes ({', '.join(missing)}): update it"}
+        motions = [sets.Motion()]
+        for p in self.set_paths():
+            try:
+                st = sets.load(p)
+            except MintError:
+                continue
+            if st.motion:
+                motions.append(st.motion)
+        server = self.comfy()
+        for knob, (node, inp, folder) in wan.FILES.items():
+            avail = server.options(node, inp) or []
+            for m in motions:
+                fn = getattr(m, knob)
+                if fn not in avail:
+                    return {"ready": False, "hint": f"ComfyUI has no {fn} in models/{folder}: fetch {wan.url(knob, fn)}"}
+        return {"ready": True, "hint": ""}
 
     def describer(self):
         return describe.Describer.from_workspace(self.ws)
@@ -102,6 +138,7 @@ class State:
 def variant_dict(v):
     d = v.to_dict()
     d["path"] = str(v.path)
+    d["videos"] = [str(p) for p in v.videos]
     return d
 
 
@@ -189,11 +226,14 @@ def create_app(ws):
         return {"home": str(ws.home), "maker": ws.maker, "maker_code": ws.maker_code,
                 "comfy": {"url": ws.comfy_url, "alive": S.comfy_alive(),
                           # what the inspire mode needs: the ComfyUI_IPAdapter_plus node pack
-                          "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes()},
+                          "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes(),
+                          # what animate needs: the Wan 2.2 files in ComfyUI and ffmpeg here (else why not)
+                          "wan": S.wan_info()},
                 "cards": {"path": str(ws.cards_file), "count": count},
                 # who writes subject lines from pictures (describe.py), and whether they could now
                 "describer": S.describer_info(),
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
+                "loops": list(sets.LOOPS), "motion_remix": list(sets.MOTION_REMIX),
                 "style_fields": style_fields(), "frame_fields": frame_fields(),
                 "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
                 "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer,
@@ -558,7 +598,7 @@ def create_app(ws):
         st = S.find_set(body["set"]) if body.get("set") else None
         names = body.get("names") or (st.names() if st else [])
         submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes,
-                  "printrun": submit_printrun, "describe": submit_describe}.get(kind)
+                  "printrun": submit_printrun, "describe": submit_describe, "animate": submit_animate}.get(kind)
         if not submit:
             raise HTTPException(400, f"unknown job kind {kind!r}")
         job = submit(S, st, names, body)
@@ -650,6 +690,7 @@ def set_detail(S, st):
     d["path"] = str(st.path)
     d["css"] = st.css
     d["frame"] = dataclasses.asdict(st.frame or sets.Frame())
+    d["motion_knobs"] = {k: v for k, v in dataclasses.asdict(st.motion or sets.Motion()).items() if k != "explicit"}
     d["out_dir"] = str(S.out_dir(st))
     d["cards_detail"] = [card_detail(S, st, n, cards=None) for n in st.names()]
     return d
@@ -678,6 +719,12 @@ def card_detail(S, st, name, cards=None):
         info["base_missing"] = recipe["base"] if sets.is_label(recipe["base"]) else None
         cur = art.variant(card, info["style_hash"])
         info["current"] = variant_dict(cur) if cur else None
+    if crop.exists() or entry.art:  # the clip the motion recipe would make now, and from which image
+        try:
+            mr = st.motion_recipe(card, art=art)
+            info["motion_recipe"], info["motion_hash"] = mr, sets.recipe_hash(mr)
+        except MintError:
+            pass
     if entry.pick:  # the styled art the card asked for by hash, whatever the recipe says
         pv = art.variant(card, entry.pick)
         info["picked"] = variant_dict(pv) if pv else None
@@ -867,6 +914,50 @@ def submit_enhance(S, st, names, body):
             "a new enhance variant each")
     return S.jobs.submit("enhance", title, {"set": st.code if st else None, "names": names, "base": base, "model": model,
                                             "what": what, "dest": str(S.art.dir)}, run)
+
+
+def submit_animate(S, st, names, body):
+    """An animate job (animate.py): a clip of each card's art. `base` is the image to start from (a
+    variant hash or "crop"; default the card's styled art), `motion` any knobs over the set's block
+    (loop, length, remix ...) for this run alone, and `takes` several clips each from its own random
+    seed, as restyle does."""
+    overrides = body.get("motion") or {}
+    base_knobs = dataclasses.asdict(st.motion or sets.Motion())
+    base_knobs.pop("explicit", None)
+    base_knobs.update(overrides)
+    motion = sets.from_dict({"code": "x", "motion": base_knobs}).motion
+    base = body.get("base") or None
+    takes = max(1, min(int(body.get("takes") or 1), 8))
+    force = bool(body.get("force"))
+    seed = body.get("seed")
+    seeds = [seed] if takes == 1 else [random.randrange(1, 2 ** 31) for _ in range(takes)]
+
+    def run(job):
+        info = S.wan_info()
+        if not info["ready"]:
+            raise MintError(f"animate cannot run: {info['hint']}")
+        server = S.comfy()
+        server.require()
+        cards = S.cards()
+        job.step(0, len(names) * takes)
+        made = []
+        for i, name in enumerate(names):
+            card = cards.find(name, st.card({"name": name}).printing)
+            for t, sd in enumerate(seeds):
+                v, did = animate.animate(server, S.art, card, st, motion=motion, force=force, seed=sd, base=base)
+                take = f"  (take {t + 1}, seed {sd})" if takes > 1 else ""
+                job.say(f"{'animated' if did else 'cached'} {name} -> {v.label}-{v.hash}{take}")
+                made.append(v.hash)
+                job.made(set=st.code, name=name, kind=v.kind, key=v.hash, label=v.label, path=str(v.path))
+                job.step(i * takes + t + 1)
+        return {"variants": made}
+    title = f"animate {len(names)} card(s)" + (f" x {takes} takes" if takes > 1 else "")
+    src = f"the {base} image" if base and base != "crop" else "the crop" if base else "each card's styled art"
+    what = (f"a {motion.length}-frame clip of {len(names)} card(s) of {st.code} through Wan 2.2 ({motion.remix} mode, "
+            f"{motion.loop} loop) from {src}, {takes} take(s) each; about a minute a clip")
+    params = {"set": st.code, "names": names, "motion": overrides, "base": base, "takes": takes, "what": what,
+              "dest": str(S.art.dir)}
+    return S.jobs.submit("animate", title, params, run)
 
 
 def submit_describe(S, st, names, body):

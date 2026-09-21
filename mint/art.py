@@ -8,11 +8,16 @@ printings is fetched and processed once:
     art/<id>/<label>-<hash>.png + .json  a *variant*: something ComfyUI made from another image
     art/<id>/described.json              what a describer read in the card's base image (describe.py)
 
-A variant's sidecar records what it is: its kind (`restyle` or `enhance`),
-the recipe that made it, and the image it started from (`base`: "crop" or
-another variant's hash). The hash is the recipe's (sets.recipe_hash), so a
-changed knob is a new file next to the old one, never a silent overwrite --
-and every variant that exists can be compared in the workbench.
+A variant's sidecar records what it is: its kind (`restyle`, `enhance` or
+`motion`), the recipe that made it, and the image it started from (`base`:
+"crop" or another variant's hash). The hash is the recipe's (sets.recipe_hash),
+so a changed knob is a new file next to the old one, never a silent overwrite
+-- and every variant that exists can be compared in the workbench.
+
+A `motion` variant (animate.py) is a clip of the art: its .png is the poster,
+the loop's first frame, so everything that reads variants keeps working on a
+still; the videos sit beside it with the same stem (`Variant.videos`) and go
+with it when it is deleted. A poster is never a card's styled art.
 
 `resolve()` answers "which file does this card render with, and why": an
 override from the set file; else the variant matching the wanted style hash
@@ -30,14 +35,15 @@ from . import scryfall
 from .errors import MintError
 
 HASH = re.compile(r"^[0-9a-f]{8}$")
+VIDEO = (".webm", ".gif", ".apng", ".mp4")  # what may sit beside a motion variant's poster
 DESCRIBED = "described.json"  # not a variant: the describer's reading of the card's base image
 
 
 @dataclass
 class Variant:
-    label: str          # the style name, or "enhance"
+    label: str          # the style name, "enhance", or the motion block's name
     hash: str
-    kind: str           # restyle | enhance
+    kind: str           # restyle | enhance | motion
     path: Path
     base: str           # "crop" or the hash of the variant this was made from
     recipe: dict
@@ -48,6 +54,13 @@ class Variant:
     @property
     def sidecar(self):
         return self.path.with_suffix(".json")
+
+    @property
+    def videos(self):
+        """The clips beside a motion variant's poster, sorted; empty for the other kinds."""
+        if self.kind != "motion":
+            return []
+        return sorted(p for p in self.path.parent.glob(self.path.stem + ".*") if p.suffix in VIDEO)
 
     def to_dict(self):
         d = dataclasses.asdict(self)
@@ -132,8 +145,9 @@ class Art:
         return next((v for v in self.variants(card) if v.kind == "restyle" and v.label == label), None)
 
     def delete(self, variant):
-        """Remove a variant's image and sidecar; other variants made from it keep their files."""
-        for p in (variant.path, variant.sidecar):
+        """Remove a variant's image, sidecar and any clips beside it; other variants made from it
+        keep their files."""
+        for p in (variant.path, variant.sidecar, *variant.videos):
             if p.exists():
                 p.unlink()
 

@@ -6,7 +6,8 @@ Validates every set file (sets/ and sets/private/ by default) against the
 schema, looks
 each card up, and says which image a plain and a styled render would use:
 whether the current recipe has a restyle variant, whether the crop has been
-enhanced, and any warnings about the printing.
+enhanced, whether the card has a clip for the current motion recipe (and
+which image it would animate), and any warnings about the printing.
 """
 import argparse
 import sys
@@ -41,6 +42,10 @@ def check_set(ws, cards, art, st):
             recipe = st.recipe(card, art=art)
             if sets.is_label(recipe["base"]):
                 notes.append(f"base {recipe['base']}: none yet")
+        if st.motion:
+            mr = st.motion_recipe(card, art=art)
+            mv = art.variant(card, sets.recipe_hash(mr))
+            notes.append(f"motion: {mv.label}-{mv.hash}" if mv else f"motion: missing ({sets.recipe_hash(mr)} from {mr['base']})")
         others = [v for v in art.variants(card)]
         if others:
             notes.append(f"{len(others)} variant(s)")

@@ -8,7 +8,8 @@ wrong forever after. This walks every set and keeps, per card:
 
     the picked variant and the recipe's current one, whatever a styled render
     used, the image each of those was made from (the base chain), the
-    enhances of any of those, and anything made in the last --keep-days.
+    enhances and the clips (motion variants) of any of those, and anything
+    made in the last --keep-days.
 
 Every other variant of that card is a candidate, and so is every variant
 directory no set's card refers to. Renders are judged against the manifest:
@@ -30,6 +31,11 @@ from .manifest import Manifest, frame_hash
 
 def mb(paths):
     return sum(p.stat().st_size for p in paths if p.exists()) / 1e6
+
+
+def files_of(v):
+    """A variant's image and, for a clip, the videos beside it."""
+    return [v.path, *v.videos]
 
 
 def keep_hashes(st, card, entry, art, render_sources):
@@ -55,6 +61,8 @@ def keep_hashes(st, card, entry, art, render_sources):
     for v in by_hash.values():
         if v.kind == "enhance" and v.base in keep and v.hash not in keep:
             keep[v.hash] = "an enhance of a kept one"
+        elif v.kind == "motion" and v.base in keep and v.hash not in keep:
+            keep[v.hash] = "a clip of a kept one"
     return keep
 
 
@@ -158,7 +166,7 @@ def main(argv=None):
         print(f"  skipped  {e}")
     vs = r["variants"]
     print(f"variants not picked, current, rendered, a base of one of those, or under {a.keep_days} days old: "
-          f"{len(vs)}, {mb([v.path for _, _, v in vs]):.0f} MB")
+          f"{len(vs)}, {mb([p for _, _, v in vs for p in files_of(v)]):.0f} MB")
     for code, name, v in vs:
         print(f"  {code} {name}: {v.label}-{v.hash} ({v.kind}, {v.created[:10]})")
     un = r["unreferenced"]

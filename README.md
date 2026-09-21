@@ -129,6 +129,7 @@ ollama_url = "http://127.0.0.1:11434"
 | `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet; `--faces` the backs of double-faced cards too |
 | `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
 | `mint describe` | a vision model reads each card's picture and text and writes its `subject` line; `--generate` then makes each card's `new` scene from it |
+| `mint animate` | a short seamless clip of a card's art through ComfyUI (Wan 2.2), beside its stills; the workbench's card page is where it is meant to be pressed |
 | `mint upscale` | 4× ESRGAN the art (or any variant, `--base HASH`) through a local ComfyUI; renders pick the result up automatically |
 | `mint check` | validate set files and say which image each card renders with, plain and styled |
 | `mint style` | save a set's art style as a template in `styles/` for other sets to start from; `list` and `show` them |
@@ -137,7 +138,7 @@ ollama_url = "http://127.0.0.1:11434"
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
 | `mint fonts` | report which frame fonts are present; `--repair` fixes the community copies |
 | `mint gc` | report variants no card picks, renders with, or starts from, and renders gone stale; `--delete` removes them |
-| `mint doctor` | check the card file, the fonts, a Chromium launch, ComfyUI's nodes, and every model file the styles name |
+| `mint doctor` | check the card file, the fonts, a Chromium launch, ComfyUI's nodes, every model file the styles name, and the Wan files and ffmpeg when a set has a motion block |
 | `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
 | `mint serve` | the workbench: compare art, recipes and frames in a browser, and run the tools from it |
@@ -476,6 +477,61 @@ in the footer either way: the composition is still theirs.
   weight; generate large — hatching is what the upscaler destroys first.
 - **Dark manga / Berserk-style** — the hardest without a LoRA; base models
   give "generic dark manga." Worth it with a good dark-fantasy-manga LoRA.
+
+## Art with motion: a clip per card
+
+The card page of the workbench has an **animate** button on every image --
+the crop, an enhance, any restyle -- and one on the styled-art line. Each
+makes a two-second seamless loop of that image through Wan 2.2 (the 5B
+TI2V model, image-to-video) and files it in the art cache as a *motion
+variant*: a poster PNG (the loop's first frame) with the `.webm` beside it.
+The clip plays in place on the card page and in the viewer; the poster is
+what everything else sees, so renders, `gc`, `describe` and the gallery are
+untouched. It is a clip of the *art*, not of the card, and never goes near
+a PDF.
+
+Where the clip starts from is the image whose button you press; the
+styled-art button takes what `render --styled` would use, enhance included
+-- which is how a set's SDXL look reaches the clip, since Wan cannot run an
+SDXL LoRA but can animate the picture one made. The *motion* line on the
+page is this card's own words for what moves, in place of the block's
+prompt; the loop and length pickers beside it are for the run alone. Say
+what moves and what stays still ("hair drifts, the figure breathes, the
+camera is still"); "cinematic" and "camera pans" get a music video.
+
+The knobs live in an optional `motion` block in the set file, every one
+with a default, so a set without a block still animates:
+
+```json
+"motion": {
+  "prompt": "hair drifts as if underwater, fabric sways, the figure breathes slowly; the camera is still",
+  "remix": "animate",           // animate: from the image (I2V) | new: from the words alone (T2V)
+  "width": 832, "height": 576,  // multiples of 32; the art window is 1.42:1
+  "length": 49, "fps": 24,      // frames, 4n+1: 49 is two seconds, 81 about three and a half
+  "loop": "pingpong",           // pingpong | crossfade | none
+  "formats": ["webm"]           // webm | gif | apng | mp4, each written beside the poster
+}
+```
+
+Per card, `"motion": "the wave curls and crashes, spray drifts"` replaces
+the prompt. The effective recipe is hashed into the file name like a
+restyle's, so a re-restyle of the base, a new line, or any knob is a new
+clip beside the old one; the raw frames are not kept (re-looping means
+regenerating). `mint animate --set sets/x.json ["Card" ...]` does the same
+from the shell, `--from HASH` naming the image and `--remix new` a clip
+from the words alone.
+
+Into ComfyUI's `models/`, from Comfy-Org's `Wan_2.2_ComfyUI_Repackaged`
+(`mint doctor` prints the URL of each one missing):
+
+- `diffusion_models/wan2.2_ti2v_5B_fp16.safetensors` (10 GB)
+- `text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors` (6.7 GB)
+- `vae/wan2.2_vae.safetensors` (1.4 GB)
+
+The 5B model fits a 16 GB card at 832 px with room to spare: about 50 s a
+clip at 49 frames on an RTX 5070 Ti, plus the model load the first time.
+`ffmpeg` does the encoding and has to be on PATH. The 14B pair is prettier
+but needs a two-stage sampler and quantised weights; a second engine, later.
 
 ## Universes Beyond
 

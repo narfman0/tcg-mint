@@ -4,13 +4,14 @@
       "code": "BLS1", "name": "...", "size": 18,
       "art_filter": "saturate(1.4)",       CSS filter for --styled when no restyle exists
       "style": {...},                      the restyle recipe (Style below; restyle.py explains the knobs)
+      "motion": {...},                     the animate recipe (Motion below; animate.py explains the knobs)
       "base": "spore",                     what every restyle starts from: a restyle label (that card's newest
                                            variant with it) or a variant hash; default the crop
       "cards": {
         "Card Name": {"number": 1, "flavor": "...", "art": "path.png", "art_filter": "...",
                       "subject": "what the picture is of", "printing": "rvr:40",
                       "base": "<variant hash>", "pose": "<variant hash>", "seed": 123,
-                      "pick": "<variant hash>"}
+                      "pick": "<variant hash>", "motion": "what moves in this card's clip"}
       }
     }
 
@@ -29,6 +30,12 @@ The card's *styled art* (`SetFile.styled_hash`) is the variant its `pick`
 names, else the one the effective recipe hashes to. A pick is how a take from
 a random seed, or a restyle in another look, becomes the card's art without
 rewriting the recipe to match it.
+
+A *motion recipe* (`SetFile.motion_recipe`) is the same idea for a clip of
+the art: the motion block (or its defaults, when the set has none) with the
+card's own `motion` line in place of the prompt, its seed, and the image the
+clip starts from -- the card's styled art unless told otherwise. Its hash
+names the motion variant (art.py: a poster frame plus the videos beside it).
 """
 import dataclasses
 import hashlib
@@ -52,6 +59,10 @@ SEED_RULES = ("stable", "position")
 #            carry over, the words decide the pose, action and scene
 REMIX = ("restyle", "repose", "new", "inspire")
 INSPIRE_TYPES = ("standard", "prompt first", "style")  # the IP-Adapter weight types, in plain words
+# how a clip of the art is made (animate.py): from the card's styled picture, or from words alone
+MOTION_REMIX = ("animate", "new")
+LOOPS = ("pingpong", "crossfade", "none")  # how the clip is made seamless (loop.py)
+FORMATS = ("webm", "gif", "apng", "mp4")
 
 
 @dataclass
@@ -132,6 +143,61 @@ class Style:
 
 
 @dataclass
+class Motion:
+    """The animate recipe: a short seamless clip of the card's art through Wan 2.2 (animate.py).
+    Every knob has a default, so a card can be animated from the workbench without the set
+    spelling a block; a block is for a set whose clips should all move the same way."""
+    name: str = "motion"                   # the variant label: art/<id>/<name>-<hash>.png (poster) + .webm
+    prompt: str = "hair drifts as if underwater, fabric sways, the figure breathes slowly; the camera is still"
+    negative: str = "static, still image, frozen, blurry, low quality, text, watermark, flicker, jump cut"
+    remix: str = "animate"                 # MOTION_REMIX: animate the styled art (I2V) | new: from words alone (T2V)
+    width: int = 832                       # the art window is 1.42:1; both multiples of 32
+    height: int = 576
+    length: int = 49                       # frames, 4n+1; 49 at 24 fps is two seconds, 81 is ~3.4 s
+    fps: int = 24
+    steps: int = 20
+    cfg: float = 5.0
+    shift: float = 8.0
+    sampler: str = "uni_pc"
+    scheduler: str = "simple"
+    seed: int = 7
+    seed_rule: str = "stable"              # as Style.seed_rule
+    loop: str = "pingpong"                 # LOOPS: pingpong | crossfade | none
+    crossfade: int = 12                    # frames blended tail-into-head when loop = crossfade
+    formats: list = field(default_factory=lambda: ["webm"])  # FORMATS, each encoded beside the poster
+    gif_width: int = 480                   # a gif is scaled to this width (0 = the generation size)
+    model: str = "wan2.2_ti2v_5B_fp16.safetensors"
+    text_encoder: str = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+    vae: str = "wan2.2_vae.safetensors"
+    loras: list = field(default_factory=list)  # [{"name": "x.safetensors", "strength": 0.8}], model-only
+    explicit: set = field(default_factory=set, compare=False, repr=False)
+
+    def validate(self, where):
+        if self.remix not in MOTION_REMIX:
+            raise SetError(f"{where}: remix must be one of {', '.join(MOTION_REMIX)}, not {self.remix!r}")
+        if self.seed_rule not in SEED_RULES:
+            raise SetError(f"{where}: seed_rule must be one of {', '.join(SEED_RULES)}")
+        if self.loop not in LOOPS:
+            raise SetError(f"{where}: loop must be one of {', '.join(LOOPS)}, not {self.loop!r}")
+        if self.length < 5 or self.length % 4 != 1:
+            raise SetError(f"{where}: length must be 4n+1 frames (49, 81 ...), not {self.length}")
+        for k in ("width", "height"):
+            v = getattr(self, k)
+            if v < 32 or v % 32:
+                raise SetError(f"{where}: {k} must be a multiple of 32, not {v}")
+        if self.loop == "crossfade" and (self.crossfade <= 0 or 2 * self.crossfade >= self.length):
+            raise SetError(f"{where}: crossfade must be between 1 and half the length ({self.length // 2}), "
+                           f"not {self.crossfade}")
+        if not self.formats or any(f not in FORMATS for f in self.formats):
+            raise SetError(f"{where}: formats must be some of {', '.join(FORMATS)}, not {self.formats!r}")
+        if self.fps < 1 or self.steps < 1:
+            raise SetError(f"{where}: fps and steps must be positive")
+        for lora in self.loras:
+            if not isinstance(lora, dict) or "name" not in lora:
+                raise SetError(f"{where}: each lora needs a name")
+
+
+@dataclass
 class Frame:
     """The frame's dressing: each knob a strength 0-1 (0 = off), reaching template.html as a CSS
     custom property of the same name (--art-bevel ...), so a set's css can still override any."""
@@ -162,6 +228,7 @@ class CardEntry:
     seed: int | None = None          # this card's seed, instead of the derived one
     remix: str | None = None         # this card's remix mode (REMIX), instead of the style's
     pick: str | None = None          # the variant hash --styled renders use, instead of the recipe's
+    motion: str | None = None        # animate: what moves in this card's clip, in place of the motion prompt
 
 
 @dataclass
@@ -172,6 +239,7 @@ class SetFile:
     note: str | None = None
     art_filter: str | None = None
     style: Style | None = None
+    motion: Motion | None = None               # how the art is animated; None = Motion's defaults
     frame: Frame | None = None                 # the frame's dressing; None = the defaults
     base: str | None = None                    # every card's restyle base unless its entry says: hash or label
     cards: dict = field(default_factory=dict)  # name -> CardEntry, in collector order
@@ -249,6 +317,46 @@ class SetFile:
         r["base"] = "none" if remix == "new" else base  # `new` reads no image, so none names its variant
         return r
 
+    def motion_recipe(self, record, motion=None, art=None, seed=None, remix=None, base=None):
+        """The effective animate recipe for one card (animate.py), as a plain dict: the motion
+        block (`motion`, a Motion, for a one-off; else the set's; else the defaults) with the
+        card's `motion` line as the prompt, its seed, and `base`, the image the clip starts from.
+        Given no base, it is the card's styled art -- the file `render --styled` would use, enhance
+        included -- resolved through the art cache, else the crop. `new` reads no image: the subject
+        line (or the card's name and type) leads the prompt, and the base is "none"."""
+        motion = motion or self.motion or Motion()
+        entry = self.card(record)
+        r = {k: v for k, v in dataclasses.asdict(motion).items() if k not in ("name", "seed_rule", "explicit")}
+        # knobs that do nothing stay out of the hash, so a clip keeps its name when they change
+        if r["loop"] != "crossfade":
+            del r["crossfade"]
+        if "gif" not in r["formats"]:
+            del r["gif_width"]
+        if not r["loras"]:
+            del r["loras"]
+        remix = remix or motion.remix
+        if remix not in MOTION_REMIX:
+            raise SetError(f"{record['name']}: motion remix must be one of {', '.join(MOTION_REMIX)}, not {remix!r}")
+        if remix == "animate":
+            del r["remix"]
+        else:
+            r["remix"] = remix
+        if entry.motion:
+            r["prompt"] = entry.motion
+        if remix == "new":  # words are the whole input: say what the picture is of, then how it moves
+            subject = entry.subject or f"{record['name']}, {record.get('type_line', '')}".rstrip(", ")
+            r["prompt"] = f"{subject}, {r['prompt']}"
+        r["seed"] = seed if seed is not None else self.card_seed(record["name"], record.get("illustration_id", ""), motion)
+        if remix == "new":
+            base = "none"
+        elif base is None:
+            if art is not None:
+                base = art.resolve(record, style_hash=self.styled_hash(record, art=art)).hash or "crop"
+            else:
+                base = entry.pick or "crop"
+        r["base"] = base
+        return r
+
     def styled_hash(self, record, art=None):
         """The variant hash the card's styled art comes from: its pick, else the effective
         recipe's hash, else None without a style."""
@@ -279,6 +387,8 @@ class SetFile:
                 d[k] = getattr(self, k)
         if self.style:
             d["style"] = _slim(dataclasses.asdict(self.style), Style, self.style.explicit)
+        if self.motion:
+            d["motion"] = _slim(dataclasses.asdict(self.motion), Motion, self.motion.explicit)
         if self.frame and _slim(dataclasses.asdict(self.frame), Frame):
             d["frame"] = _slim(dataclasses.asdict(self.frame), Frame)
         d["cards"] = {n: {k: v for k, v in dataclasses.asdict(e).items() if v is not None} for n, e in self.cards.items()}
@@ -355,6 +465,7 @@ def from_dict(d, where="set"):
         raise SetError(f"{where}: a set needs a code")
     d = dict(d)
     style = d.pop("style", None)
+    motion = d.pop("motion", None)
     frame = d.pop("frame", None)
     cards = d.pop("cards", {})
     st = _build(SetFile, d, where)
@@ -365,6 +476,10 @@ def from_dict(d, where="set"):
         st.style = _build(Style, style, f"{where}: style")
         st.style.explicit = set(style)
         st.style.validate(f"{where}: style")
+    if motion is not None:
+        st.motion = _build(Motion, motion, f"{where}: motion")
+        st.motion.explicit = set(motion)
+        st.motion.validate(f"{where}: motion")
     if not isinstance(cards, dict):
         raise SetError(f"{where}: cards must be an object of name -> entry")
     st.cards = {n: _build(CardEntry, e or {}, f"{where}: cards[{n!r}]") for n, e in cards.items()}
