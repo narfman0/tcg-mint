@@ -3,8 +3,10 @@
     mint impose [--paper letter|a4] [--bleed 0.04] [--dpi 600] [--out sheet.pdf] card.png ...
 
 Nine cards per page (3x3) at exactly 2.5x3.5in plus `bleed` on every side, so
-you cut on the 2.5x3.5 grid and never see a white edge. Cut marks sit in the
-page margins, aligned to that grid. The PDF page is the paper size, at 100%,
+you cut on the 2.5x3.5 grid and never see a white edge. Every cut line is drawn
+in full: a black tick in each page margin, and bright green across the cards
+themselves so you can see it where the black bleeds of neighbours meet. The
+PDF page is the paper size, at 100%,
 which is what `mint print` insists on.
 
 Renders are 2.72x3.72in with 0.11in of bleed; the default keeps 0.04in of it
@@ -28,6 +30,8 @@ CARD = (2.5, 3.5)
 RENDER_BLEED = 0.11  # what render.py puts around the card
 COLS, ROWS = 3, 3
 PAGES_PER_RUN = 3    # pages per Chromium document; parts are joined with pdfunite (poppler)
+MARK = 0.2           # length of the cut ticks in the page margins, inches
+GREEN = "#00ff00"    # the cut line over the cards: bright, and not a colour a black border hides
 
 
 def prepare(path, bleed, dpi, tmpdir, i):
@@ -55,22 +59,21 @@ def page_html(paths, paper, bleed):
     for k, p in enumerate(paths):
         c, r = k % COLS, k // COLS
         parts.append(f'<img src="file://{p}" style="left:{x0 + c * cw}in;top:{y0 + r * ch}in;width:{cw}in;height:{ch}in">')
-    # cut marks: in the margins, on the 2.5x3.5 grid lines (i.e. inset by the bleed)
-    mark = 0.18
-    for c in range(COLS + 1):
-        for edge in (0, 1):
-            x = x0 + c * cw + (bleed if edge == 0 else -bleed)
-            if c == 0 and edge == 1 or c == COLS and edge == 0:
-                continue
-            parts.append(f'<i class="v" style="left:{x}in;top:{y0 - mark - 0.02}in;height:{mark}in"></i>')
-            parts.append(f'<i class="v" style="left:{x}in;top:{y0 + ROWS * ch + 0.02}in;height:{mark}in"></i>')
-    for r in range(ROWS + 1):
-        for edge in (0, 1):
-            y = y0 + r * ch + (bleed if edge == 0 else -bleed)
-            if r == 0 and edge == 1 or r == ROWS and edge == 0:
-                continue
-            parts.append(f'<i class="h" style="top:{y}in;left:{x0 - mark - 0.02}in;width:{mark}in"></i>')
-            parts.append(f'<i class="h" style="top:{y}in;left:{x0 + COLS * cw + 0.02}in;width:{mark}in"></i>')
+    # cut lines on the 2.5x3.5 grid (i.e. inset by the bleed): a black tick in each margin,
+    # and a bright green line across the whole block so the cut is visible where the cards'
+    # black bleeds meet -- the way Proxxied does it. Vertical, then horizontal.
+    xs = [x0 + c * cw + (bleed if edge == 0 else -bleed) for c in range(COLS + 1) for edge in (0, 1)
+          if not (c == 0 and edge == 1 or c == COLS and edge == 0)]
+    ys = [y0 + r * ch + (bleed if edge == 0 else -bleed) for r in range(ROWS + 1) for edge in (0, 1)
+          if not (r == 0 and edge == 1 or r == ROWS and edge == 0)]
+    for x in xs:
+        parts.append(f'<i class="v" style="left:{x}in;top:{y0 - MARK}in;height:{MARK}in"></i>')
+        parts.append(f'<i class="v" style="left:{x}in;top:{y0 + ROWS * ch}in;height:{MARK}in"></i>')
+        parts.append(f'<i class="v g" style="left:{x}in;top:{y0}in;height:{ROWS * ch}in"></i>')
+    for y in ys:
+        parts.append(f'<i class="h" style="top:{y}in;left:{x0 - MARK}in;width:{MARK}in"></i>')
+        parts.append(f'<i class="h" style="top:{y}in;left:{x0 + COLS * cw}in;width:{MARK}in"></i>')
+        parts.append(f'<i class="h g" style="top:{y}in;left:{x0}in;width:{COLS * cw}in"></i>')
     parts.append("</div>")
     return "\n".join(parts)
 
@@ -89,7 +92,8 @@ def impose(cards, out, paper="letter", bleed=0.04, dpi=600, log=print):
            ".page { position: relative; page-break-after: always; overflow: hidden; }"
            ".page img { position: absolute; display: block; }"
            ".page i { position: absolute; background: #000; }"
-           ".page i.v { width: 0.6pt; margin-left: -0.3pt; } .page i.h { height: 0.6pt; margin-top: -0.3pt; }"
+           f".page i.g {{ background: {GREEN}; }}"
+           ".page i.v { width: 0.75pt; margin-left: -0.375pt; } .page i.h { height: 0.75pt; margin-top: -0.375pt; }"
            "</style>")
     per_page = COLS * ROWS
     chunk = per_page * PAGES_PER_RUN

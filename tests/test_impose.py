@@ -22,15 +22,25 @@ def test_page_html_places_nine_cards_on_letter():
         assert float(top) == pytest.approx(y0 + (k // 3) * ch)
         assert (float(w), float(h)) == (pytest.approx(cw), pytest.approx(ch))
     assert f'<div class="page" style="width:{pw}in;height:{ph}in">' in html
-    # four grid lines per axis, two marks each end, minus the outer edges' outside-facing pair
+    # six cut lines per axis (four grid lines, the inner two doubled by the bleed), each drawn
+    # as a tick in both margins and one green line across the block; the marks come after
+    # the images so they paint on top of the bleed
     assert html.count('<i class="v"') == 12 and html.count('<i class="h"') == 12
-    # the first vertical mark sits on the 2.5in grid line: bleed in from the image edge, above the top row
-    assert f'<i class="v" style="left:{x0 + bleed}in;top:{y0 - 0.18 - 0.02}in;height:0.18in"></i>' in html
+    assert html.count('<i class="v g"') == 6 and html.count('<i class="h g"') == 6
+    assert html.rindex("<img") < html.index("<i ")
+    # the first vertical cut sits on the 2.5in grid line: bleed in from the image edge, ticked
+    # above the top row and lined from the top of the block to its bottom
+    x = x0 + bleed
+    assert f'<i class="v" style="left:{x}in;top:{y0 - impose.MARK}in;height:{impose.MARK}in"></i>' in html
+    assert f'<i class="v g" style="left:{x}in;top:{y0}in;height:{3 * ch}in"></i>' in html
+    # the two lines between columns are 2*bleed apart, and a horizontal line spans all three columns
+    assert f'left:{x0 + cw - bleed}in' in html and f'left:{x0 + cw + bleed}in' in html
+    assert f'<i class="h g" style="top:{y0 + bleed}in;left:{x0}in;width:{3 * cw}in"></i>' in html
 
 
 def test_page_html_fewer_cards_and_a4():
     html = impose.page_html(["/a.png", "/b.png"], "a4", 0.0)
-    assert len(IMG.findall(html)) == 2 and html.count("<i ") == 24
+    assert len(IMG.findall(html)) == 2 and html.count("<i ") == 36
 
 
 def test_page_html_rejects_bleed_that_does_not_fit():
