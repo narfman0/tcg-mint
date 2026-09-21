@@ -16,8 +16,11 @@ from . import PKG
 
 
 def frame_hash(set_css="", frame_vars=""):
-    """Identifies the frame rules a render used: the template, the set's frame knobs and its CSS."""
+    """Identifies the frame rules a render used: the template, the code that fills it (frame.py builds
+    the set symbol, the crown, the collector line), the set's frame knobs and its CSS. A render made
+    before a frame fix is stale, not current, so it never goes to the printer as if it were."""
     h = hashlib.sha1((PKG / "template.html").read_bytes())
+    h.update((PKG / "frame.py").read_bytes())
     h.update(frame_vars.encode())
     h.update(set_css.encode())
     return h.hexdigest()[:8]

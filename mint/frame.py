@@ -478,10 +478,28 @@ def _burst():
 
 
 def _icon_parts(icon_svg):
-    """(viewBox, inner markup) of a Scryfall set icon: black paths in an 800-unit box."""
+    """(viewBox, inner markup) of a Scryfall set icon: black paths, in whatever box the icon was drawn in."""
     m = re.search(r'viewBox="([^"]+)"', icon_svg)
     inner = re.sub(r"^.*?<svg[^>]*>|</svg>\s*$", "", icon_svg, flags=re.S)
     return (m.group(1) if m else "0 0 800 800"), inner
+
+
+# the symbol's black edge as a fraction of its rendered size (14 units on an 800-unit icon)
+EDGE = 14 / 800
+
+
+def _edge_width(box):
+    """The stroke that draws a thin edge on an icon in this viewBox, in the icon's own units.
+
+    Scryfall's icons are drawn in boxes from 17 units across (MH2) to 1600 (BLC); the symbol is fit
+    to a square (meet), so one unit is 1/max(w, h) of the rendered symbol. A fixed 14-unit stroke
+    was a hairline on the 800-unit icons and, on MH2's, wider than the glyph -- the whole symbol
+    came out black."""
+    try:
+        _, _, w, h = (float(v) for v in box.replace(",", " ").split())
+    except ValueError:
+        w = h = 800
+    return round(EDGE * max(w, h), 4)
 
 
 def set_symbol(rarity, icon_svg=None):
@@ -492,7 +510,9 @@ def set_symbol(rarity, icon_svg=None):
             f'<stop offset=".5" stop-color="{hi}"/><stop offset="1" stop-color="{edge}"/></linearGradient></defs>')
     if icon_svg:  # the icon's paths take the gradient and a thin black edge, as the printed symbol has
         box, inner = _icon_parts(icon_svg)
-        inner = re.sub(r"<path\b", '<path fill="url(#g)" stroke="#000" stroke-width="14" paint-order="stroke"', inner)
+        inner = re.sub(r'\s(?:fill|stroke|stroke-width|paint-order)="[^"]*"', "", inner)  # the icon's own black goes
+        inner = re.sub(r"<(path|polygon|rect|circle|ellipse)\b",
+                       rf'<\1 fill="url(#g)" stroke="#000" stroke-width="{_edge_width(box):g}" paint-order="stroke"', inner)
         return f'<svg class="setsym" viewBox="{box}">{grad}{inner}</svg>'
     return (f'<svg class="setsym" viewBox="0 0 24 24">{grad}'
             f'<polygon points="{_burst()}" fill="url(#g)" stroke="#000" stroke-width="1"/></svg>')

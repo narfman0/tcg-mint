@@ -14,7 +14,7 @@ wrong forever after. This walks every set and keeps, per card:
 Every other variant of that card is a candidate, and so is every variant
 directory no set's card refers to. Renders are judged against the manifest:
 an entry whose file is gone is dropped, a PNG the manifest does not know is
-an orphan, and an entry is *stale* when the frame (template, knobs, set css)
+an orphan, and an entry is *stale* when the frame (template, frame.py, knobs, set css)
 or the art it should render with has changed since, or the card left the
 set. Nothing is removed without --delete; the report says what would be.
 """

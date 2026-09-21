@@ -746,7 +746,7 @@ def card_detail(S, st, name, cards=None):
 
 def renders_for(S, st, name, want=None):
     """The card's newest plain and styled render, its proof and its theme sheet. `want` is the art
-    hash each of plain / styled should render with now; a render is `stale` when the frame (template,
+    hash each of plain / styled should render with now; a render is `stale` when the frame (template, frame.py,
     knobs, set css) or that art has changed since it was made."""
     out = {}
     m = Manifest(S.out_dir(st))

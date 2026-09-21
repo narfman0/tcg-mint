@@ -159,6 +159,24 @@ def test_set_symbol_is_the_icon_when_we_have_it():
     assert "M0 0h800v800H0z" in mark and "url(#g)" not in mark
 
 
+# Modern Horizons 2's icon, as Scryfall draws it: a 17-by-11 box, the path already filled black
+MH2 = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 17 11">'
+       '<path d="M7.245 4.52c-.08.315-.116.587-.109.815z" fill="#000" fill-rule="nonzero"/></svg>')
+
+
+def test_set_symbol_edge_scales_with_the_icon_box():
+    # the edge is a fraction of the rendered symbol, whatever units the icon was drawn in: a fixed
+    # 14-unit stroke covered MH2's 17-unit icon in black
+    assert 'stroke-width="14"' in frame.set_symbol("rare", ICON)
+    mh2 = frame.set_symbol("rare", MH2)
+    assert 'stroke-width="0.2975"' in mh2 and 'viewBox="0 0 17 11"' in mh2
+    assert frame._edge_width("0 0 1600 1600") == 28 and frame._edge_width("0 0 100 76") == 1.75
+    assert frame._edge_width("garbage") == 14
+    # the icon's own fill goes, so the gradient is the only one on the path; fill-rule stays
+    path = mh2[mh2.index("<path"):]
+    assert path.count(' fill="') == 1 and 'fill="url(#g)"' in path and 'fill-rule="nonzero"' in path
+
+
 def test_sets_cache_reads_from_disk_and_degrades_offline(tmp_path, monkeypatch):
     asked = []
 
