@@ -309,3 +309,22 @@ def test_animate_job_and_the_card_page_show_clips(client, art):
     assert m["videos"] == [str(v.path.with_suffix(".webm"))]
     assert client.delete("/api/sets/TST/cards/Alpha/variants/abcdef12").status_code == 200
     assert not v.path.with_suffix(".webm").exists()
+
+
+def test_img_revalidates_so_a_rewritten_render_shows(client, art):
+    """A render is overwritten in place under the same name, so /img must not let the browser keep
+    a thumbnail for an hour: the thumbnail's key is the ETag, a match is a 304, a rewritten file is new."""
+    import os
+    import shutil
+    from PIL import Image
+    p = client.ws.home / "out" / "render.png"
+    p.parent.mkdir()
+    shutil.copy(art, p)
+    r = client.get("/img", params={"path": str(p), "w": 160})
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-cache" and r.headers["etag"]
+    again = client.get("/img", params={"path": str(p), "w": 160}, headers={"If-None-Match": r.headers["etag"]})
+    assert again.status_code == 304 and again.headers["etag"] == r.headers["etag"]
+    Image.new("RGB", (284, 200), "white").save(p)  # re-rendered: new bytes, a later mtime
+    os.utime(p, (p.stat().st_atime, p.stat().st_mtime + 5))
+    fresh = client.get("/img", params={"path": str(p), "w": 160}, headers={"If-None-Match": r.headers["etag"]})
+    assert fresh.status_code == 200 and fresh.headers["etag"] != r.headers["etag"]

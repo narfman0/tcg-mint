@@ -8,7 +8,7 @@ import threading
 import time
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
 from .. import PKG, animate, comfy, describe, frame, impose, loop, newset, printing, render, restyle, sets, style, upscale, wan
 from ..art import Art
@@ -168,7 +168,6 @@ def create_app(ws):
 
     @app.get("/favicon.ico")
     def favicon():
-        from fastapi.responses import Response
         svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect x="2" y="1" width="12" height="14" rx="1.5" '
                'fill="#2160a3" stroke="#0d2b4d"/><rect x="4" y="3" width="8" height="5" fill="#d7e3f1"/></svg>')
         return Response(svg, media_type="image/svg+xml")
@@ -190,8 +189,15 @@ def create_app(ws):
         return FileResponse(p)
 
     @app.get("/img")
-    def img(path: str, w: int = 320):
-        return FileResponse(thumbnail(ws, path, w), headers={"Cache-Control": "max-age=3600"})
+    def img(request: Request, path: str, w: int = 320):
+        """A thumbnail. A render is overwritten in place under the same name, so the browser must ask
+        again each time: the thumbnail's cache key (path, size, mtime) is the ETag, and an unchanged
+        file costs a stat and a 304."""
+        thumb = thumbnail(ws, path, w)
+        etag = f'"{thumb.stem}"'
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+        return FileResponse(thumb, headers={"ETag": etag, "Cache-Control": "no-cache"})
 
     @app.get("/file")
     def file(path: str, download: bool = False):
