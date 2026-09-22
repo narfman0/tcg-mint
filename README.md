@@ -450,12 +450,25 @@ printings of its kind, and `mint/designs/<name>.css` carries the numbers:
 - `fullart` — the art under everything; a basic gets the type bar at the
   foot with the mana medallion, a card with rules text a smoked-glass
   type bar and text plate, the collector line on a black strip.
-- `auto` — each card takes its printing's design (`full_art`,
-  `border_color`, `frame_effects: extendedart`).
+- `textless` — the picture behind a smoked-glass title bar and on down to
+  a sweeping black foot, no type bar and no text box (the player-rewards
+  and Secret Lair promos).
+- `modern` — the 2003 frame, Eighth Edition to M14: a squarer bevelled
+  band, plain bars with no pinline plate, the art in a black line, a lower
+  text box, no holofoil stamp; its own palette per colour, measured off
+  seventy-four scans.
+- `retro` — the 1997 frame, the old border: a bevelled coloured frame with
+  the colour's texture, the title straight on the frame, the art in a thin
+  black line, the text box an inset panel, a small P/T box; its own palette
+  per colour, measured off twenty-five scans.
+- `auto` — each card takes its printing's design (`textless`, `full_art`,
+  `border_color`, `frame_effects: extendedart`, then the frame's era:
+  1993 and 1997 retro, 2003 modern).
 
-A design steers the default printing to its own kind and sizes restyles
-and clips to its art rectangle. Sagas, classes, splits and battles keep
-the M15 frame whatever the design.
+A design steers the default printing to its own kind — a printing of that
+kind is no longer odd for the markers, the border or the promo that make
+it one — and sizes restyles and clips to its art rectangle. Sagas,
+classes, splits and battles keep the M15 frame whatever the design.
 
 ### Style templates
 

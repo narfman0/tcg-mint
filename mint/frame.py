@@ -309,9 +309,9 @@ DESIGNS = {
     "extended": (272, 179.4, "extended.css"),      # the page's width, from under the title bar to the text box's plate
     "borderless": (272, 206, "borderless.css"),    # the page's width, from its top edge to the type bar
     "fullart": (272, 372, "fullart.css"),          # the whole page
-    "textless": (272, 372, "textless.css"),        # the whole page, only the title bar and the collector line on it
-    "modern": (209, 154, "modern.css"),            # the 2003 frame (8th Edition to M14): its window, provisional
-    "retro": (209, 161, "retro.css"),              # the 1997 frame (Mirage to Scourge): its window, provisional
+    "textless": (210.6, 303.6, "textless.css"),    # the M15 window's width, from under the title bar's glass to the foot
+    "modern": (208, 153, "modern.css"),            # the 2003 frame's window (8th Edition to M14)
+    "retro": (192.5, 153.7, "retro.css"),          # the 1997 frame's window, inside its black line (Mirage to Scourge)
 }
 DESIGN_CHOICES = ("auto", *DESIGNS)  # what a set or card entry may say; auto follows the printing
 # the layouts whose art is not the window the designs move (a saga's and a class's beside the text, a split's and

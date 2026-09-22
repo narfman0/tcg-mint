@@ -117,3 +117,25 @@ def test_a_design_makes_its_own_printings_the_plain_ones():
     assert default_printing([full, extended, regular], "borderless") is regular  # full art is still odd for it
     assert oddness(full, "borderless")[1] == ["full art", "not borderless"]
     assert oddness(regular, "extended") == (5, ["not extended"]) and oddness(regular, "m15") == (0, [])
+
+
+def test_a_designs_own_printings_are_not_odd_for_being_its_kind():
+    from mint.cards import default_printing, oddness
+    plain = lambda **o: {"name": "X", "illustration_id": "i", "set_type": "expansion", "border_color": "black",
+                         "lang": "en", "released_at": "2020-01-01", "collector_number": "10", "type_line": "Creature",
+                         "frame": "2015", **o}
+    regular = plain(set="cmm", collector_number="150")
+    # a textless card exists only as a promo, full art, borderless and marked "inverted": for the textless design
+    # none of that is odd, and it wins; for any other design it is the oddity it was
+    promo = plain(set="pf19", set_type="promo", promo=True, textless=True, full_art=True, border_color="borderless",
+                  frame_effects=["inverted"])
+    assert oddness(promo)[0] >= 70 and oddness(promo, "textless") == (0, [])
+    assert default_printing([promo, regular], "textless") is promo
+    assert default_printing([promo, regular]) is regular
+    assert default_printing([promo, regular], "m15") is regular
+    retro = plain(set="dmr", frame="1997")
+    assert oddness(retro, "retro") == (0, []) and oddness(retro, "modern")[1] == ["not modern"]
+    assert default_printing([regular, retro], "retro") is retro
+    # what is odd for its own reasons still is: a digital printing of the right kind never wins
+    digital = plain(set="pmtg1", digital=True, textless=True, promo=True, set_type="promo")
+    assert oddness(digital, "textless")[1] == ["digital"]

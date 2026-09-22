@@ -100,7 +100,7 @@ reusable came out of it.
 - A design changes the restyle recipe hash only through the generation
   size, and only off M15.
 
-## Phase 4 -- textless, the 2003 frame, the 1997 frame (scaffolded 2026-09-22)
+## Phase 4 -- textless, the 2003 frame, the 1997 frame (done 2026-09-22)
 
 Three more designs, named by Scryfall's markers so `auto` follows them:
 `textless` (`textless: true`; the whole page, only the title bar and the
@@ -118,3 +118,15 @@ provisional art rectangles for the two era frames; the agents measure
 the real ones and report them. Same rules as phase 2: one agent per
 design in a worktree, scans not eyeballing, a golden, the M15 render
 pixel-identical, `mint check` warns of a wrong-shape picture.
+
+Merged 2026-09-22. The measured art rectangles are in `frame.DESIGNS`
+(textless 210.6 x 303.6, modern 208 x 153, retro 192.5 x 153.7); no design
+needed a hook in the base. `cards.oddness` gained the rule the textless
+agent found: a printing of the design's own kind is not odd for what makes
+it one -- its markers, its border, and the promo or box set that is the
+only place some of them are printed -- so `design: "textless"` now picks a
+textless promo instead of the plain printing. A planeswalker renders in
+every design (the modern and textless agents mended theirs; retro's is an
+anachronism that renders). Left undone: `mint calibrate --design`, and an
+art source that cuts a textless printing's picture out of the scan when
+Scryfall's crop is the plain window (art.py; the agent's follow-up).

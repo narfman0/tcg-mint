@@ -67,10 +67,20 @@ def TODAY():
     return dt.date.today().isoformat()
 
 
+# the frame effects each design's own printings carry, which are not odd for it ("inverted" marks nothing
+# visible and rides along on the promos that print textless and borderless cards)
+DESIGN_FRAME = {"extended": {"extendedart"}, "fullart": {"fullart", "inverted"}, "borderless": {"inverted"},
+                "textless": {"textless", "fullart", "inverted"}}
+
+
 def oddness(card, design=None):
     """(penalty, reasons) for a printing as the default; 0 is a plain black-bordered card. With a frame
-    design (frame.DESIGNS) the design's own marker is not odd, so a card set to full art defaults to
-    its newest full-art printing."""
+    design (frame.DESIGNS), a printing of that design's own kind is not odd for the things that make it
+    one -- its markers, its border, and the promo or box set it was printed in, which is the only place
+    some of them exist -- so a card set to full art defaults to its newest full-art printing, and one set
+    to textless to a textless promo; everything else still counts, and a printing of another kind is
+    ranked behind."""
+    mine = bool(design) and design != "m15" and printed_design(card) == design  # a printing of the design's own kind
     why = []
     if card.get("digital"):
         why.append(("digital", 100))
@@ -85,28 +95,26 @@ def oddness(card, design=None):
     if is_universes_beyond(card):
         why.append(("Universes Beyond", 40))
     t = card.get("set_type")
-    if t in ODD_SET_TYPES:
+    if t in ODD_SET_TYPES and not mine:
         why.append((t.replace("box", "Secret Lair / box set"), ODD_SET_TYPES[t]))
-    if card.get("promo") and t != "promo":
+    if card.get("promo") and t != "promo" and not mine:
         why.append(("promo", 30))
     if card.get("set") == "plst" or card.get("set", "").startswith("mb"):
         why.append(("The List / Mystery Booster", 15))
     border = card.get("border_color")
-    plain_border = border == "borderless" and design in ("borderless", "fullart")  # a full-art card is borderless too
+    plain_border = border == "borderless" and (mine or design in ("borderless", "fullart"))
     if border not in (None, "black") and not plain_border:
         why.append((border + " border", 10))
     odd = ODD_FRAME & set(card.get("frame_effects") or [])
-    if design == "extended":
-        odd.discard("extendedart")
-    if design == "fullart":
-        odd.discard("fullart")
+    if mine:
+        odd -= DESIGN_FRAME.get(design, set())
     if odd:
         why.append((", ".join(sorted(odd)), 10))
-    if card.get("full_art") and "Land" not in card.get("type_line", "") and design != "fullart":
+    if card.get("full_art") and "Land" not in card.get("type_line", "") and not mine and design != "fullart":
         why.append(("full art", 10))
-    if design and design != "m15" and printed_design(card) != design:  # the design's own printings come first
+    if not mine and design and design != "m15":  # the design's own printings come first
         why.append((f"not {design}", 5))
-    if card.get("textless"):
+    if card.get("textless") and not mine:
         why.append(("textless", 20))
     return sum(p for _, p in why), [w for w, _ in why]
 
