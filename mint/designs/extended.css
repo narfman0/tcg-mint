@@ -1,4 +1,59 @@
-/* extended art: the art window widened to the border, x 10-240, everything else the M15 frame.
-   Phase 2 of todo/frame-designs.md fills this in, measured off scans of real extended-art printings
-   (the art's edges, whether the pinline plate keeps its art piece, the band beside the window).
-   Until then a card in this design renders as M15. */
+/* extended art (Scryfall frame_effects "extendedart": the Commander-deck and collector-booster printings from 2019
+   on). The art runs off the card's sides -- there is no side border and no band between the title bar and the type
+   bar -- while the title bar, the text box and the band above and below stay the M15 ones. Measured off sixteen
+   scans (ZNR 347, CMR 627/632/644/689/700, THB 308, MID 373, MKM 399, OTJ 314/358, BLB 357, M3C 65, PIP 387, EOC
+   40, MSC 359), the way template.html's header did for M15: brightness rows and columns, edges at the half-way
+   point. In card units:
+   - the art reaches x 0 and x 250, the cut edges, on every scan (the card's own corners are the only thing black
+     beside it), so here it spans the whole 272 page, bleed included, and the card lets it out of its box;
+   - under the title bar it starts where M15's does: bar outline 36-37.2, pinline 36.6-38.4, then the one black line
+     38.5-39.6, image from 39.7 (ZNR 39.6, MKM 40.0, MID 39.9, EOC 40.0). Outside the bar's plate it rises to about
+     36-37 (ZNR x 11: 36.5; MID 35; OTJ 34), beside the bar's arcs;
+   - at the foot the image runs into the type bar's own outline (196.3-196.6) with no line and no pinline round the
+     bar: the plate's type piece is gone, the text box's plate shows below the bar as before (its top edge, the
+     pinline 216.4-218.4, on every scan). Beside the bar the art continues to the text box's plate at 216.4;
+   - the top and bottom borders end in a feathered diagonal at each side of the art, an airbrushed corner ~8 units
+     deep. Its half-way line runs from (x 0, y 38.5) up to (x 9, y 32) at the top (ZNR 41.6-36.6, EOC 37-31, OTJ
+     33-27, MKM 35-29, MID 36-37) and from (x 0, y 206) down to (x 9, y 211) at the bottom (OTJ 207-215, MID 210-212,
+     MKM 210-211, ZNR 197-205), inside the border's own 10, so a 21 x 20 patch per corner in the bleed and border;
+   - the type bar is black: a near-black face tinted with the bar's colour at the top (ZNR 38,26,20 under a bar of
+     237,201,192; OTJ 53,35,30; MKM 37,38,49; EOC 33,25,15) running to 0,0,0 at the foot, a 1.4 rim of the bar's
+     colour at half strength along its top (197.2-198.6: ZNR 128,91,77; OTJ 131,103,82; MKM 101,88,114; EOC
+     107,95,81), the outline where M15's is (196.6 / 216.1), white text. The title bar keeps its colour. A common's
+     black set symbol gets a white edge on it (CMR 632).
+   The CMR and MID printings drop the type bar to 213-231 and shorten the text box to 234-322 instead (nine of the
+   sixteen sit on the M15 bars, all from ZNR, THB and 2023 on): this design keeps the M15 bars. The layouts whose art
+   is elsewhere (saga, class, split, battle) stay M15, as todo/frame-designs.md says. */
+.design-extended:is(.normal, .planeswalker, .adventure) { overflow: visible; }  /* the art into the bleed */
+/* the window: the page's width, from 37 beside the bars down to the text box's plate. Its top steps down to the
+   black line under the title bar's plate between the feet of the plate's arcs (x 17-233: the arc's underside is
+   above 37 outside that), so the plate's bottom 2 stay in view and the art comes up to 37 beside the arcs; the
+   corner fades (the ::before) reach above the box into the border. A picture of the M15 shape (1.37:1) is shorter
+   than this box: hung from the top, cover crops only its foot, and that lands under the type bar */
+.design-extended:is(.normal, .planeswalker, .adventure) .art { left: -11px; top: 37px; width: 272px; height: 179.4px;
+  background-position: center top;
+  clip-path: polygon(0 -11px, 28px -11px, 28px 1.7px, 244px 1.7px, 244px -11px, 100% -11px, 100% 100%, 0 100%); }
+/* the art's one black line survives only under the title bar's plate: the ring is pushed down to the image's top
+   (39.7) and clipped to its top edge across the step */
+.design-extended:is(.normal, .planeswalker, .adventure) .art::after { top: 2.7px; clip-path: inset(-1px 28px 100% 28px); }
+/* the border's feathered corners over the art's ends: four 21 x 20 patches in the outer 10 of the card and the
+   bleed, each a black-to-clear gradient across the measured diagonal (the mid line at 52-58% of the gradient's run,
+   4.5 units of feather each side: the scans' airbrush is that soft, and above the art at x < 10 it fades into the
+   border's own black) */
+.design-extended:is(.normal, .planeswalker, .adventure) .art::before { content: ""; position: absolute; inset: -11px 0 0;
+  pointer-events: none;
+  background: linear-gradient(144deg, #000 42%, transparent 74%) 0 0 / 21px 20px no-repeat,
+    linear-gradient(216deg, #000 42%, transparent 74%) 100% 0 / 21px 20px no-repeat,
+    linear-gradient(29deg, #000 36%, transparent 68%) 0 100% / 21px 20px no-repeat,
+    linear-gradient(331deg, #000 36%, transparent 68%) 100% 100% / 21px 20px no-repeat; }
+/* no pinline round the type bar: it sits on the art with its own outline, and the text box's plate shows beneath */
+.design-extended:is(.normal, .planeswalker, .adventure) .pl-type { display: none; }
+/* the black type bar: the tinted-black face, the rim of the bar's colour along the top instead of the M15 bevel,
+   white text; the grain and rarity tint stay, and do nothing on black */
+.design-extended:is(.normal, .planeswalker, .adventure) .typebar { color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bar) 20%, #000), #000);
+  box-shadow: inset 0 1.4px 0 color-mix(in srgb, var(--bar) 55%, #000); }
+/* a common's set symbol is black on black: the printed one carries a white edge (the halo lands on an uncommon's
+   silver too, the class list not naming the rarity; it is faint there) */
+.design-extended:is(.normal, .planeswalker, .adventure):not(.stamped) .typebar .setsym {
+  filter: drop-shadow(0 0 .3px #fff) drop-shadow(0 0 .3px #fff); }

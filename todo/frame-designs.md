@@ -15,7 +15,7 @@ Named after Scryfall's vocabulary, so `auto` can follow the printed card:
 | design | what it is | Scryfall says | art the picture must cover (card units, bleed included where it reaches it) |
 |---|---|---|---|
 | `m15` | the frame as it is | `frame: 2015`, black border | 210.6 x 154 (the window) |
-| `extended` | the art window widened to the border, everything else M15 | `frame_effects: extendedart` | 230 x 154 (x 10-240) |
+| `extended` | the art off the card's sides between the title bar and a black type bar, everything else M15 | `frame_effects: extendedart` | 272 x 179 (the page's width, y 37-216; measured phase 2: the printed art reaches the cut edge, and `frame.DESIGNS` still says 230 x 154) |
 | `borderless` | no border and no band: the art runs off the card's edges between the title bar and the type bar; the bars and text box sit where they always do | `border_color: borderless`, `full_art: false` | 272 x 200 |
 | `fullart` | the art under everything; the title bar floating at the top, the type bar and a translucent text plate at the foot; a card with no rules text (a basic) has no plate | `full_art: true` | 272 x 372 (the whole card) |
 
