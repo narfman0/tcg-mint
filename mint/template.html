@@ -119,25 +119,26 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   color-mix(in srgb, color-mix(in srgb, var(--pinline) 50%, var(--pinline-b)) 60%, #fff) 50%, var(--pinline-b) 75%); }
 /* the bars span 14.8-235 outline included, 4.8 past the art on each side, 20 tall, their ends the pointed ovals of
    --bar-shape; the fill is flat (the bottom shade is the bevel's), the bevel lit from the upper right. The outline
-   is a half-unit of black just inside the clip: two cap images draw the ends' curve as a 1-wide stroke astride the
-   edge (the outer half falls to the clip), two gradients the hairlines along the top and bottom between them (each
-   the full height with its half unit of black at one edge: a half-unit image set at the bottom is snapped out of
-   the box and never paints); a transparent
+   is a unit of black just inside the clip (a 0.5 border always rendered as 1): two cap images draw the ends' curve
+   as a 2-wide stroke astride the edge (the outer half falls to the clip), two gradients the hairlines along the
+   top and bottom between them (each the full height with its unit of black at one edge: a thin image set at the
+   bottom is snapped out of the box and never paints); a transparent
    border of the same half unit keeps the bevel's inset shadows off the outline, as the black border did */
 .bar { position: absolute; left: 14.8px; width: 220.2px; height: 20.2px; padding: 0 5.2px;
   display: flex; align-items: center; justify-content: space-between;
-  clip-path: var(--bar-shape); border: 0.5px solid transparent;
+  clip-path: var(--bar-shape); border: 1px solid transparent;
   background:
-    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 20%22 preserveAspectRatio=%22none%22%3E%3Cpath d=%22M12 0 H3.2 C3.6 0.8 0 2.5 0 10 C0 17.5 3.6 19.2 3.2 20 H12%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%221%22/%3E%3C/svg%3E") left top / 12px 100% no-repeat,
-    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 20%22 preserveAspectRatio=%22none%22%3E%3Cpath d=%22M0 0 H8.8 C8.4 0.8 12 2.5 12 10 C12 17.5 8.4 19.2 8.8 20 H0%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%221%22/%3E%3C/svg%3E") right top / 12px 100% no-repeat,
-    linear-gradient(#000 0.5px, transparent 0.5px) 12px 0 / calc(100% - 24px) 100% no-repeat,
-    linear-gradient(to top, #000 0.5px, transparent 0.5px) 12px 0 / calc(100% - 24px) 100% no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 20%22 preserveAspectRatio=%22none%22%3E%3Cdefs%3E%3Cfilter id=%22b%22 x=%22-1%22 y=%22-1%22 width=%223%22 height=%223%22%3E%3CfeGaussianBlur stdDeviation=%220.9%22/%3E%3C/filter%3E%3C/defs%3E%3Cpath d=%22M3.2 0 C3.6 0.8 0 2.5 0 10 C0 17.5 3.6 19.2 3.2 20%22 fill=%22none%22 stroke=%22rgba%280,0,0,.45%29%22 stroke-width=%225%22 filter=%22url%28%23b%29%22/%3E%3Cpath d=%22M12 0 H3.2 C3.6 0.8 0 2.5 0 10 C0 17.5 3.6 19.2 3.2 20 H12%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22/%3E%3C/svg%3E") left top / 12px 100% no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 20%22 preserveAspectRatio=%22none%22%3E%3Cdefs%3E%3Cfilter id=%22b%22 x=%22-1%22 y=%22-1%22 width=%223%22 height=%223%22%3E%3CfeGaussianBlur stdDeviation=%220.5%22/%3E%3C/filter%3E%3C/defs%3E%3Cpath d=%22M8.8 0 C8.4 0.8 12 2.5 12 10 C12 17.5 8.4 19.2 8.8 20%22 fill=%22none%22 stroke=%22rgba%28255,255,255,.4%29%22 stroke-width=%223.6%22 filter=%22url%28%23b%29%22/%3E%3Cpath d=%22M0 0 H8.8 C8.4 0.8 12 2.5 12 10 C12 17.5 8.4 19.2 8.8 20 H0%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%222%22/%3E%3C/svg%3E") right top / 12px 100% no-repeat,
+    linear-gradient(#000 1px, transparent 1px) 12px 0 / calc(100% - 24px) 100% no-repeat,
+    linear-gradient(to top, #000 1px, transparent 1px) 12px 0 / calc(100% - 24px) 100% no-repeat,
     linear-gradient(180deg, color-mix(in srgb, var(--bar) 94%, #fff) 0, var(--bar) 12%, var(--bar) 100%);
   background-origin: border-box; background-clip: border-box;
   /* the bevel inside, lit from the upper right like everything else: the top and right edges catch the light, the
-     bottom and left edges fall dark; no shadow of its own -- the pinline plate under it casts one */
-  box-shadow: inset 0 1px 1.2px rgba(255,255,255,.6), inset -1.2px 0 0 rgba(255,255,255,.35),
-    inset 0 -1.6px 0 rgba(0,0,0,.6), inset 2px 0 1.5px rgba(0,0,0,.4); }
+     bottom and left edges fall dark; no shadow of its own -- the pinline plate under it casts one. The top and
+     bottom are inset shadows; the ends' shading is in the cap images, a soft band along the curve (an inset shadow
+     runs straight down the box and showed as a grey bar beside the pointed end) */
+  box-shadow: inset 0 1px 1.2px rgba(255,255,255,.6), inset 0 -1.6px 0 rgba(0,0,0,.6); }
 .titlebar { top: 17px; padding-right: 4.5px; }
 .typebar { top: 197px; height: 20px; padding: 0 4px 0 5px; }
 .name { font-family: var(--title-font); font-size: 13.1px; font-weight: 700; white-space: nowrap; letter-spacing: .012em; word-spacing: .04em;
