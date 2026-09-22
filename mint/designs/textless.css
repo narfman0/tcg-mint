@@ -1,4 +1,100 @@
-/* textless (Scryfall textless: true, the promos and box-set cards that print the picture over the whole card with
-   only the title bar and the collector line): the art under everything, as full art, with the type bar and the
-   text plate gone. Phase 4 of todo/frame-designs.md fills this in, measured off scans of real textless printings.
-   Until then a card in this design renders as M15. */
+/* textless (Scryfall textless: true): the picture over the whole face of the card, the title bar over it, no type
+   line, no rules text, the collector line on the black foot. The M15-era look, the promos of 2019 on: the band and
+   its pinline kept down the sides and across the top, the title bar in its M15 place but smoked glass with white
+   lettering, the art from under the bar to a foot that sweeps up into the sides, the P/T plate and the stamp where
+   M15 puts them, the stamp in a bite out of the art's foot, and black from the foot down. The base template stacks
+   the art at z 1 and the bars, the P/T plate, the stamp, the crown and the footer at 2, so the art grows down
+   under them; the type bar, the text box and their plates are hidden, nothing else is restated. Coordinates are
+   card units (1/100 in) from the card's top-left, the bleed outside them.
+
+   Measured off Scryfall's 745 x 1040 scans (2.98 px per unit) of ten black-bordered paper printings across the
+   colours, creatures and spells, promos of 2019-2026: Lightning Bolt (PF19 1, R instant), Path to Exile (PF20 1, W
+   instant), Counterspell (PF24 1, U instant), Avacyn's Pilgrim (PF25 1F, G 1/1), Sakura-Tribe Elder (PLG24 1, G
+   1/1), Gigantosaurus (FDN 718, G 10/10), Dark Confidant (SCH 3, B 2/1), Dauthi Voidwalker (SCH 23e, B 3/2),
+   Jedit Ojanen (PL22 2, WU legendary 5/5), Vendilion Clique (PSPL 8, U legendary 3/1). Brightness rows and
+   columns, each edge at the half-way point, averaged; the seven colour scans agree within 0.5 on every edge below.
+   - the top is M15's: border 10, band 10-15, pinline 15-16.7, bar outline 16.8-17.3, bar face 17.4-36.4, outline
+     to 37, pinline 37.2-38.4, art line 38.6-39.4, art from 39.6 (M15: bar 17-37.2, plate 15-37.8, art 39.7).
+     The bar is glass, not paint: the picture shows through it (the Bolt's lightning, the Elder's trees), its
+     lettering white. Its face reads 0.3 of the art beside it plus a grey of ~74 (fitted as (1 - a) art + a grey
+     over the ten scans; by the art's chroma surviving it, a = 0.7 within 0.1), so --bar is that grey at 70%.
+     The bar keeps its outline, caps and bevel (template.html .bar paints them as background layers over the
+     fill), so only the fill's colour changes, through the variable the fill is drawn from.
+   - the sides are M15's: the band to 16.6, the pinline plate 16.6-18.6, the art line 18.6-19.6, the art 19.6-230.2.
+   - the foot: the art ends flat at 320.6 (320.6-320.7 on every scan), its line 320.7-321.6, the pinline to 323,
+     black from 323. At each side the foot sweeps up into the rail: the plate's outer edge leaves the rail at 309.8
+     and reaches the flat foot at x 54 -- 16.4 at 310, 16.6 at 311, 17.6 at 312, 18.9 at 313, 20.3 at 314, 21.9 at
+     315, 23.6 at 316, 25.5 at 317, 27.6 at 318, 30 at 319, 32.7 at 320, 36.1 at 321, 40.4 at 322, 46 at 322.6, 50
+     at 322.8, 54 at 323 -- one cubic per corner, fitted by least squares within 0.15: from (16.6, 309.8) with
+     controls (16.6, 313.2) and (30.8, 323) to (54, 323). Neither an arc nor an ellipse quadrant fits (1.8 off).
+     The art's edge runs 3 inside it up the side and 2.4 above it along the foot (the line and the pinline, as
+     everywhere else on M15): the same shape offset, fitted within 0.35 of the measured art edges -- from
+     (19.6, 309.8) with controls (19.6, 310.4) and (31.2, 320.6) to (54, 320.6); the line between them is the art's
+     edge 1 out, a cubic from (18.6, 309.8) with controls (18.6, 311.6) and (31.2, 321.6) to (54, 321.6), within
+     0.1 of the true offset. The right side mirrors the left within 0.1.
+   - the band ends at the sweep: its outer edge leaves the border at 294.4 and curves in to meet the pinline's rail
+     at 309.3 -- 10.5 at 299.5, 11 at 301.7, 12 at 304.5, 13 at 306.5, 14 at 308.2, 14.55 at 309 -- and at 309.5
+     the first thing beside the black is the pinline at 16.4, so the band's foot is above that: a foot at 310 with
+     an elliptical corner 7.2 wide and 17.6 tall (tangent at 292.4) fits the arc within 0.13 and ends under the
+     pinline; the corner is not M15's 22-unit arc (which would sit 8 further in at 309). Under the plate the band
+     goes nowhere; below the sweep, and behind the stamp's bite, is the card's own black.
+   - the P/T plate is M15's: 194-235.2 x 309.9-330.5 on Gigantosaurus and Avacyn's Pilgrim (its lit rim at 309.9,
+     black from 330.5, from 235.2; M15's box 310.5-330.5, right edge 235.7), opaque. The Sakura-Tribe Elder promo
+     prints no P/T at all; the other five creatures do, so the plate stays.
+   - the stamp is M15's: 114.2-135.5 x 319.1-330 (21.3 x 11, centred 124.85 x 324.5; M15's 21.6 x 11 centred
+     125 x 324.7) and its bite is the M15 text box's arc about the same centre, cutting the lower foot: at x 125
+     the art ends at 314.9 (5.7 above its foot: the 24.1 arc about (125, 339.1), which meets the foot 31 wide,
+     109.2-140.7 measured), the line 315.1-315.9, the pinline 316.1-317.2 (its outer edge 21.7 from the centre;
+     M15's hole is 22.1), black to the stamp. The black line follows the art's edge 1 out (r 23.1).
+   - the collector rows sit at 326.5-330.5 and 332.5-337, a unit or two above M15's; not restated.
+   - a legendary (Jedit Ojanen, Vendilion Clique) keeps the M15 crown; the plate's top moves under the tongue
+     piece as on M15, so the plate's paths come twice, 5.6 shorter under a crown.
+   The other kinds on file are not this frame and not followed: the 2003-frame Player Rewards (P05-P11; Lightning
+   Bolt P10 1, Cryptic Command P09 1 looked at) print the 2003 bars and an arched art window inside the band with
+   the collector line in the band and no black foot -- a second template; the Secret Lair trio of 2024 (Goblin King
+   SLD 1705, Coffin Queen 1704, Rankle 1707) is borderless with the title lettered into the picture, no frame at
+   all; the textless lands (Reliquary Tower PF23 3, Command Tower PW25 17) add a type bar at the foot with the set
+   symbol in it, the Command Tower without the band -- the full-art basic's look (fullart.css), which this design
+   does not draw: a land here is as bare as a spell. Scryfall's "inverted" frame effect on some of these
+   (Counterspell, Path, Dark Confidant) marks nothing visible: every scan has the same glass bar. */
+/* the art grows down to the foot; its sweep is a path (the arcs of the stamp's bite in the stamped variants), the
+   corners a unit outside the box on the top and sides so the window's line (.art::after, a box-shadow) still
+   paints there; along the sweep and the bite the line is the plate's, below */
+.design-textless .art { height: 280.9px;
+  clip-path: path('M-1 -1 H211.6 V270.1 H210.6 C210.6 270.7 199 280.9 176.2 280.9 H34.4 C11.6 280.9 0 270.7 0 270.1 H-1 Z'); }
+.design-textless.stamped .art {
+  clip-path: path('M-1 -1 H211.6 V270.1 H210.6 C210.6 270.7 199 280.9 176.2 280.9 H120.85 A24.1 24.1 0 0 0 89.95 280.9 \
+H34.4 C11.6 280.9 0 270.7 0 270.1 H-1 Z'); }
+/* the art's plate reaches the foot too, 2 outside the art as M15's does (the base sets a height: the foot is what
+   is fixed here, so it goes and the bottom takes over) */
+.design-textless .pl-art { height: auto; bottom: 27px;
+  clip-path: path('M0 0 H216.8 V272.4 C216.8 275.8 202.6 285.6 179.4 285.6 H37.4 C14.2 285.6 0 275.8 0 272.4 Z'); }
+.design-textless.stamped .pl-art {
+  clip-path: path('M0 0 H216.8 V272.4 C216.8 275.8 202.6 285.6 179.4 285.6 H122.95 A21.7 21.7 0 0 0 93.85 285.6 H37.4 \
+C14.2 285.6 0 275.8 0 272.4 Z'); }
+.design-textless.legendary .pl-art {
+  clip-path: path('M0 0 H216.8 V266.8 C216.8 270.2 202.6 280 179.4 280 H37.4 C14.2 280 0 270.2 0 266.8 Z'); }
+.design-textless.legendary.stamped .pl-art {
+  clip-path: path('M0 0 H216.8 V266.8 C216.8 270.2 202.6 280 179.4 280 H122.95 A21.7 21.7 0 0 0 93.85 280 H37.4 \
+C14.2 280 0 270.2 0 266.8 Z'); }
+/* the art's black line along the sweep and round the bite, where the window's rectangular shadow cannot follow:
+   a black shape on the plate under the art, the art's edge 1 out, starting inside the rim (the M15 line's 18.6 /
+   231.2 / 38.7); faded by the same knob as the line it continues. Both copies of the plate carry it; the shape
+   is inside the plate's silhouette, so the plate's shadows are unchanged */
+.design-textless .pl-art::before { content: ""; position: absolute; inset: 0; background: #000; opacity: var(--art-bevel);
+  clip-path: path('M2 1.3 H214.6 V272.4 C214.6 274.2 202 284.2 179.2 284.2 H37.4 C14.6 284.2 2 274.2 2 272.4 Z'); }
+.design-textless.stamped .pl-art::before {
+  clip-path: path('M2 1.3 H214.6 V272.4 C214.6 274.2 202 284.2 179.2 284.2 H123.48 A23.1 23.1 0 0 0 93.32 284.2 H37.4 \
+C14.6 284.2 2 274.2 2 272.4 Z'); }
+.design-textless.legendary .pl-art::before {
+  clip-path: path('M2 1.3 H214.6 V266.8 C214.6 268.6 202 278.6 179.2 278.6 H37.4 C14.6 278.6 2 268.6 2 266.8 Z'); }
+.design-textless.legendary.stamped .pl-art::before {
+  clip-path: path('M2 1.3 H214.6 V266.8 C214.6 268.6 202 278.6 179.2 278.6 H123.48 A23.1 23.1 0 0 0 93.32 278.6 H37.4 \
+C14.6 278.6 2 268.6 2 266.8 Z'); }
+/* the band's foot at 310 with the tall elliptical corners (longhands: a crown squares the top corners) */
+.design-textless .frame { bottom: 40px; border-bottom-left-radius: 7.2px 17.6px; border-bottom-right-radius: 7.2px 17.6px; }
+/* no type line, no rules text: the type bar, the text box, their plates, and a planeswalker's box outline */
+.design-textless .typebar, .design-textless .pl-type, .design-textless .textbox, .design-textless .pl-text,
+.design-textless .pw-line { display: none; }
+/* the title bar's smoked glass, white lettering */
+.design-textless .titlebar { --bar: rgba(74, 74, 74, .7); color: #fff; }
