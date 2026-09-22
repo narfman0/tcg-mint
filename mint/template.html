@@ -54,7 +54,7 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .legendary .frame { top: 15px; border-top-left-radius: 0; border-top-right-radius: 0; }
 .legendary .pl-title { display: none; }  /* the crown meets the bar's outline directly */
 /* the flat pinline is a stroke, not a backdrop: a 1.8-unit band of the colour around the perimeter of each element,
-   following its shape (the bars' arcs, the text box's chamfered top corners), the strokes merging across the gaps;
+   following its shape (the bars' arcs, the boxes' straight sides), the strokes merging across the gaps;
    the textured band shows everywhere outside them. They are one layer, painted before every element, so no element's
    line can cover another's pinline and the band is the same width all round; the elements sit on this plate and it,
    not they, casts the shadow (to the left: the light comes from the right on the real cards). */
@@ -70,8 +70,12 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .pl-title { left: 12.8px; top: 15px; width: 224.4px; height: 23.4px; border-radius: 8px / 50%; }
 .pl-type { left: 12.8px; top: 195px; width: 224.4px; height: 23.4px; border-radius: 8px / 50%; }
 .pl-art { left: 16.6px; top: 37.4px; width: 216.8px; height: 159px; }
-.pl-text { left: 16.6px; top: 217px; width: 216.8px; height: 106.6px;
-  clip-path: polygon(2.4px 0, calc(100% - 2.4px) 0, 100% 2.4px, 100% 100%, 0 100%, 0 2.4px); }
+/* the text box's plate is a plain rectangle: its top corners sit under the type bar's arcs, which land on its sides
+   (traced off the scans, the pinline's edge runs 16.0, 16.4, 16.7 down the arc then 17.1 straight down the box, one
+   convex line). The top sits above where the arc crosses the side (216.66 as written, 216.46 once Chromium snaps
+   the boxes to whole units, so 216.4 rounds to 216): a chamfer there, or a top below the crossing, leaves the arc
+   curling in past the box's edge, a notch in the outline with the plate's shadow pooled dark inside it. */
+.pl-text { left: 16.6px; top: 216.4px; width: 216.8px; height: 107.2px; }
 /* the colour's painted texture (frame.TEXTURES), light veins and tinted shadows over the flat fill, faded by its knob.
    The band's edge is a crisp step, as on the cards: no bevel line, no ring */
 .frame::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
@@ -178,7 +182,7 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   box-shadow: inset 0 0 0 .6px rgba(255,255,255,.5); }
 /* on a stamped card the text box's bottom edge is bitten by a 21-unit arc around the stamp, its pinline following */
 .stamped .textbox { clip-path: path('M.5 0 H212.3 L212.8 .5 V103.6 H119.6 A21 21 0 0 0 93.2 103.6 H0 V.5 Z'); }
-.stamped .pl-text { clip-path: path('M2.4 0 H214.4 L216.8 2.4 V106.6 H125.6 A22.6 22.6 0 0 0 91.2 106.6 H0 V2.4 Z'); }
+.stamped .pl-text { clip-path: path('M0 0 H216.8 V107.2 H125.6 A22.6 22.6 0 0 0 91.2 107.2 H0 Z'); }
 /* --- the other layouts. Everything above is the normal frame; each of these moves its parts. --- */
 /* double-faced: the face's icon before its name, and the other face named at the foot of the text box */
 .dfc { display: inline-block; font-size: .8em; margin-right: 3px; opacity: .8; }
