@@ -37,10 +37,10 @@ printing in that order: full art, then borderless, then extended art.
   it and nothing else.
 - Generation size follows the design: `frame.generation_size(design,
   pixels)` picks the multiple-of-32 size nearest the design's aspect at the
-  same pixel budget as the M15 default (1248x912 for restyle, 832x576 for
-  Wan). A style or motion block that spells `width`/`height` keeps them.
-  On M15 the derived size is exactly the old default, so no recipe hash
-  moves.
+  same pixel budget as the block's default (1248x912 for restyle, 832x576
+  for Wan). A style or motion block that spells `width`/`height` keeps
+  them. On M15 the blocks' defaults are used as they are (they *are* the
+  M15 sizes), so no recipe hash moves.
 - The printings picker: `oddness(card, design)` does not count the design's
   own effect as odd, so a card set to `fullart` defaults to its newest
   full-art printing.
