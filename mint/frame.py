@@ -528,6 +528,107 @@ def pt_plate(text):
     return f'<div class="pt" style="width:{w:.1f}px">{svg}<span>{esc(text)}</span></div>'
 
 
+# The planeswalker's silver: one gradient shared by every badge and the loyalty shield on the page, lit from above
+# and a little to the right, as the rest of the frame is (measured off the scans: the rim's outer slope reads 238
+# along the top, 219 down the right, 143-161 down the left and along the bottom; the inner slope a flat 191-219)
+LOYALTY_DEFS = ('<svg class="lodefs" width="0" height="0" aria-hidden="true"><defs>'
+                '<linearGradient id="lorim" x1=".7" y1="0" x2=".3" y2="1">'
+                '<stop offset="0" stop-color="#f2f2f2"/><stop offset=".5" stop-color="#d0d0d0"/>'
+                '<stop offset="1" stop-color="#8a8a8a"/></linearGradient>'
+                # the rows' torn edges (template.html .planeswalker .textbox p::before): noise pushes the shaded band's
+                # top and bottom edges up to 1.2 units up and down, a wavelength of about 4 units as on the printed
+                # sheets; the red channel is held at the map's neutral 0.5 so nothing moves sideways
+                '<filter id="lotear" x="-2%" y="-10%" width="104%" height="120%">'
+                '<feTurbulence type="fractalNoise" baseFrequency=".25 .5" numOctaves="2" seed="3"/>'
+                '<feColorMatrix values="0 0 0 0 .5  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/>'
+                '<feDisplacementMap in="SourceGraphic" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>'
+                '</filter></defs></svg>')
+
+
+def _quad_side(a, w, b):
+    """A quadratic Bezier from a through w (its midpoint) to b: the concave side of a badge, its control point
+    pulled in so the curve passes through the measured waist."""
+    cx, cy = 2 * w[0] - (a[0] + b[0]) / 2, 2 * w[1] - (a[1] + b[1]) / 2
+    return f"Q{cx:.2f} {cy:.2f} {b[0]:.2f} {b[1]:.2f}"
+
+
+def _badge_path(cx, apex, shoulder, waist, corner, middle, pointed, flip=None):
+    """One ring of a loyalty badge, symmetric about x=cx, as an SVG path: for a pointed badge a roof from the apex
+    to the shoulders, else a flat top bowed up to the apex; concave sides through the waist to the bottom corners;
+    the bottom edge bowed down to `middle`. Each argument is (half-width or 0, y); `flip` is the box height to
+    mirror the shape in, for a badge pointed at the bottom."""
+    y = (lambda v: flip - v) if flip else (lambda v: v)
+    sx, sy = shoulder[0], y(shoulder[1])
+    wx, wy = waist[0], y(waist[1])
+    bx, by = corner[0], y(corner[1])
+    # clockwise from the top: down the right side, along the bottom, up the left side
+    right_side = _quad_side((cx + sx, sy), (cx + wx, wy), (cx + bx, by))
+    bottom = f"Q{cx:.2f} {2 * y(middle[1]) - by:.2f} {cx - bx:.2f} {by:.2f}"
+    left_side = _quad_side((cx - bx, by), (cx - wx, wy), (cx - sx, sy))
+    if pointed:
+        top = f"M{cx:.2f} {y(apex[1]):.2f} L{cx + sx:.2f} {sy:.2f}"
+        close = f"L{cx - sx:.2f} {sy:.2f} Z"
+    else:  # the flat end mirrors the bowed bottom
+        top = f"M{cx - sx:.2f} {sy:.2f} Q{cx:.2f} {2 * y(apex[1]) - sy:.2f} {cx + sx:.2f} {sy:.2f}"
+        close = "Z"
+    return f"{top} {right_side} {bottom} {left_side} {close}"
+
+
+def loyalty_badge(cost):
+    """The badge beside a loyalty ability, an inline SVG under the number: a black face in a silver rim, pointed at
+    the top for a "+" ability, at the bottom for a "-", flat both ends for "0". Traced off Chandra, Flameshaper
+    (FDN 81), Jace, the Mind Sculptor (A25 62), Karn, Scion of Urza (DOM 1), Teferi, Hero of Dominaria (DOM 207),
+    Vivien Reid (M19 208) and Ajani, Strength of the Pride (M20 2): the face 12.5 tall from its point to the flat
+    end (11.8 flat to flat), 19.7 wide at the shoulders below the point, 18.4 at the waist and 20.7 at the flat
+    end's corners, the sides concave through the waist, the flat end bowed out 0.4; the point's roof drops 2.6 to
+    the shoulders. The rim is 2.3 all round but rises to a 3.8 peak over the point, its roof steeper than the
+    face's (24 against 15 degrees): the silver is thickest at the tip. The rim is two slopes, the outer one lit
+    from the upper right (LOYALTY_DEFS), the inner a flat grey. The box is 26 wide, the shape centred in it."""
+    kind = "up" if cost.startswith("+") else "down" if cost.startswith("−") else "zero"
+    cx = 13.0
+    if kind == "zero":
+        h = 16.4  # rim 2.3, face 11.8, rim 2.3
+        rings = [((0, 0), (12.7, 0.2), (11.5, 8.2), (12.7, 16.2), (0, 16.4)),
+                 ((0, 1.15), (11.5, 1.45), (10.35, 8.2), (11.5, 14.95), (0, 15.25)),
+                 ((0, 2.3), (10.35, 2.7), (9.2, 8.2), (10.35, 13.7), (0, 14.1))]
+        num_y = h / 2
+    else:
+        h = 18.6  # rim peak 3.8, face 12.5, rim 2.3, the point up; a "-" badge is the same shape upside down
+        rings = [((0, 0), (12.2, 5.7), (11.5, 11.4), (12.7, 16.4), (0, 18.6)),
+                 ((0, 1.9), (11.0, 6.05), (10.35, 11.4), (11.5, 16.15), (0, 17.45)),
+                 ((0, 3.8), (9.85, 6.4), (9.2, 11.4), (10.35, 15.9), (0, 16.3))]
+        num_y = (3.8 + 16.3) / 2 + 0.8  # the number sits 0.8 toward the flat end from the face's centre
+        if kind == "down":
+            num_y = h - num_y
+    flip = h if kind == "down" else None
+    rim, mid, face = (_badge_path(cx, *ring, pointed=kind != "zero", flip=flip) for ring in rings)
+    svg = (f'<svg class="shield" viewBox="0 0 26 {h}" width="26" height="{h}">'
+           f'<path d="{rim}" fill="url(#lorim)"/><path d="{mid}" fill="#c4c4c4"/><path d="{face}" fill="#000"/></svg>')
+    return f'<span class="lcost {kind}" style="height:{h}px">{svg}<b style="top:{num_y:.2f}px">{esc(cost)}</b></span>'
+
+
+def loyalty_box(text):
+    """The loyalty shield at the bottom right, an inline SVG under the number: two horns either side of a
+    scoop, concave sides, a point at the bottom, a 2-unit silver rim of the badges' two slopes. Traced off the six
+    scans of loyalty_badge, all within half a unit of each other: 31.3 wide at the top corners, 18.3 from the horn
+    tips to the point; the horns 13.5 apart at the tips, the scoop 3.1 deep between them, the top corners 3.1 below
+    the tips, the waist 27.1 wide at 11 down, the bottom corners 26.7 wide at 13.5 down. The rim is a stroke on
+    the face's path, mitred, so it thickens into the same points the printed rim does. The box is 36 x 23, the
+    tips at y 2.2 and the centre at x 18."""
+    cx, top = 18.0, 2.2
+    # the scoop is a V at 35 degrees from the horizontal with a rounded bottom (its opening 11.7 wide 0.2 below the
+    # tips, 5.1 at 2.5 down, 2.3 at 2.9 down on Chandra): not an arc, which would be 13 wide near the tips
+    face = (f"M{cx - 6.75} {top} L{cx - 1.6} {top + 2.6} Q{cx} {top + 3.6} {cx + 1.6} {top + 2.6} L{cx + 6.75} {top} "
+            f"L{cx + 15.65} {top + 3.1} "
+            f"Q{cx + 13.55} {top + 5.5} {cx + 13.35} {top + 13.5} L{cx} {top + 18.3} L{cx - 13.35} {top + 13.5} "
+            f"Q{cx - 13.55} {top + 5.5} {cx - 15.65} {top + 3.1} Z")
+    svg = (f'<svg class="shield" viewBox="0 0 36 23" width="36" height="23">'
+           f'<path d="{face}" fill="none" stroke="url(#lorim)" stroke-width="4" stroke-linejoin="miter" stroke-miterlimit="4"/>'
+           f'<path d="{face}" fill="none" stroke="#cfcfcf" stroke-width="2" stroke-linejoin="miter" stroke-miterlimit="4"/>'
+           f'<path d="{face}" fill="#000"/></svg>')
+    return f'<div class="loyalty">{svg}<span>{esc(text)}</span></div>'
+
+
 def crown_html():
     """The crown's two layers: the black outline under the gold fill, each clipped to its traced path."""
     fill, outline = crown_paths()
@@ -641,7 +742,7 @@ def ability_word(p):
 
 ROMAN = r"(?:I|II|III|IV|V|VI|VII|VIII)"
 CHAPTER_RE = re.compile(rf"^({ROMAN}(?:, {ROMAN})*) — ")
-LOYALTY_RE = re.compile(r"^([+−\-]\d+|0): ")
+LOYALTY_RE = re.compile(r"^([+−\-](?:\d+|X)|0): ")  # +1, −3, −X (Chandra, Awakened Inferno), 0
 LEVEL_RE = re.compile(r"^(\{[^}]+\})+: Level (\d+)$")
 
 
@@ -693,15 +794,14 @@ def render_text(card, symbols, flavor=None, layout="normal"):
     if sym:
         return f'<p class="big-sym"><span class="pip"><img src="{symbols.data_uri(sym)}"></span></p>'
     paras = []
-    if layout == "planeswalker":  # each loyalty ability a row with its cost in a badge; static ones plain
+    if layout == "planeswalker":  # each loyalty ability a row: its cost in a badge, the colon, the text; static ones plain
         for p in text.split("\n") if text else []:
             m = LOYALTY_RE.match(p)
             if m:
-                cost = m.group(1).replace("-", "−")
-                kind = "up" if cost.startswith("+") else "down" if cost.startswith("−") else "zero"
-                paras.append(f'<p class="loyal"><span class="lcost {kind}">{cost}</span><span>{syms(p[m.end():])}</span></p>')
+                badge = loyalty_badge(m.group(1).replace("-", "−"))
+                paras.append(f'<p class="loyal">{badge}<span class="colon">:</span><span>{syms(smart(p[m.end():]))}</span></p>')
             else:
-                paras.append(f'<p class="static">{syms(ability_word(p))}</p>')
+                paras.append(f'<p class="static">{syms(ability_word(smart(p)))}</p>')
         return "".join(paras)
     if layout == "saga":  # the reminder line, then a row per chapter with its numerals in a badge
         for p in text.split("\n") if text else []:
@@ -798,10 +898,10 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
                f'<div class="main">{render_text(main, symbols, flavor)}</div></div>')
         return f'{title(main)}<div class="art"></div>{typebar(main)}{box}{pt_html}'
     text = render_text(card, symbols, flavor, layout)
-    if layout == "planeswalker":
-        loyalty = f'<div class="loyalty"><span>{esc(str(card.get("loyalty")))}</span></div>'
-        return (f'{PINLINES}{crown}{title(card)}<div class="art"></div>{typebar(card)}'
-                f'<div class="textbox" id="text">{text}</div>{loyalty}{other}')
+    if layout == "planeswalker":  # the box's black outline is a plate of its own under it (template.html .pw-line)
+        return (f'{PINLINES}{crown}{title(card)}<div class="art"></div>{typebar(card)}{LOYALTY_DEFS}'
+                f'<div class="pw-line"></div><div class="textbox" id="text">{text}</div>'
+                f'{loyalty_box(str(card.get("loyalty")))}{other}')
     if layout in ("saga", "class"):
         return f'{title(card)}<div class="art"></div><div class="textbox" id="text">{text}</div>{typebar(card)}{other}'
     cls = "has-pt" if pt_html else ""
@@ -881,12 +981,17 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
     rarity = card["rarity"]
     rarity_hi = RARITY[rarity][1] if rarity in ("uncommon", "rare", "mythic") else "transparent"
     layout = layout_of(card)
+    # a planeswalker with four rows or more gets the tall text box, the type bar and the box 23.5 higher and the
+    # art that much shorter (measured on Jace, the Mind Sculptor A25 62, Gideon Blackblade WAR 13 and Chandra,
+    # Awakened Inferno M20 127, against the three-row Chandra, Flameshaper, Karn and Teferi)
+    tall = layout == "planeswalker" and (card.get("oracle_text") or "").count("\n") >= 3
     pt = pt_plate(f'{card["power"]}/{card["toughness"]}') if card.get("power") is not None else ""
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
     # the collector line carried through from the printed card: its number and set in a wide sans, the
     # artist in the title face as small caps after a brush; the studio's credit on the right, in the rules
     # serif, where the real cards put the year and the publisher
-    footer_cls = " has-pt" if pt else ""  # the credit line drops to the bottom line beside a P/T box
+    # the credit line drops to the bottom line beside a P/T box, and beside a planeswalker's loyalty shield
+    footer_cls = " has-pt" if pt or layout == "planeswalker" else ""
     footer = (f'<div class="footer{footer_cls}"><span class="collector">'
               f'<b>{collector_number(card)}/{set_size or "?"} {card["rarity"][0].upper()}</b><br>'
               f'{esc(card["set"].upper())} • {esc(card.get("lang", "en").upper())} '
@@ -905,7 +1010,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
         pair=(" pair hybrid" if kind_b != kind else " pair") if pair else "",
         frame_vars=frame_vars or frame_css(),
         design=f" design-{design}", design_css=design_css(design),
-        watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout,
+        watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout + (" tall" if tall else ""),
         stamp=stamp_html(stamp), stamped=f" stamped stamp-{stamp}" if stamp else "",
         body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else "",
                        crown=crown_html() if legendary and not turned else "", set_icon=set_icon),

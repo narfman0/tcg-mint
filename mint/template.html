@@ -286,17 +286,81 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
   color: var(--ink); background: color-mix(in srgb, var(--bar) 70%, var(--frame)); border-top: 0.7px solid var(--bar-edge); }
 .other-face small { color: rgba(0,0,0,.6); margin-left: 3px; }
 .textbox .other-face { margin: 0 -5px -4px; position: static; }
-/* planeswalker: a loyalty badge per ability, rows shaded in turn, and the loyalty shield where P/T sits */
-.planeswalker .textbox { padding: 2px 5px 2px 4px; justify-content: safe center; font-size: 10.6px; }
-.planeswalker .textbox p { margin: 0; padding: 2px 0; }
-.planeswalker .textbox p.loyal { display: flex; gap: 5px; align-items: center; }
-.planeswalker .textbox p.loyal:nth-child(even) { background: rgba(0,0,0,.06); margin: 0 -5px 0 -4px; padding-left: 4px; padding-right: 5px; }
-.lcost { flex: none; width: 24px; height: 14px; line-height: 14px; text-align: center; color: #fff; font-weight: 700; font-size: 8.5px;
-  font-family: var(--title-font); background: #222; border-radius: 3px 3px 5px 5px / 3px 3px 7px 7px; box-shadow: inset 0 0 0 0.7px rgba(255,255,255,.35); }
-.lcost.up { background: #4d5a3a; } .lcost.down { background: #5a3a3a; } .lcost.zero { background: #3a3a3a; }
-.loyalty { position: absolute; right: 13px; top: 313px; width: 30px; height: 21px; color: #fff; font-family: var(--title-font); font-weight: 700;
-  font-size: 12px; text-align: center; line-height: 21px; background: #1a1a1a; box-shadow: inset 0 0 0 0.9px #b9b9b9;
-  clip-path: polygon(0 20%, 50% 0, 100% 20%, 100% 70%, 50% 100%, 0 70%); }
+/* planeswalker: the text box is a plain white sheet with a black outline in place of the bevel and pinline, inset on
+   the left so the loyalty badges straddle its edge over a wide flat strip; a badge per ability, a row per
+   paragraph shaded in turn, and the loyalty shield bottom right straddling the box's foot and the frame.
+   Measured off Chandra, Flameshaper (FDN 81), Karn, Scion of Urza (DOM 1), Teferi, Hero of Dominaria (DOM 207),
+   Vivien Reid (M19 208) and Ajani, Strength of the Pride (M20 2), all within half a unit of each other:
+   the flat strip runs 14.8-234.4 with the plate's shadow line at 13.4-14.8; the box's outline 29.3-30.3 and
+   230.3-231.3, its face 30.3-230.3; the outline's top 2.3 under the type bar (219.3) and its bottom 5 above the
+   frame's foot (319.5), 1 thick; the face 220.2-318.6. The box's bottom corners are shallow ellipses (38 x 8.5,
+   fitted to the outline traced down Karn's and Teferi's bottom-left corner to 0.2), and the strip's foot follows
+   the black border in a big sweep (traced on the same scans, 14.8 at 309.5 to 64 at 324.5) where a creature's
+   plate keeps its square corner. No bevel: the printed box is a translucent sheet over the art. */
+.planeswalker .pl-text { left: 14.8px; width: 219.6px; height: 108.1px;
+  clip-path: path('M0 0 H219.6 V93.1 C219.6 105.1 182.4 108.1 170.4 108.1 H49.2 C37.2 108.1 0 105.1 0 93.1 Z'); }
+.pw-line { position: absolute; left: 29.3px; top: 219.3px; width: 202px; height: 100.2px; background: #000; z-index: 2;
+  border-radius: 0 0 39px 39px / 0 0 9.5px 9.5px; }
+.planeswalker .textbox { left: 30.3px; top: 220.2px; width: 200px; height: 98.4px; padding: 0; box-shadow: none;
+  overflow: visible; border-radius: 0 0 38px 38px / 0 0 8.5px 8.5px; font-size: 9.4px;
+  /* the clip reaches 20 left of the box for the badges' overhang; the corners are the ellipses of the border-radius */
+  clip-path: path('M-20 0 H200 V89.9 A38 8.5 0 0 1 162 98.4 H38 A38 8.5 0 0 1 0 89.9 H-20 Z'); }
+/* the stamp's bite in the box's foot and the strip's, the same arcs as the normal frame's about the same centre;
+   the stamp rides 2.6 above the box's bottom edge as it does on a creature */
+.planeswalker.stamped .textbox {
+  clip-path: path('M-20 0 H200 V89.9 A38 8.5 0 0 1 162 98.4 H107.9 A21 21 0 0 0 81.5 98.4 H38 A38 8.5 0 0 1 0 89.9 H-20 Z'); }
+.planeswalker.stamped .pw-line { clip-path: path('M0 0 H202 V100.2 H111.4 A22 22 0 0 0 80 100.2 H0 Z'); }
+.planeswalker.stamped .pl-text {
+  clip-path: path('M0 0 H219.6 V93.1 C219.6 105.1 182.4 108.1 170.4 108.1 H127.4 A22.6 22.6 0 0 0 93 108.1 H49.2 C37.2 108.1 0 105.1 0 93.1 Z'); }
+.planeswalker .stamp { top: 316px; }
+/* four rows or more: the tall box (frame.build_html sets .tall), the type bar and the box's top 23.5 higher, the art
+   that much shorter, the foot unchanged; the same paths 23.5 further down each element */
+.planeswalker.tall .art { height: 130.5px; }
+.planeswalker.tall .pl-art { height: 135.5px; }
+.planeswalker.tall .pl-type { top: 171.5px; }
+.planeswalker.tall .typebar { top: 173.5px; }
+.planeswalker.tall .pl-text { top: 192.9px; height: 131.6px;
+  clip-path: path('M0 0 H219.6 V116.6 C219.6 128.6 182.4 131.6 170.4 131.6 H49.2 C37.2 131.6 0 128.6 0 116.6 Z'); }
+.planeswalker.tall .pw-line { top: 195.8px; height: 123.7px; }
+.planeswalker.tall .textbox { top: 196.7px; height: 121.9px;
+  clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H38 A38 8.5 0 0 1 0 113.4 H-20 Z'); }
+.planeswalker.tall.stamped .textbox {
+  clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H107.9 A21 21 0 0 0 81.5 121.9 H38 A38 8.5 0 0 1 0 113.4 H-20 Z'); }
+.planeswalker.tall.stamped .pw-line { clip-path: path('M0 0 H202 V123.7 H111.4 A22 22 0 0 0 80 123.7 H0 Z'); }
+.planeswalker.tall.stamped .pl-text {
+  clip-path: path('M0 0 H219.6 V116.6 C219.6 128.6 182.4 131.6 170.4 131.6 H127.4 A22.6 22.6 0 0 0 93 131.6 H49.2 C37.2 131.6 0 128.6 0 116.6 Z'); }
+/* the rows fill the box top to bottom, each its text centred in its band, every second band shaded (the printed
+   sheet is a shade more transparent there: 214 against 226 over Chandra's art). Rules text is MPlantin at 9.4:
+   an x-height of 4.0 and a line pitch of 8.7 measured on Chandra; the fit shrinks the long ones. A loyalty row is
+   the badge overhanging the box's left edge (its 26-unit box spans 12.4-38.4, centred on the printed badges'
+   25.4), the colon centred in the 7.6 to the text at 46, then the text; a static row's text starts at 34.4 */
+.planeswalker .textbox p { flex: 1 1 auto; display: flex; align-items: center; margin: 0; padding: 0 4px 0 0;
+  position: relative; z-index: 0; }
+.planeswalker .textbox p.static { padding-left: 4.1px; }
+/* the shaded band is a layer under the row's text, torn along its top and bottom by the noise filter in
+   frame.LOYALTY_DEFS. It fills the row exactly: a layer poking out of it would count toward the box's scrollHeight and
+    the fit would shrink the text to the floor; the filter's ink beyond the row is not layout, and the box's clip
+   cuts what a last row's tear pushes past the foot */
+.planeswalker .textbox p:nth-child(even)::before { content: ""; position: absolute; inset: 0; z-index: -1;
+  background: rgba(0,0,0,.06); filter: url(#lotear); }
+.planeswalker .textbox p .colon { flex: none; width: 7.6px; text-align: center; }
+.planeswalker .textbox p > span:last-child { flex: 1 1 auto; }
+/* a badge (frame.loyalty_badge draws it as an inline SVG): the number white in the title face, Beleren digits 7.6
+   tall on the scans (0.72 em), centred on the face and nudged down as the P/T is */
+.lcost { position: relative; flex: none; width: 26px; margin-left: -17.9px;
+  filter: drop-shadow(.6px .8px .5px rgba(0,0,0,.4)); }
+.lcost .shield { position: absolute; left: 0; top: 0; width: 26px; display: block; }
+.lcost b { position: absolute; left: 0; width: 26px; text-align: center; line-height: 1;
+  transform: translateY(calc(-50% + var(--pt-dy))); color: #fff; font-family: var(--title-font); font-weight: 700;
+  font-size: 10.5px; }
+/* the loyalty shield (frame.loyalty_box): 36 x 23 with the horn tips at y 2.2, placed so the tips sit at 309.2 and
+   the point at 327.5 (15.3 above and 3 below the frame's foot), centred on x 218.9; its number Beleren at 12.1,
+   0.5 below the shape's centre; the credit line of the footer keeps under it (.footer.has-pt) */
+.loyalty { position: absolute; left: 200.9px; top: 307px; width: 36px; height: 23px; color: #fff;
+  filter: drop-shadow(.5px .7px .5px rgba(0,0,0,.35)); }
+.loyalty .shield { position: absolute; left: 0; top: 0; width: 36px; height: 23px; display: block; }
+.loyalty span { position: absolute; left: 0; width: 36px; top: 12.55px; text-align: center; line-height: 1;
+  transform: translateY(calc(-50% + var(--pt-dy))); font-family: var(--title-font); font-weight: 700; font-size: 12.1px; }
 /* saga: chapters down the left, the art the full height on the right, the type line under both */
 .saga .art { left: 125.6px; top: 38.7px; width: 109px; height: 262px; }
 .saga .textbox { left: 15.4px; top: 38.7px; width: 109px; height: 262px; padding: 5px 4px; font-size: 9.6px; justify-content: flex-start; }
@@ -385,8 +449,9 @@ window.fit = () => {
     t.style.fontSize = '';
     let f = parseFloat(getComputedStyle(t).fontSize);
     while (t.scrollHeight > t.clientHeight && f > 6) { f -= 0.2; t.style.fontSize = f + 'px'; }
-    // the P/T plate overlaps the box's bottom right: the last line keeps clear of it, as on the real cards
-    const pt = document.querySelector('.pt');
+    // the P/T plate (or a planeswalker's loyalty shield) overlaps the box's bottom right: the last line keeps
+    // clear of it, as on the real cards
+    const pt = document.querySelector('.pt, .loyalty');
     if (pt && t.id === 'text') {
       const pr = pt.getBoundingClientRect();
       const last = () => { const r = document.createRange(); r.selectNodeContents(t); const rs = r.getClientRects(); return rs[rs.length - 1]; };

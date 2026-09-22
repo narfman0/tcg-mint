@@ -119,7 +119,7 @@ def compare(got, want):
 def test_golden(name, art, tmp_path, browser):
     out, sizes = render(name, art, tmp_path, browser)
     assert Image.open(out).size == (408, 558)
-    base = {"planeswalker": 10.6, "saga": 9.6}.get(name, 12.6)  # these layouts set their text smaller to begin with
+    base = {"planeswalker": 9.4, "saga": 9.6}.get(name, 12.6)  # these layouts set their text smaller to begin with
     if name == "land":
         assert frame.TEXT_FLOOR <= sizes["text"] < 12.6  # the long text was shrunk to fit
     else:
