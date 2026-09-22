@@ -118,8 +118,9 @@ kind of entry; `sets/` and `styles/` are yours and git ignores both):
   its own kind (a card set to `fullart` starts from its newest full-art
   printing), sizes a restyle or a clip to its shape unless the block
   spells `width` and `height`, and `mint check` warns when the picture is
-  the wrong shape for it. The designs beyond M15 are being drawn
-  (`todo/frame-designs.md`); until then they render as M15.
+  the wrong shape for it. Each design is measured off scans of real
+  printings of its kind (`mint/designs/*.css` says which); a saga, class,
+  split or battle card stays M15 whatever the design.
 
 Unknown keys are errors (`mint check` finds them), so a typo in a recipe never
 passes silently. Who you are on the cards, the ComfyUI address, the printer,

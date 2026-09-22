@@ -51,7 +51,7 @@ printing in that order: full art, then borderless, then extended art.
 - Stub css files for `extended`, `borderless`, `fullart` (comments only)
   so every name renders -- as M15 -- until phase 2 fills them.
 
-## Phase 2 -- one agent per design, in parallel, in worktrees
+## Phase 2 -- one agent per design, in parallel, in worktrees (done 2026-09-21)
 
 Each agent owns `mint/designs/<name>.css`, that design's row in the table
 above if the measurements move it, its tests, and nothing else shared. For
@@ -76,7 +76,7 @@ each:
 Layouts stay M15 in this pass: a saga, split or battle card in a non-M15
 design renders M15 and `check` says so.
 
-## Phase 3 -- merge and review (serial)
+## Phase 3 -- merge and review (merged 2026-09-21; the review pass and the sheet remain)
 
 Merge the three; render designs x {normal, basic, legendary, rare with
 stamp} into one sheet; one review pass across the three css files so

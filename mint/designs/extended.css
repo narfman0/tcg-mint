@@ -86,6 +86,10 @@
    it runs along the plate's underside, with a stub at 16-16.6 under the fill's foot that joins the outline's.
    Beside the crown the art shows from 33 on the scans, so the window starts there on a legendary (its picture
    hangs from 33: four more units of its top go under the bar; the corner fades stay where they are) */
+/* the M15 tongues under the crown's feet (the plate's .pl-crown piece) have no place on the cut badge, and the
+   art's plate keeps its M15 top (the base drops it to 43 under the tongues): it is the bowed plate here */
+.design-extended.legendary:is(.normal, .planeswalker, .adventure) .pl-crown { display: none; }
+.design-extended.legendary:is(.normal, .planeswalker, .adventure) .pl-art { top: 37.4px; height: 159px; }
 .design-extended.legendary:is(.normal, .planeswalker, .adventure) .art { top: 33px; height: 183.4px;
   clip-path: polygon(0 0, 27.6px 0, 27.6px 8.7px, 45px 8.7px, 52px 7.6px, 60px 6.7px, 68px 6.3px, 76px 6px, 84px 5.7px,
     188px 5.7px, 196px 6px, 204px 6.3px, 212px 6.7px, 220px 7.6px, 227px 8.7px, 244.4px 8.7px, 244.4px 0, 100% 0,

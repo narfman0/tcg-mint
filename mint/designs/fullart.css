@@ -46,7 +46,7 @@
 .design-fullart .art::after { display: none; }  /* no window, no window line */
 .design-fullart .pl-art { display: none; }
 /* no crown, as on the legendary promos; the title bar's plate comes back where the crown had replaced it */
-.design-fullart .crown-o, .design-fullart .crown { display: none; }
+.design-fullart .crown-o, .design-fullart .crown, .design-fullart .pl-crown { display: none; }
 .design-fullart.legendary .pl-title { display: block; }
 /* the band becomes the footer's black strip, page-wide into the bleed, under the P/T plate and the stamp (both
    later in the document at the same z); its texture goes, and a hybrid's second texture with it */

@@ -846,7 +846,7 @@ async function card(r) {
             <span class="muted" id="printing-n"></span><div class="printings" id="printings" hidden></div></span>
           <span title="the frame design this card renders in: the set's unless the card says; auto follows the printing">design</span><span class="row">
             <select id="design">${designOptions(c.entry.design, `the set's (${st.design || 'm15'})`)}</select>
-            <span class="muted">renders as <b>${esc(c.design || 'm15')}</b>${c.design && c.design !== 'm15' ? ' — phase 2 of todo/frame-designs.md draws it; until then it is M15' : ''}</span></span>
+            <span class="muted">renders as <b>${esc(c.design || 'm15')}</b>${c.design && c.design !== 'm15' ? '' : ''}</span></span>
           <span>subject</span><span class="row"><input type="text" id="subject" style="width:36em;max-width:100%" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene">
             <button class="small" id="describe" ${describer.ready ? '' : 'disabled'} title="${esc(describer.ready ? `${describer.kind} (${describer.model}) reads the ${esc(c.entry.base || st.base || 'crop')} image and the card's text and writes the subject line${c.entry.subject ? ', replacing this one' : ''}` : `no describer: ${describer.hint}`)}">from the picture</button></span>
           ${motionRow(c)}
@@ -1131,7 +1131,7 @@ function frame() {
     <div class="panel" style="margin-bottom:16px">
       <h2>frame design</h2>
       <div class="toolbar"><select id="sdesign">${designOptions(st.design, 'm15')}</select>
-        <span class="muted">which frame the set's cards render in (frame.DESIGNS): the M15 frame, its art window widened (extended), the art off the card's sides (borderless), or under everything (fullart); <span class="mono">auto</span> follows each card's printing. A card's own page can override it. The designs beyond M15 are drawn in phase 2 of todo/frame-designs.md; until then they render as M15</span></div>
+        <span class="muted">which frame the set's cards render in (frame.DESIGNS): the M15 frame, its art window widened (extended), the art off the card's sides (borderless), or under everything (fullart); <span class="mono">auto</span> follows each card's printing. A card's own page can override it; a saga, class, split or battle card stays M15</span></div>
     </div>
     <div class="panel" style="margin-bottom:16px">
       <h2>frame knobs</h2>

@@ -66,7 +66,7 @@ def test_the_css_moves_or_hides_m15_pieces_and_leaves_the_bars_outline_alone():
     are template.html's layers over the fill, so the glass comes through the --bar variable alone."""
     css = frame.design_css("fullart")
     assert ".design-fullart .frame" in css and ".design-fullart .pl-art { display: none; }" in css
-    assert ".design-fullart .crown-o, .design-fullart .crown { display: none; }" in css
+    assert ".design-fullart .crown-o, .design-fullart .crown, .design-fullart .pl-crown { display: none; }" in css
     for sel, body in rules(css):
         assert sel.startswith(".design-fullart"), f"a rule outside the design's class: {sel}"
         last = sel.split()[-1]
