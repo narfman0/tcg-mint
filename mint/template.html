@@ -53,6 +53,23 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 /* a legendary card's crown stands against black: the band starts under the crown, so the valleys show the border */
 .legendary .frame { top: 15px; border-top-left-radius: 0; border-top-right-radius: 0; }
 .legendary .pl-title { display: none; }  /* the crown meets the bar's outline directly */
+/* The bars' ends, and the pinline pills' around them, are not arcs. Traced off four scans (rows at 1/2 unit, each
+   scan's edge taken against its own rail beside the text box), the bar's outline leaves the top edge 3.2 in from
+   the bar's outermost point on a diagonal of about 40 degrees from vertical, rounds off over the next four units and
+   is flat at the middle: a pointed oval. The pinline pill around it is the same kind of curve 2 out, 4 in at its top
+   and bottom -- the rail beside the art and the text box, once Chromium has snapped both boxes to whole units (13 +
+   4 = 17) -- so the pill leaves the rail and rejoins it on that diagonal instead of meeting it at an angle; the
+   scans' pills rejoin the rail 0.6 above where the old arcs ended, so the pieces are 22.8 tall, not 23.4. Measured
+   depths off the rail, type bar, pill (bar outline): 0.4 at 195.5, 1.1 (-1.8) at 196.5, 1.4 (-1.2) at 197, 1.9
+   (-0.7) at 197.5, 2.4 (0.2) at 199, 2.85 (0.7) at 200, 3.2 (1.1) at 201, 3.5 (1.6) at 203, 3.8 (2.0) from 205 to
+   209, the mirror below; the title bar within 0.3 of the same. Each end is one cubic per corner, fitted to those rows
+   by least squares (within 0.15 on the pill's top half, 0.4 on its bottom, where the scans' pills sit a little
+   higher than ours) and sampled into a polygon so one shape fits a bar of any width (a battle's bars are 322 and 168
+   wide): the pill M4,0 C2.6,3 1,3 .2,10; the bar M3.2,0 C3.6,.8 0,2.5 0,10. A chord is 0.05 off its curve at most. */
+:root {
+  --pill-shape: polygon(4px 0.0%, 3.47px 4.4%, 2.93px 8.1%, 2.39px 11.6%, 1.88px 15.4%, 1.38px 20.0%, 0.93px 25.9%, 0.54px 33.7%, 0.20px 43.9%, 0.20px 56.1%, 0.54px 66.3%, 0.93px 74.1%, 1.38px 80.0%, 1.88px 84.6%, 2.39px 88.4%, 2.93px 91.9%, 3.47px 95.6%, 4px 100.0%, calc(100% - 4px) 100.0%, calc(100% - 3.47px) 95.6%, calc(100% - 2.93px) 91.9%, calc(100% - 2.39px) 88.4%, calc(100% - 1.88px) 84.6%, calc(100% - 1.38px) 80.0%, calc(100% - 0.93px) 74.1%, calc(100% - 0.54px) 66.3%, calc(100% - 0.20px) 56.1%, calc(100% - 0.20px) 43.9%, calc(100% - 0.54px) 33.7%, calc(100% - 0.93px) 25.9%, calc(100% - 1.38px) 20.0%, calc(100% - 1.88px) 15.4%, calc(100% - 2.39px) 11.6%, calc(100% - 2.93px) 8.1%, calc(100% - 3.47px) 4.4%, calc(100% - 4px) 0.0%);
+  --bar-shape: polygon(3.20px 0.0%, 3.18px 1.8%, 2.87px 4.2%, 2.36px 7.7%, 1.75px 12.4%, 1.12px 18.8%, 0.56px 26.9%, 0.15px 37.2%, 0 50.0%, 0 50.0%, 0.15px 62.8%, 0.56px 73.1%, 1.12px 81.2%, 1.75px 87.6%, 2.36px 92.3%, 2.87px 95.8%, 3.18px 98.2%, 3.20px 100.0%, calc(100% - 3.20px) 100.0%, calc(100% - 3.18px) 98.2%, calc(100% - 2.87px) 95.8%, calc(100% - 2.36px) 92.3%, calc(100% - 1.75px) 87.6%, calc(100% - 1.12px) 81.2%, calc(100% - 0.56px) 73.1%, calc(100% - 0.15px) 62.8%, 100% 50.0%, 100% 50.0%, calc(100% - 0.15px) 37.2%, calc(100% - 0.56px) 26.9%, calc(100% - 1.12px) 18.8%, calc(100% - 1.75px) 12.4%, calc(100% - 2.36px) 7.7%, calc(100% - 2.87px) 4.2%, calc(100% - 3.18px) 1.8%, calc(100% - 3.20px) 0.0%);
+}
 /* the flat pinline is a stroke, not a backdrop: a 1.8-unit band of the colour around the perimeter of each element,
    following its shape (the bars' arcs, the boxes' straight sides), the strokes merging across the gaps;
    the textured band shows everywhere outside them. They are one layer, painted before every element, so no element's
@@ -63,12 +80,11 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .pinlines { position: absolute; inset: 0; }
 .pinlines.shade { filter: drop-shadow(-1.5px 0.6px 0.4px rgba(0,0,0,.85)); }
 .pinlines.light { filter: drop-shadow(0.9px -1.1px 0.3px rgba(255,255,255,.18)); }
-.pl-title, .pl-type { box-shadow: 1.2px 0 .3px rgba(255,255,255,.16); }  /* the ridge is strongest beside the arcs */
 .pinline { position: absolute; background: var(--pinline); }
 /* (named pl-*, not after the elements: a piece called "art" would match the art window's own rule); 2 outside each
    element on the perimeter, meeting across the 1.2-1.7 gaps */
-.pl-title { left: 12.8px; top: 15px; width: 224.4px; height: 23.4px; border-radius: 8px / 50%; }
-.pl-type { left: 12.8px; top: 195px; width: 224.4px; height: 23.4px; border-radius: 8px / 50%; }
+.pl-title { left: 12.8px; top: 15px; width: 224.4px; height: 22.8px; clip-path: var(--pill-shape); }
+.pl-type { left: 12.8px; top: 195px; width: 224.4px; height: 22.8px; clip-path: var(--pill-shape); }
 .pl-art { left: 16.6px; top: 37.4px; width: 216.8px; height: 159px; }
 /* the text box's plate is a plain rectangle: its top corners sit under the type bar's arcs, which land on its sides
    (traced off the scans, the pinline's edge runs 16.0, 16.4, 16.7 down the arc then 17.1 straight down the box, one
@@ -101,12 +117,23 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   mask-image: linear-gradient(90deg, transparent calc(50% - 30px), #000 calc(50% + 30px)); }
 .pair .crown { background: linear-gradient(90deg, var(--pinline) 25%,
   color-mix(in srgb, color-mix(in srgb, var(--pinline) 50%, var(--pinline-b)) 60%, #fff) 50%, var(--pinline-b) 75%); }
-/* the bars span 14.8-235 outline included, 4.8 past the art on each side, 20 tall, their ends arcs 6 deep;
-   the fill is flat (the bottom shade is the bevel's), the bevel lit from the upper right */
+/* the bars span 14.8-235 outline included, 4.8 past the art on each side, 20 tall, their ends the pointed ovals of
+   --bar-shape; the fill is flat (the bottom shade is the bevel's), the bevel lit from the upper right. The outline
+   is a half-unit of black just inside the clip: two cap images draw the ends' curve as a 1-wide stroke astride the
+   edge (the outer half falls to the clip), two gradients the hairlines along the top and bottom between them (each
+   the full height with its half unit of black at one edge: a half-unit image set at the bottom is snapped out of
+   the box and never paints); a transparent
+   border of the same half unit keeps the bevel's inset shadows off the outline, as the black border did */
 .bar { position: absolute; left: 14.8px; width: 220.2px; height: 20.2px; padding: 0 5.2px;
   display: flex; align-items: center; justify-content: space-between;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bar) 94%, #fff) 0, var(--bar) 12%, var(--bar) 100%);
-  border: 0.5px solid #000; border-radius: 6px / 50%;
+  clip-path: var(--bar-shape); border: 0.5px solid transparent;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 20%22 preserveAspectRatio=%22none%22%3E%3Cpath d=%22M12 0 H3.2 C3.6 0.8 0 2.5 0 10 C0 17.5 3.6 19.2 3.2 20 H12%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%221%22/%3E%3C/svg%3E") left top / 12px 100% no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 12 20%22 preserveAspectRatio=%22none%22%3E%3Cpath d=%22M0 0 H8.8 C8.4 0.8 12 2.5 12 10 C12 17.5 8.4 19.2 8.8 20 H0%22 fill=%22none%22 stroke=%22%23000%22 stroke-width=%221%22/%3E%3C/svg%3E") right top / 12px 100% no-repeat,
+    linear-gradient(#000 0.5px, transparent 0.5px) 12px 0 / calc(100% - 24px) 100% no-repeat,
+    linear-gradient(to top, #000 0.5px, transparent 0.5px) 12px 0 / calc(100% - 24px) 100% no-repeat,
+    linear-gradient(180deg, color-mix(in srgb, var(--bar) 94%, #fff) 0, var(--bar) 12%, var(--bar) 100%);
+  background-origin: border-box; background-clip: border-box;
   /* the bevel inside, lit from the upper right like everything else: the top and right edges catch the light, the
      bottom and left edges fall dark; no shadow of its own -- the pinline plate under it casts one */
   box-shadow: inset 0 1px 1.2px rgba(255,255,255,.6), inset -1.2px 0 0 rgba(255,255,255,.35),
