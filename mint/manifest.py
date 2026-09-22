@@ -1,8 +1,10 @@
 """What a render was made from.
 
 `mint render` writes out/<dir>/manifest.json beside its PNGs: for each file,
-the card, its number and theme, the art it used (kind, path, variant hash),
-the shrink-to-fit sizes, warnings, and a hash of the template plus set CSS.
+the card, its number, theme and frame design, the art it used (kind, path,
+variant hash), the shrink-to-fit sizes, warnings, and a hash of the template
+plus set CSS. A file name ends in the PNG's own digest, so every render a
+card has ever had that differs from the rest is its own entry here.
 Everything downstream -- the gallery, the workbench, regression diffs --
 reads this instead of guessing from filenames.
 """
@@ -49,7 +51,7 @@ class Manifest:
         src = rendered.source
         self.entries[os.path.basename(rendered.out)] = {
             "card": rendered.name, "number": rendered.number, "theme": rendered.theme,
-            "set": set_code, "styled": styled,
+            "set": set_code, "styled": styled, "design": rendered.design, "back": rendered.back,
             "source": {"kind": src.kind, "path": str(src.path), "hash": src.hash,
                        "label": src.variant.label if src.variant else None},
             "art_filter": rendered.art_filter, "sizes": rendered.sizes, "warnings": rendered.warnings,

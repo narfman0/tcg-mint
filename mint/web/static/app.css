@@ -101,8 +101,8 @@ details.sect[open] summary::before { content: '▾'; }
 .group .cols { display: flex; flex-wrap: wrap; }
 .group .col { width: 230px; }
 .cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-.cols.renders { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); max-width: 560px; margin-top: 8px; }
-.col.styled { border-color: var(--accent); }
+.cols.renders { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-top: 8px; }
+.col.styled, .col.pinned { border-color: var(--accent); }
 .col .acts button.on { border-color: var(--accent); color: var(--accent-ink); }
 details.menu { position: relative; display: inline-block; }
 details.menu summary { list-style: none; cursor: pointer; padding: .1em .55em; border: 1px solid var(--line-2); border-radius: var(--radius); font-size: .85em; background: var(--panel-2); line-height: 1.5; }

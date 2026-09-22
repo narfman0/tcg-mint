@@ -9,7 +9,8 @@ whether the current recipe has a restyle variant, whether the crop has been
 enhanced, whether the card has a clip for the current motion recipe (and
 which image it would animate), any warnings about the printing, and the
 frame design a card renders in when it is not the M15 frame -- with a warning
-when the picture is the wrong shape for it.
+when the picture is the wrong shape for it, or has too few pixels to fill it
+at the 800 DPI `mint export` writes for MPC Autofill.
 """
 import argparse
 import sys
@@ -20,6 +21,8 @@ from . import frame, sets, workspace
 from .art import Art
 from .cards import Cards, warnings
 from .errors import MintError
+
+ORDER_DPI = 800  # what `mint export` writes for MPC Autofill, and where MakePlayingCards' press tops out
 
 
 def art_fit(path, design):
@@ -35,6 +38,24 @@ def art_fit(path, design):
         return None
     shape = "wider" if aspect > want else "taller"
     return f"the picture is {aspect:.2f}:1, {shape} than the {design} design's {want:.2f}:1 -- cover crops it"
+
+
+def art_thin(path, design, dpi=ORDER_DPI):
+    """Why the picture at `path` has too few pixels for the design's art window at `dpi`, or None.
+    `cover` never stretches a picture -- it keeps the aspect and crops -- so this is about
+    resolution: below the window's pixel count the browser interpolates the difference."""
+    try:
+        with Image.open(path) as im:
+            have = im.size
+    except (OSError, ValueError):
+        return None
+    w, h, _ = frame.DESIGNS[design]
+    want = (round(w / 100 * dpi), round(h / 100 * dpi))
+    f = max(want[0] / have[0], want[1] / have[1])
+    if f <= 1.05:
+        return None
+    return (f"the picture is {have[0]}x{have[1]} and the {design} window wants {want[0]}x{want[1]} at {dpi} DPI "
+            f"-- {f:.1f}x up; `mint upscale` gives it the pixels")
 
 
 def check_set(ws, cards, art, st):
@@ -57,6 +78,8 @@ def check_set(ws, cards, art, st):
         notes.append(f"plain: {plain.describe() if plain else 'crop not fetched'}")
         if plain and (fit := art_fit(plain.path, design)):
             notes.append(f"warn: {fit}")
+        if plain and (thin := art_thin(plain.path, design)):
+            notes.append(f"warn: {thin}")
         h = st.styled_hash(card, art=art)
         if h:
             v = art.variant(card, h)

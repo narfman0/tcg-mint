@@ -26,8 +26,9 @@ and a two-colour card — a dual land, a fetch land by the basic types it
 finds, a spell whose every coloured pip is hybrid — runs its left colour
 into its right across the pinline, the text box and (on a spell) the frame.
 
-Output is 2.72 × 3.72 in with bleed — MakePlayingCards' template size, and
-what any imposer wants.
+Output is 2.72 × 3.72 in with bleed, which is what any imposer wants;
+`mint export` turns a set into the folder MPC Autofill's desktop tool uploads
+from, trimmed to MakePlayingCards' own 2.72 × 3.70 in card.
 
 ## Install
 
@@ -48,7 +49,7 @@ Then, in the directory you want to work in (your *workspace*):
 ```sh
 mint cards            # fetch Scryfall's oracle-cards bulk file (~200 MB, gitignored)
 mint fonts            # see which frame fonts you have; fonts/README.md says where to get them
-mint render "Cyclonic Rift"                        # -> ./001_Cyclonic_Rift.png at 1200 DPI
+mint render "Cyclonic Rift"                        # -> ./001_Cyclonic_Rift-<hash>.png at 1200 DPI
 mint render --set sets/bls1.json --out proofs      # a whole set
 mint render --set sets/bls1.json --styled --out proofs   # the set's stylized art variant
 ```
@@ -77,9 +78,13 @@ kind of entry; `sets/` and `styles/` are yours and git ignores both):
 }
 ```
 
-- `number` is the card's collector number in *your* set: it orders the set,
-  names the output file (`BLS1-014_...png`) and keys the manifest. The card
+- `number` is the card's collector number in *your* set: it orders the set
+  and names the output file (`BLS1-014_Cyclonic_Rift-1a2b3c4d.png`). The card
   itself prints the original printing's number and set (`040/291 RVR`).
+  The eight hex at the end are the PNG's own digest, so a render that differs
+  from the last one — another design, other knobs, newer art — is a file of
+  its own beside it rather than over it, and the manifest keeps them both.
+  Rendering the same thing twice writes the same name and stays one file.
 - `flavor` replaces the printed flavor text; omit the key to keep the original.
 - `art` points at your own image; otherwise Scryfall's art crop is used.
 - `printing` (`"rvr:40"`) renders a specific printing when the card file holds
@@ -154,10 +159,11 @@ ollama_url = "http://127.0.0.1:11434"
 | `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
 | `mint fonts` | report which frame fonts are present; `--repair` fixes the community copies |
-| `mint gc` | report variants no card picks, renders with, or starts from, and renders gone stale; `--delete` removes them |
+| `mint gc` | report variants no card picks, renders with, or starts from, and renders gone stale (a pinned render never is); `--delete` removes them |
 | `mint doctor` | check the card file, the fonts, a Chromium launch, ComfyUI's nodes, every model file the styles name, and the Wan files and ffmpeg when a set has a motion block |
 | `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
+| `mint export` | a set as a folder MPC Autofill's desktop tool runs in: a card image each at MakePlayingCards' size, and the `cards.xml` order beside them |
 | `mint serve` | the workbench: compare art, recipes and frames in a browser, and run the tools from it |
 | `mint gallery` | export a set as a static, read-only gallery page |
 
@@ -167,6 +173,7 @@ End to end, on this machine:
 mint upscale --set sets/bls1.json
 mint render  --set sets/bls1.json --out proofs
 mint impose  --out proofs/bls1.pdf proofs/0*.png
+mint export  --set sets/bls1.json          # -> out/bls1/mpc/, for MPC Autofill
 mint print   --test proofs/bls1.pdf        # one page on plain paper first
 mint print   -p matte proofs/bls1.pdf
 ```
@@ -193,7 +200,7 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   a style template). Every card is a tile (styled render,
   plain render, or just the art), with badges from the render manifest: no restyle for the current
   recipe, not rendered, stale render (the frame or the art changed since), rules text shrunk,
-  Universes Beyond art, own art. *only what's missing* counts a stale render as missing.
+  Universes Beyond art, own art, render pinned. *only what's missing* counts a stale render as missing.
   A search box matches name, type and artist. Order the tiles by number,
   name or *colour* (the shown image's hue, measured in the browser, so a
   take that wandered off the set's palette stands out); *sheet* drops the
@@ -205,6 +212,8 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   subject line from its picture and text (cards that have one keep it), then
   a `new` scene follows from it in the look (below, "Subjects from the
   pictures").
+  *export for MPC* writes the whole set (or the selection) as an MPC Autofill
+  folder under `out/<code>/mpc/`, rendering what is missing or stale first.
   *all* in the nav puts every set on one board.
 - **Viewer** (click a card) — the tile's image large: ← → or a swipe steps
   through the board in its current order, wheel / pinch / drag zoom and pan,
@@ -220,7 +229,13 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   Mark two images A and B for a wipe (drag the line; wheel or pinch to zoom,
   then drag to pan), or a blind A/B.
   *Card*, at the bottom: the styled art — the variant the styled render
-  uses — with the renders and their buttons.
+  uses — and every render the set holds for this card, newest first, each
+  labelled with its design, dpi and when it was made, so two designs or two
+  frames sit side by side the way two takes of the art do. *pin* makes one
+  of them the render the card prints as: the board tile shows it and a print
+  run imposes it, whatever is rendered afterwards, and neither staleness nor
+  `mint gc` touches it. A bin on each deletes it, and deleting a pinned one
+  puts the card back on its newest.
   A restyled variant offers *keep* — it becomes the card's styled art (the
   entry's `pick`), whatever the recipe says — and *enhance*; a menu on every
   image holds *restyle / inspire from this*, *repose from this*, *pin its seed*
@@ -389,7 +404,10 @@ Per card, `"base": "<variant hash>"` starts the restyle from an enhanced or
 earlier restyled image instead of the crop, `"seed": 123` pins a seed you
 liked, and `"pick": "<variant hash>"` names the variant styled renders use
 outright — a take from a random seed, or one in another look — without the
-recipe having to match it.
+recipe having to match it. `"render": "BLS1-014_Cyclonic_Rift-1a2b3c4d.png"`
+does the same for the finished card: of everything the set has rendered for
+it, that file is the one the board shows and a print run imposes, and it is
+never stale and never collected, whatever is rendered after.
 
 A card entry can add `"subject": "a red dragon with a blue-finned crest,
 wings spread"` — prepended to the prompt so the style can't drift a character
@@ -591,6 +609,80 @@ so the warning is all it can do; with `mint cards --kind default_cards` the
 renderer picks the newest non-crossover printing by itself, and a card's
 `printing` key picks one by hand. Cards that only exist in a non-exempt
 crossover set will always warn — that's a deck decision, not a render one.
+
+## Ordering from MakePlayingCards
+
+`mint export` writes the folder MPC Autofill's desktop tool reads:
+
+```sh
+mint export --set sets/bls1.json                 # -> out/bls1/mpc/
+mint export --set sets/bls1.json --styled --dpi 600 --stock "(M31) Linen"
+```
+
+```
+out/bls1/mpc/
+  images/        001 Cyclonic Rift.png, 002 …  — one per card, collector order
+  cards.xml      which image goes in which slot, on which stock
+  README.txt     what to do with it
+```
+
+Put the desktop tool (`autofill.exe` / `autofill`) in that folder and run it
+there. The paths in `cards.xml` are relative, so the folder can be moved or
+zipped; `--absolute` writes full paths for running the tool from elsewhere.
+The images are ordinary files at MPC's size, so MakePlayingCards' own uploader
+takes them too — their names sort into collector order.
+
+The geometry is MPC Autofill's own, not a guess. Its desktop tool reads a
+card's resolution off the image's height alone (`img_dpi = 10 * round(height *
+300 / 1110)`), so a card image is 3.70 in tall by its arithmetic, and 2.72 in
+wide to match MakePlayingCards' standard template: a 2.48 × 3.46 in card cut
+out of a 2.72 × 3.70 in bleed rectangle. 800 DPI (2176 × 2960 px) is where
+MPC's press tops out and where the tool downscales anything larger, so that is
+the default. A render is 2.72 × 3.72 in, drawn for a 2.5 × 3.5 in cut, so the
+export trims 0.01 in of bleed off the top and bottom — nothing in the card
+moves or squashes, and 0.10 in of bleed is left for MPC to cut into.
+
+### Does the art have the pixels?
+
+The art window is CSS `cover`: it keeps a picture's aspect and crops the
+excess, so nothing is ever stretched or squashed — `mint check` warns when
+that crop is deep (a landscape crop into a full-art card loses its sides).
+What can fall short is resolution. At 800 DPI the M15 window is 1685 × 1232 px,
+and:
+
+| the art | pixels | vs the M15 window at 800 DPI |
+|---|---|---|
+| Scryfall's `art_crop` | 626 × 457 | **2.7× short** — about 300 DPI on the card |
+| after `mint upscale` (4× ESRGAN) | 2504 × 1828 | 0.67× — half again what it needs |
+| a restyle at the block's default | 1248 × 912 | **1.35× short** — about 590 DPI |
+| that restyle enhanced | 4992 × 3648 | 0.34× |
+
+So an enhanced picture covers every design with pixels to spare (0.33–0.59×,
+the hungriest being `fullart` and `textless`, whose windows are most of the
+card); a raw crop or a plain restyle is interpolated up by the browser. Both
+`mint export` and `mint check` measure this per card and say which ones are
+thin, naming the picture's size, the window's, and the factor.
+
+### Why the render stays at 1200
+
+800 DPI is the *output* target — MPC Autofill downscales anything above it —
+but the render that feeds it is still made at 1200, and that is not waste.
+Drawing at 1200 and resampling down to 800 is supersampling: measured on the
+same card, it comes out a shade crisper than drawing at 800 directly (a higher
+mean edge gradient, the two differing by under 0.5/255 overall). It costs about
+1.7× the time and 1.8× the disk per card, which is the trade.
+
+What matters more is the floor: a render made *below* the export's resolution
+would have the frame itself blown up — the one thing a vector frame should
+never need. `mint export` treats such a render as missing and makes it again,
+so a 300 DPI proof never ends up in an 800 DPI order. A card pinned to one is
+the card's own choice, and is exported with a warning instead.
+
+Cards with no render, or with one gone stale, are rendered first; `--no-render`
+exports only what is on disk. A card pinned to a render (below) exports that
+one. A double-faced card whose back has been rendered gets that back in the
+order's `<backs>` at its own slot; every other card gets the common card back,
+which `--back` takes as `auto` (`mint back`), `none`, or an image of your own.
 
 ## What's not here yet
 

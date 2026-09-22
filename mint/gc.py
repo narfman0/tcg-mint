@@ -16,7 +16,8 @@ directory no set's card refers to. Renders are judged against the manifest:
 an entry whose file is gone is dropped, a PNG the manifest does not know is
 an orphan, and an entry is *stale* when the frame (template, frame.py, knobs, set css)
 or the art it should render with has changed since, or the card left the
-set. Nothing is removed without --delete; the report says what would be.
+set -- unless the card is pinned to it, which says it prints as it is.
+Nothing is removed without --delete; the report says what would be.
 """
 import argparse
 import datetime as dt
@@ -87,6 +88,9 @@ def render_state(ws, st, cards, art):
             stale.append((m, fn, "the card is not in the card file"))
             continue
         entry = st.card(card)
+        if entry.render == fn:  # the render the card is pinned to prints as it is; it is never stale
+            sources.setdefault(card["illustration_id"], set()).add((e.get("source") or {}).get("hash"))
+            continue
         want = (art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art)) if e.get("styled")
                 else art.resolve(card, override=entry.art)).hash
         if e.get("frame") != fh:

@@ -14,10 +14,12 @@ the command-line face of it.
 """
 import argparse
 import datetime as dt
+import hashlib
 import os
 import re
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from . import frame, sets, workspace
 from .art import Art, ArtSource
@@ -39,6 +41,8 @@ class Rendered:
     sizes: dict | None = None
     art_filter: str | None = None
     warnings: list = field(default_factory=list)
+    design: str | None = None   # the frame design it was rendered in, for the card page to tell two apart
+    back: bool = False          # a double-faced card's back face, filed under the front's number
 
     @property
     def shrunk(self):
@@ -47,6 +51,23 @@ class Rendered:
 
 def slug(name):
     return re.sub(r"[^A-Za-z0-9]+", "_", name).strip("_")
+
+
+def stamp(base, out_dir, html, browser):
+    """Render `html` into out_dir under `base`, named by what came out: the PNG's own eight-hex
+    digest ends the file name. Two renders of the same card that differ -- another design, other
+    knobs, newer art -- are two files side by side, the way two takes of the art are; rendering the
+    same thing twice writes the same name again and stays one. Returns (path, sizes)."""
+    part = os.path.join(out_dir, f".{base}.part.png")
+    try:
+        sizes = browser.render(html, part)
+        rid = hashlib.sha1(Path(part).read_bytes()).hexdigest()[:8]
+        out = os.path.join(out_dir, f"{base}-{rid}.png")
+        os.replace(part, out)
+    finally:  # a render that died half way leaves nothing behind for gc to call an orphan
+        if os.path.exists(part):
+            os.unlink(part)
+    return out, sizes
 
 
 def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",), dpi=1200, out_dir=".",
@@ -99,14 +120,15 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
         tag = f".{th}" if compare else ""
         prefix = f"{set_code}-" if set_path else ""
         num = f"{number:03d}" + ("b" if back else "")
-        out = os.path.join(out_dir, f"{prefix}{num}_{slug(card['name'])}{'.styled' if styled else ''}{tag}.png")
+        base = f"{prefix}{num}_{slug(card['name'])}{'.styled' if styled else ''}{tag}"
+        design = st.design_of(card)
         html = frame.build_html(
             card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
             set_size=expansions.size(card["set"]), set_icon=expansions.icon(card["set"]), flavor=entry.flavor,
             art_filter=art_filter, set_css=st.css, frame_vars=frame.frame_css(st.frame),
-            maker=ws.maker, year=year, other_face=other_face, design=st.design_of(card))
-        sizes = browser.render(html, out)
-        r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
+            maker=ws.maker, year=year, other_face=other_face, design=design)
+        out, sizes = stamp(base, out_dir, html, browser)
+        r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card), design, back)
         manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash, dpi=dpi)
         manifest.save()
         yield r

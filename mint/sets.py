@@ -14,7 +14,7 @@
                       "subject": "what the picture is of", "printing": "rvr:40",
                       "base": "<variant hash>", "pose": "<variant hash>", "seed": 123,
                       "pick": "<variant hash>", "motion": "what moves in this card's clip",
-                      "design": "fullart"}
+                      "design": "fullart", "render": "BLS1-001_Card_Name-1a2b3c4d.png"}
       }
     }
 
@@ -233,6 +233,7 @@ class CardEntry:
     seed: int | None = None          # this card's seed, instead of the derived one
     remix: str | None = None         # this card's remix mode (REMIX), instead of the style's
     pick: str | None = None          # the variant hash --styled renders use, instead of the recipe's
+    render: str | None = None        # the render this card prints as, by file name, instead of its newest
     motion: str | None = None        # animate: what moves in this card's clip, in place of the motion prompt
     design: str | None = None        # this card's frame design (frame.DESIGNS or "auto"), instead of the set's
 
@@ -519,6 +520,8 @@ def from_dict(d, where="set"):
     for n, e in st.cards.items():
         if e.pick is not None and not re.fullmatch(r"[0-9a-f]{8}", e.pick):
             raise SetError(f"{where}: cards[{n!r}]: pick should be a variant hash (8 hex characters), not {e.pick!r}")
+        if e.render is not None and ("/" in e.render or not e.render.endswith(".png")):
+            raise SetError(f"{where}: cards[{n!r}]: render should be a render's file name under out/, not {e.render!r}")
         _check_design(e.design, f"{where}: cards[{n!r}]")
     return st
 

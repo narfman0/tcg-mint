@@ -105,7 +105,15 @@ def test_pages_tiles_viewer_knobs_and_a_render_job(served):
         assert until(lambda: bool(finished()), 90)
         job = finished()[0]
         assert job["state"] == "done" and not job.get("error"), job
-        assert (ws.home / "out" / "tst" / "TST-001_Alpha.png").exists()
+        # the file is named for what came out: TST-001_Alpha-<eight hex>.png
+        made = [f.name for f in (ws.home / "out" / "tst").glob("TST-001_Alpha-????????.png")]
+        assert made
+
+        # it lands under the card as its own column, and pinning it writes the card's entry
+        pg.wait_for_selector(".renders .col")
+        pg.locator(".renders .col [data-act=pin-render]").first.click()
+        assert until(lambda: json.loads((ws.sets / "tst.json").read_text())["cards"]["Alpha"].get("render") == made[0])
+        pg.wait_for_selector(".renders .col [data-act=unpin-render]")
 
         pg.goto(url + "/#/jobs")
         pg.wait_for_selector(".job")

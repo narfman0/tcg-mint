@@ -10,7 +10,25 @@ import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from .. import PKG, animate, comfy, describe, frame, impose, loop, newset, printing, render, restyle, sets, style, upscale, wan
+from .. import (
+    PKG,
+    animate,
+    comfy,
+    describe,
+    export,
+    frame,
+    impose,
+    loop,
+    newset,
+    printing,
+    render,
+    renders,
+    restyle,
+    sets,
+    style,
+    upscale,
+    wan,
+)
 from ..art import Art
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
@@ -186,7 +204,9 @@ def create_app(ws):
         p = STATIC / name
         if not p.is_file() or "/" in name:
             raise HTTPException(404)
-        return FileResponse(p)
+        # no-cache, not no-store: the browser keeps app.js and asks whether it changed, so an edit
+        # here shows up on the next load instead of after a hard refresh
+        return FileResponse(p, headers={"Cache-Control": "no-cache"})
 
     @app.get("/img")
     def img(request: Request, path: str, w: int = 320):
@@ -201,11 +221,13 @@ def create_app(ws):
 
     @app.get("/file")
     def file(path: str, download: bool = False):
-        """A file inside the workspace; `download` makes the browser save it instead of showing it."""
+        """A file inside the workspace; `download` makes the browser save it instead of showing it.
+        no-cache, so the viewer revalidates: a file written over in place (a crop refetched, an older
+        render still under its name) came back changed, and a 304 costs a stat."""
         p = inside(ws, path)
         if not p.is_file():
             raise HTTPException(404)
-        return FileResponse(p, headers={"Cache-Control": "max-age=60"}, filename=p.name if download else None)
+        return FileResponse(p, headers={"Cache-Control": "no-cache"}, filename=p.name if download else None)
 
     @app.get("/pdfpage")
     def pdf_page(path: str, n: int = 1, w: int = 800):
@@ -243,7 +265,10 @@ def create_app(ws):
                 "style_fields": style_fields(), "frame_fields": frame_fields(), "designs": list(frame.DESIGN_CHOICES),
                 "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
                 "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer,
-                          "export_dir": str(ws.export_path)}}
+                          "export_dir": str(ws.export_path)},
+                # what an MPC Autofill export offers: MakePlayingCards' cardstocks and the DPI it tops out at
+                "mpc": {"stocks": list(export.STOCKS), "stock": export.DEFAULT_STOCK, "max_dpi": export.MAX_DPI,
+                        "size": list(export.MPC_BLEED)}}
 
     # --- sets ---------------------------------------------------------------------------
     @app.get("/api/sets/{code}")
@@ -419,6 +444,9 @@ def create_app(ws):
     @app.put("/api/sets/{code}/cards/{name:path}")
     def put_card(code: str, name: str, body: dict):
         st = S.find_set(code)
+        if body.get("render"):  # pinning a render: it has to be one this set made
+            if not (S.out_dir(st) / body["render"]).is_file():
+                raise HTTPException(404, f"no render {body['render']} in {S.out_dir(st)}")
         with S.lock:
             if name not in st.cards:
                 raise HTTPException(404, f"{name} is not in {st.code}")
@@ -508,7 +536,8 @@ def create_app(ws):
 
     @app.delete("/api/sets/{code}/renders/{filename}")
     def delete_render(code: str, filename: str):
-        """Remove one rendered card (the PNG in out/<set>/ and its manifest entry)."""
+        """Remove one rendered card (the PNG in out/<set>/ and its manifest entry). A card pinned to it
+        goes back to its newest render."""
         st = S.find_set(code)
         if "/" in filename or not filename.endswith(".png"):
             raise HTTPException(400, "a render is a .png in the set's out directory")
@@ -519,6 +548,11 @@ def create_app(ws):
             name = m.entries.get(filename, {}).get("card")
             m.remove(filename)
             m.save()
+            unpinned = [n for n, e in st.cards.items() if e.render == filename]
+            for n in unpinned:
+                st.cards[n].render = None
+            if unpinned:
+                sets.save(st.path, st)
         return card_detail(S, st, name) if name else {"ok": True}
 
     @app.get("/api/sets/{code}/cards/{name:path}/printings")
@@ -618,7 +652,7 @@ def create_app(ws):
         names = body.get("names") or (st.names() if st else [])
         submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes,
                   "printrun": submit_printrun, "describe": submit_describe, "animate": submit_animate,
-                  "crops": submit_crops}.get(kind)
+                  "crops": submit_crops, "export": submit_export}.get(kind)
         if not submit:
             raise HTTPException(400, f"unknown job kind {kind!r}")
         job = submit(S, st, names, body)
@@ -761,25 +795,26 @@ def card_detail(S, st, name, cards=None):
 
 
 def renders_for(S, st, name, want=None):
-    """The card's newest plain and styled render, its proof and its theme sheet. `want` is the art
-    hash each of plain / styled should render with now; a render is `stale` when the frame (template, frame.py,
-    knobs, set css) or that art has changed since it was made."""
+    """Every render the set's out/ dir holds for this card, newest first, under `all`; the one each of
+    plain and styled resolves to now -- the card's pinned render when it is of that kind, else its
+    newest -- under `plain` and `styled`; and its proof and theme sheet. `want` is the art hash each of
+    plain / styled should render with now; a render is `stale` when the frame (template, frame.py,
+    knobs, set css) or that art has changed since it was made, and a pinned one never is: it is the
+    render the card was told to print as."""
     out = {}
-    m = Manifest(S.out_dir(st))
     fh = frame_hash(st.css, frame.frame_css(st.frame))
-    mine = {name, name.split(" // ")[0]}  # a double-faced card's render is filed under its front face's name
-    for fn, e in m.entries.items():
-        if e.get("card") not in mine:
-            continue
-        p = S.out_dir(st) / fn
-        if not p.exists():
-            continue
-        key = ("styled" if e.get("styled") else "plain") if e.get("theme") == "wizards" or not e.get("theme") else None
-        if key and key not in out or (key and e["rendered_at"] > out[key]["rendered_at"]):
-            out[key] = {**e, "file": fn, "path": str(p)}
-            if want is not None:
-                out[key]["stale"] = ("the frame changed" if e.get("frame") != fh
-                                     else "the art changed" if (e.get("source") or {}).get("hash") != want.get(key) else None)
+    pin = st.card({"name": name}).render
+    every = renders.for_card(S.out_dir(st), name, pin)
+    if want is not None:
+        for r in every:
+            r["stale"] = renders.stale(r, fh, want)
+    out["all"] = every
+    for key in ("plain", "styled"):
+        chosen = renders.chosen(every, key)
+        if chosen:
+            out[key] = chosen
+    if pin and not any(r["pinned"] for r in every):
+        out["pin_gone"] = pin  # the pinned render was deleted or never made; the newest stands in
     proof = S.out_dir(st) / "proof"
     if proof.is_dir():
         pm = Manifest(proof)
@@ -846,6 +881,7 @@ def submit_printrun(S, st, names, body):
         # named when it runs, with the job's id: two runs queued in the same minute keep their own files
         pdf = out_dir / "print" / f"{st.code}-{key}-{time.strftime('%Y%m%d-%H%M')}-{job.id[:4]}.pdf"
         need = [n for n in names if not (r := renders_for(S, st, n, want_for(S, st, n)).get(key)) or r.get("stale")]
+        # a pinned render is never stale (renders_for), so it goes to the printer as it is
         job.step(0, len(need) + 2)
         done = 0
         if need:
@@ -887,9 +923,40 @@ def want_for(S, st, name):
         card = S.cards().find(name, entry.printing)
     except MintError:
         return {}
-    art = S.art
-    return {"plain": art.resolve(card, override=entry.art).hash,
-            "styled": art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art)).hash}
+    return renders.want_hashes(st, card, S.art, entry)
+
+
+def submit_export(S, st, names, body):
+    """An MPC Autofill folder under out/<set>/mpc/: every card as an image at MPC's size, and the
+    cards.xml its desktop tool reads. Cards without a render, or with a stale one, are rendered first."""
+    styled, dpi = bool(body.get("styled")), int(body.get("dpi") or export.MAX_DPI)
+    stock = body.get("stock") or export.DEFAULT_STOCK
+    fmt = body.get("format") or "png"
+    if stock not in export.STOCKS:
+        raise HTTPException(400, f"stock is one of {', '.join(export.STOCKS)}")
+    out_dir = S.out_dir(st) / "mpc"
+    key = "styled" if styled else "plain"
+    title = f"export {st.code} for MPC Autofill: {len(names)} card(s) {key} @ {dpi} dpi"
+    what = (f"writes {len(names)} card image(s) at {dpi} DPI -- MPC's 2.72x3.70in card with its bleed -- and "
+            f"cards.xml beside them, into out/{st.code.lower()}/mpc/; a card whose {key} render is missing or "
+            f"stale is rendered first")
+
+    def run(job):
+        job.step(0, len(names) + 1)
+        done = [0]
+
+        def log(msg):
+            job.say(msg)
+            done[0] = min(len(names), done[0] + 1)
+            job.step(done[0])
+        r = export.export(S.ws, st, names, out_dir, styled=styled, dpi=dpi, stock=stock,
+                          card_back=body.get("back") or "auto", fmt=fmt, foil=bool(body.get("foil")),
+                          absolute=bool(body.get("absolute")), log=log)
+        job.made(set=st.code, name=f"{r['fronts']} card(s)", kind="mpc", file="cards.xml", path=r["xml"])
+        job.step(len(names) + 1)
+        return r
+    return S.jobs.submit("export", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi,
+                                           "stock": stock, "what": what, "dest": str(out_dir)}, run)
 
 
 def submit_themes(S, st, names, body):

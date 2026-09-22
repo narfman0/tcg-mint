@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from mint import scryfall, sets, workspace
+from mint import frame, scryfall, sets, workspace
+from mint.manifest import Manifest, frame_hash
 from mint.web.server import create_app
 from tests.conftest import synthetic_card
 
@@ -388,9 +389,10 @@ def test_animate_job_and_the_card_page_show_clips(client, art):
     assert not v.path.with_suffix(".webm").exists()
 
 
-def test_img_revalidates_so_a_rewritten_render_shows(client, art):
-    """A render is overwritten in place under the same name, so /img must not let the browser keep
-    a thumbnail for an hour: the thumbnail's key is the ETag, a match is a 304, a rewritten file is new."""
+def test_img_revalidates_so_a_rewritten_file_shows(client, art):
+    """A crop refetched, a clip remade: an image can be written over in place under the same name, so
+    /img must not let the browser keep a thumbnail for an hour. The thumbnail's key is the ETag, a
+    match is a 304, a rewritten file is new."""
     import os
     import shutil
 
@@ -423,3 +425,108 @@ def test_design_on_the_set_and_the_card(client):
     assert client.get("/api/sets/TST/cards/Beta").json()["design"] == "m15"
     ps = client.get("/api/sets/TST/cards/Alpha/printings").json()
     assert ps and ps[0]["design"] == "m15"
+
+
+def render_entry(m, out, fn, *, card="Alpha", design="m15", at="2026-01-01T00:00:00+00:00", fhash="", styled=False,
+                 number=1):
+    """A render on disk and in the manifest, without driving Chromium. The file is a real image at
+    the render's proportions, so an export can crop and resample it."""
+    from PIL import Image
+    m.entries[fn] = {"card": card, "number": number, "theme": "wizards", "set": "TST", "styled": styled,
+                     "design": design, "back": False, "sizes": {"text": 8.0},
+                     "source": {"kind": "crop", "path": "", "hash": None, "label": None},
+                     "shrunk": False, "frame": fhash, "dpi": 1200, "rendered_at": at}
+    Image.new("RGB", (272, 372), (30, 60, 110)).save(out / fn)
+
+
+def test_every_render_is_kept_under_the_card_and_one_can_be_pinned(client):
+    """Renders behave like the art: each one that differs is its own file listed under the card, and
+    the card can be pinned to the one it prints as -- which is then never stale, whatever is rendered after."""
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"]})
+    client.settle()
+    out = client.ws.home / "out" / "tst"
+    out.mkdir(parents=True)
+    st = sets.load(client.ws.sets / "tst.json")
+    fh = frame_hash(st.css, frame.frame_css(st.frame))
+    m = Manifest(out)
+    old, new = "TST-001_Alpha-aaaaaaaa.png", "TST-001_Alpha-bbbbbbbb.png"
+    render_entry(m, out, old, design="m15", at="2026-01-01T00:00:00+00:00", fhash="00000000")
+    render_entry(m, out, new, design="retro", at="2026-02-01T00:00:00+00:00", fhash=fh)
+    m.save()
+
+    c = client.get("/api/sets/TST/cards/Alpha").json()
+    assert [r["file"] for r in c["renders"]["all"]] == [new, old]          # newest first, both kept
+    assert [r["design"] for r in c["renders"]["all"]] == ["retro", "m15"]  # what tells them apart
+    assert c["renders"]["plain"]["file"] == new and c["renders"]["all"][1]["stale"] == "the frame changed"
+
+    r = client.put("/api/sets/TST/cards/Alpha", json={"render": old})
+    assert r.status_code == 200
+    plain = r.json()["renders"]["plain"]
+    assert plain["file"] == old and plain["pinned"] and plain["stale"] is None  # pinned: it prints as it is
+    assert json.loads((client.ws.sets / "tst.json").read_text())["cards"]["Alpha"]["render"] == old
+    assert client.put("/api/sets/TST/cards/Alpha", json={"render": "nope.png"}).status_code == 404
+
+    d = client.delete(f"/api/sets/TST/renders/{old}").json()
+    assert d["renders"]["plain"]["file"] == new and "render" not in d["entry"]  # the pin went with it
+    assert not (out / old).exists()
+
+
+def test_a_pinned_render_that_is_gone_is_said_so(client):
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"]})
+    client.settle()
+    out = client.ws.home / "out" / "tst"
+    out.mkdir(parents=True)
+    m = Manifest(out)
+    render_entry(m, out, "TST-001_Alpha-aaaaaaaa.png")
+    m.save()
+    client.put("/api/sets/TST/cards/Alpha", json={"render": "TST-001_Alpha-aaaaaaaa.png"})
+    (out / "TST-001_Alpha-aaaaaaaa.png").unlink()  # deleted from under it
+    c = client.get("/api/sets/TST/cards/Alpha").json()
+    assert c["renders"]["pin_gone"] == "TST-001_Alpha-aaaaaaaa.png" and "plain" not in c["renders"]
+
+
+def test_the_page_and_the_workspace_files_are_revalidated_not_held(client):
+    """app.js and a full-size file must come back with no-cache, so a changed one shows on the next
+    load instead of after a hard refresh."""
+    assert client.get("/static/app.js").headers["cache-control"] == "no-cache"
+    p = client.ws.home / "out" / "x.png"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(b"png")
+    r = client.get("/file", params={"path": str(p)})
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-cache" and r.headers["etag"]
+
+
+def test_the_board_exports_a_set_for_mpc_autofill(client):
+    """The export job writes out/<set>/mpc/: a card image at MPC's size per card, and the cards.xml
+    its desktop tool reads, with every path resolving from inside the folder."""
+    import xml.etree.ElementTree as ET
+
+    from PIL import Image
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha", "Beta"]})
+    client.settle()
+    st = sets.load(client.ws.sets / "tst.json")
+    fh = frame_hash(st.css, frame.frame_css(st.frame))
+    out = client.ws.home / "out" / "tst"
+    out.mkdir(parents=True)
+    m = Manifest(out)
+    render_entry(m, out, "TST-001_Alpha-aaaaaaaa.png", card="Alpha", number=1, fhash=fh)
+    render_entry(m, out, "TST-002_Beta-bbbbbbbb.png", card="Beta", number=2, fhash=fh)
+    m.save()
+
+    assert client.get("/api/workspace").json()["mpc"]["max_dpi"] == 800
+    r = client.post("/api/jobs", json={"kind": "export", "set": "TST", "dpi": 300, "back": "none"})
+    assert r.status_code == 200
+    client.settle()
+    job = [j for j in client.get("/api/jobs").json() if j["kind"] == "export"][0]
+    assert job["state"] == "done", (job["error"], job["log"])
+
+    mpc = out / "mpc"
+    root = ET.fromstring((mpc / "cards.xml").read_text())
+    assert root.find("details").findtext("quantity") == "2"
+    ids = [c.findtext("id") for c in root.find("fronts").findall("card")]
+    assert ids == ["images/001 Alpha.png", "images/002 Beta.png"]
+    for rel in ids:
+        assert (mpc / rel).is_file()
+    with Image.open(mpc / ids[0]) as im:
+        assert im.size == (816, 1110)   # 2.72 x 3.70in at 300 DPI
+    assert client.post("/api/jobs", json={"kind": "export", "set": "TST", "stock": "(S99) Glitter"}).status_code == 400

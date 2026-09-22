@@ -104,3 +104,28 @@ def test_a_clip_of_a_kept_image_stays_and_goes_with_its_files(ws):
     assert gc.files_of(stray) == [stray.path, stray.path.with_suffix(".webm")]
     gc.main(["--delete"])
     assert not stray.path.with_suffix(".webm").exists() and kept.path.with_suffix(".webm").exists()
+
+
+def test_the_render_a_card_is_pinned_to_is_never_stale(ws):
+    """A pin says this card prints as this file, so gc leaves it even when the frame moved on."""
+    st = sets.from_dict({"code": "TST", "name": "t",
+                         "cards": {"Alpha": {"number": 1, "render": "TST-001_Alpha-aaaaaaaa.png"}}})
+    sets.save(ws.sets / "tst.json", st)
+    art = Art(ws.art)
+    card = json.loads(ws.cards_file.read_text().splitlines()[0])
+    art.crop(card, fetch=False).parent.mkdir(parents=True, exist_ok=True)
+    art.crop(card, fetch=False).write_bytes(b"jpg")
+    out = ws.home / "out" / "tst"
+    out.mkdir(parents=True)
+    m = Manifest(out)
+    for fn in ("TST-001_Alpha-aaaaaaaa.png", "TST-001_Alpha-bbbbbbbb.png"):
+        m.entries[fn] = {"card": "Alpha", "number": 1, "theme": "wizards", "styled": False, "design": "m15",
+                         "source": {"kind": "crop", "hash": None}, "frame": "00000000",  # both made before a frame fix
+                         "rendered_at": "2026-01-01"}
+        (out / fn).write_bytes(b"png")
+    m.save()
+
+    r = gc.collect(ws, keep_days=3)
+    assert [fn for _, _, fn, _ in r["stale"]] == ["TST-001_Alpha-bbbbbbbb.png"]
+    gc.main(["--delete"])
+    assert set(Manifest(out).entries) == {"TST-001_Alpha-aaaaaaaa.png"}

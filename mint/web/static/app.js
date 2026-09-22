@@ -23,6 +23,7 @@ const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mod
                style2: '', sort: 'number', sheet: false, colours: {}, paper: 'letter', stock: '',
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
                takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false,
+               mpcStock: '', mpcDpi: 800,  // MakePlayingCards' cardstock and the export's resolution
                motion: {loop: '', length: 0, takes: 1}};  // the card page's animate knobs for this run ('' / 0 = the block's)
 
 async function api(path, opts = {}) {
@@ -215,6 +216,8 @@ function badges(c) {
   if (c.entry.pose) b.push(['accent', 'pose ' + short(c.entry.pose.split('/').pop())]);
   if (c.base_missing) b.push(['warn', `no ${c.base_missing} to start from`]);
   if (c.entry.seed != null) b.push(['accent', 'seed pinned']);
+  if (c.renders?.pin_gone) b.push(['bad', 'pinned render gone']);
+  else if (c.entry.render) b.push(['accent', 'render pinned']);
   const remix = c.entry.remix || styleOf(c)?.remix || 'restyle';
   if (remix !== 'restyle') b.push(['accent', REMIX_BADGE[remix] || remix]);
   if (!c.renders?.plain && !c.renders?.styled) b.push(['', 'not rendered']);
@@ -237,7 +240,7 @@ function shown(c, style = state.style) {
   const m = state.mode;
   if (state.show === 'card' && style === 'current') {
     const r = c.renders?.[m];
-    if (r) return {path: r.path, card: true, what: `render · ${m} · ${r.dpi || '?'} dpi`};
+    if (r) return {path: r.path, card: true, what: `render · ${m} · ${r.design || 'm15'} · ${r.dpi || '?'} dpi${r.pinned ? ' · pinned' : ''}`};
   }
   if (m === 'styled' && style !== 'current') {
     const v = variantFor(c, style);
@@ -417,6 +420,11 @@ function board() {
         <select id="paper">${(state.ws.print?.paper || ['letter']).map(p => `<option ${state.paper === p ? 'selected' : ''}>${p}</option>`).join('')}</select>
         <select id="stock" title="what is in the tray; PDF only makes the file and prints nothing"><option value="">PDF only</option>${(state.ws.print?.stocks || []).map(s => `<option ${state.stock === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       </span>
+      <span class="stage" title="an MPC Autofill folder under out/${esc(code.toLowerCase())}/mpc/: every card as an image at MakePlayingCards' size, and the cards.xml its desktop tool reads. Put the tool in the folder and run it there"><span class="lbl">order</span>
+        <button data-job="export" title="each card's render in the mode picked above (made where missing or stale), cropped to MPC's 2.72×3.70in card and written with cards.xml">export for MPC · ${state.mode}</button>
+        <select id="mpcstock" title="the cardstock the order asks MakePlayingCards for">${(state.ws.mpc?.stocks || []).map(x => `<option ${(state.mpcStock || state.ws.mpc?.stock) === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+        <select id="mpcdpi" title="MPC's press tops out at 800 DPI and the desktop tool downscales past it">${[300, 600, 800].map(d => `<option ${state.mpcDpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span>
+      </span>
       <label class="missing" title="each job skips the cards that already have its product: an enhance of the crop, art in the look, a plain or styled render that is not stale. The count is what it would make"><input type="checkbox" id="missing" ${state.missing ? 'checked' : ''}> only what's missing</label>
       ${n ? '<button id="clearsel" class="small">clear selection</button>' : ''}
     </div>
@@ -447,9 +455,12 @@ function board() {
   $('#dpi').onchange = e => { state.dpi = +e.target.value; };
   $('#paper').onchange = e => { state.paper = e.target.value; };
   $('#stock').onchange = e => { state.stock = e.target.value; };
+  if ($('#mpcstock')) $('#mpcstock').onchange = e => { state.mpcStock = e.target.value; };
+  if ($('#mpcdpi')) $('#mpcdpi').onchange = e => { state.mpcDpi = +e.target.value; };
   document.querySelectorAll('[data-job]').forEach(b => b.onclick = () => {
     const dpi = +$('#dpi').value, job = b.dataset.job;
-    const cs = job === 'printrun' ? target : targets(job);  // a print run wants every card it is aimed at
+    // a print run and an MPC export want every card they are aimed at, not just what is missing
+    const cs = (job === 'printrun' || job === 'export') ? target : targets(job);
     if (job === 'printrun' && state.stock && !confirm(`Print ${cs.length} card(s) of ${code} on ${state.stock} to ${state.ws.print?.printer}? Check what is in the tray.`)) return;
     if (!cs.length) return toast(state.missing ? 'nothing missing: every card has it' : 'no cards');
     // on the ALL board a job is one submission per set. The names go explicitly unless the job is
@@ -468,6 +479,7 @@ function board() {
         'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
         'newcards': lookTemplate(styled) !== null && {kind: 'describe', set: s, names: list, generate: true, template: lookTemplate(styled)},
         'printrun': {kind: 'printrun', set: s, names: list, styled: state.mode === 'styled', dpi, paper: state.paper || 'letter', stock: state.stock || null},
+        'export': {kind: 'export', set: s, names: list, styled: state.mode === 'styled', dpi: state.mpcDpi, stock: state.mpcStock || undefined},
       };
       const origin = `${all ? 'all-sets board' : code + ' board'}: ${n ? `${n} selected` : 'all cards'}${state.missing ? ', only what\'s missing' : ''}${all ? ` (${s})` : ''}`;
       if (jobs[job]) submit(jobs[job], origin);
@@ -665,6 +677,7 @@ function recipeDiff(recipe, ref) {
    overrides. The images: every picture the card has, grouped by look, to compare, keep, enhance,
    or start the next generate from. */
 const newest = (a, b) => (b.created || '').localeCompare(a.created || '');
+const when = iso => { const d = iso && new Date(iso); return d && !isNaN(d) ? d.toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : ''; };
 const isPath = s => !!s && (s.includes('/') || /\.(png|jpe?g|webp)$/i.test(s));
 /* The card's images as compare columns, in groups: source (the crop and its enhance), one group per
    look label (its restyles newest first, each enhance right after the restyle it was made from),
@@ -705,12 +718,11 @@ function columns(c) {
   if (orphans.length) groups.push({title: 'enhance · source deleted', cols: orphans.map(e => col(e, {title: 'enhance', sub: `${e.hash} · of ${e.base}`}))});
   const lost = vs.filter(v => v.kind === 'motion' && gone(v));
   if (lost.length) groups.push({title: 'motion · source deleted', cols: lost.map(m => clipCol(m, m.base))});
-  const renders = [];
-  for (const k of ['plain', 'styled']) {
-    const r = c.renders?.[k];
-    if (r) renders.push({key: 'render-' + k, title: `render · ${k}`, sub: `${r.dpi || '?'} dpi · text ${r.sizes?.text}px${r.shrunk ? ' (shrunk)' : ''}${r.stale ? ` · stale: ${r.stale}` : ''}`,
-                         path: r.path, kind: 'card', which: k, file: r.file});
-  }
+  const renders = (c.renders?.all || []).map(r => ({
+    key: 'render-' + r.file, title: r.mode, path: r.path, kind: 'card', which: r.mode, file: r.file,
+    pinned: r.pinned, stale: r.stale,
+    sub: [r.design || 'm15', `${r.dpi || '?'} dpi`, `text ${r.sizes?.text}px${r.shrunk ? ' (shrunk)' : ''}`, when(r.rendered_at)]
+      .filter(Boolean).join(' · ') + (r.stale ? ` · stale: ${r.stale}` : '')}));
   groups.push({title: 'renders', cols: renders, renders: true});
   return groups;
 }
@@ -726,6 +738,8 @@ function columnHtml(x, c) {
   if (x.key === c.entry.pose) tags.push(['accent', 'pose']);
   if (x.enhanced?.length) tags.push(['good', 'enhanced']);
   if (x.kind === 'motion') tags.push(['accent', x.current ? 'clip · the recipe\'s' : 'clip']);
+  if (x.kind === 'card' && x.pinned) tags.push(['accent', 'pinned']);
+  if (x.kind === 'card' && x.stale) tags.push(['warn', 'stale']);
   const menu = items => items.length ? `<details class="menu"><summary>…</summary><div>${items.map(([a, arg, t]) => `<button data-act="${a}" data-arg="${esc(arg)}">${t}</button>`).join('')}</div></details>` : '';
   const wan = state.ws?.comfy?.wan || {ready: false, hint: 'the workbench has not said whether Wan is there'};
   const animateBtn = key => `<button class="small" data-act="animate" data-arg="${esc(key)}" ${wan.ready ? '' : 'disabled'} title="${esc(wan.ready ? 'a short seamless clip of this image through Wan 2.2, with the motion line above; about a minute' : `cannot animate: ${wan.hint}`)}">animate</button>`;
@@ -744,13 +758,16 @@ function columnHtml(x, c) {
       ${menu([['base', 'crop', 'restyle / inspire from this'], ['pose', 'crop', 'repose from this']])}`;
   else if (x.kind === 'enhance') acts = `${animateBtn(x.key)}${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this']])}${trashBtn('delete', x.key, 'delete this image')}`;
   else if (x.kind === 'motion') acts = `${x.videos.map(p => `<a class="pill" href="${file(p)}" target="_blank" title="the clip file in a new tab">${esc(p.split('.').pop())}</a>`).join('')}${trashBtn('delete', x.key, 'delete this clip')}`;
-  else acts = `<button class="small" data-act="render-${x.which}" data-arg="">re-render</button>${trashBtn('delete-render', x.file, 'delete this render')}`;
+  else acts = `
+      <button class="small ${x.pinned ? 'on' : ''}" data-act="${x.pinned ? 'unpin-render' : 'pin-render'}" data-arg="${esc(x.file)}" title="${x.pinned ? 'back to whichever render is newest' : 'make this the render the card prints as: the board tile shows it and a print run imposes it, whatever is rendered after'}">${x.pinned ? 'pinned ✓' : 'pin'}</button>
+      <button class="small" data-act="render-${x.which}" data-arg="">re-render</button>
+      ${trashBtn('delete-render', x.file, 'delete this render')}`;
   // a clip plays in place, muted, over its poster; the page's still and the viewer show the poster
   const pic = x.video && !STATIC
     ? `<video autoplay loop muted playsinline preload="metadata" poster="${img(x.path, 640)}" src="${file(x.video)}"></video>`
     : `<img loading="lazy" src="${img(x.path, 640)}">`;
   return `
-      <div class="col ${x.styled ? 'styled' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
+      <div class="col ${x.styled ? 'styled' : ''} ${x.pinned ? 'pinned' : ''} ${ab.a === x.key ? 'isA' : ''} ${ab.b === x.key ? 'isB' : ''}" data-key="${esc(x.key)}">
         <div class="pic ${x.kind === 'card' ? 'card' : ''}" data-open="${esc(x.path)}">${pic}
           <div class="ab"><b data-ab="a">A</b><b data-ab="b">B</b></div></div>
         <div class="title"><span>${esc(x.title)} ${tags.map(([k, t]) => `<span class="badge ${k}">${esc(t)}</span>`).join(' ')}</span><small>${esc(x.sub)}</small></div>
@@ -870,8 +887,11 @@ async function card(r) {
           <button data-cjob="render-plain">render plain</button>
           <button data-cjob="render-styled" ${styledV || st.style ? '' : 'disabled'} title="${styledV ? `the card with ${styledV.label}-${styledV.hash}` : st.style ? 'no styled art yet: the set\'s art_filter stands in' : 'nothing styled to render'}">render styled</button>
           <select id="dpi">${[300, 600, 1200].map(d => `<option ${state.dpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span></span>
+        ${c.renders?.pin_gone ? `<span class="warn">pinned</span><span class="row"><span class="warn">${esc(c.renders.pin_gone)} is gone; the newest render stands in</span>
+          <button class="small" data-act="unpin-render" data-arg="">clear</button></span>` : ''}
       </div>
-      ${renders.cols.length ? `<div class="cols renders">${renders.cols.map(x => columnHtml(x, c)).join('')}</div>` : ''}
+      ${renders.cols.length ? `<p class="muted">${renders.cols.length} render${renders.cols.length > 1 ? 's' : ''} kept, newest first — a render that differs from the last (another design, other knobs, newer art) is a file of its own beside it. Pin the one the card prints as; <code>mint gc</code> offers the rest.</p>
+        <div class="cols renders">${renders.cols.map(x => columnHtml(x, c)).join('')}</div>` : ''}
     </section>`;
   const put = body => api(`/api/sets/${code}/cards/${encodeURIComponent(c.name)}`, {method: 'PUT', body}).then(() => refresh()).catch(e => toast(e.message, true));
   // printings: a grid of art crops, each fetched from Scryfall the first time it is shown
@@ -952,6 +972,8 @@ async function card(r) {
     const act = b.dataset.act, arg = b.dataset.arg, names = [c.name];
     if (act === 'keep') put({pick: arg});
     else if (act === 'unpick') put({pick: null});
+    else if (act === 'pin-render') put({render: arg});
+    else if (act === 'unpin-render') put({render: null});
     else if (act === 'enhance') submit({kind: 'enhance', set: code, names, base: arg}, origin);
     else if (act === 'animate') animateFrom(arg);
     else if (act === 'base') put({base: arg === 'crop' ? null : arg});
@@ -1607,6 +1629,7 @@ async function jobs() {
 
 /* One thing a job made: a link to that image on the card page, the picture itself on hover. */
 function itemHtml(it) {
+  if (it.kind === 'mpc') return `<span class="it" title="run MPC Autofill's desktop tool in this folder">${esc(it.name)} <span class="mono muted">${esc(it.path)}</span></span>`;
   if (it.kind === 'pdf') return `<a class="it" href="#/set/${esc(it.set)}/pdfs/${encodeURIComponent(it.file)}">${esc(it.file)} <span class="mono muted">${esc(it.name)}</span></a>`;
   if (it.kind === 'subject') return `<a class="it" href="#/set/${esc(it.set)}/card/${encodeURIComponent(it.name)}" title="${esc(it.label)}">${esc(it.name)} <span class="muted">subject: ${esc(it.label.length > 60 ? it.label.slice(0, 60) + '…' : it.label)}</span></a>`;
   const href = it.key ? colHash(it.set, it.name, it.key) : `#/set/${esc(it.set)}/card/${encodeURIComponent(it.name)}`;
