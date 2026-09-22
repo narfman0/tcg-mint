@@ -212,7 +212,12 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   background: url("$watermark") center / 64px no-repeat; opacity: calc(var(--watermark) * .16); }
 /* the security stamp (frame.stamp_kind): the holofoil oval of a rare or mythic, or the printing's own shape --
    Universes Beyond's triangle, the Un-sets' acorn, the Signature Spellbooks' circle -- each with its own bite out
-   of the text box's bottom edge, the pinline following. The oval: 21.6 x 11 at 319.2, in a 21-unit arc. The
+   of the text box's bottom edge, the pinline following. The oval, traced off three scans (UGIN 146, SLD 176, PDFT
+   268p): 21.6 x 11 at 319.2, centred 125 x 324.7; its bite a circular arc 34 wide at the box's foot and 7 deep
+   (radius 24.1, centre 17.1 below the foot). The pinline's hole is the same arc 2 *in* (radius 22.1): the plate
+   lines the inside of the bite as it lines the outside of the box everywhere else, so the rim is 2 all round and
+   3.6 where the arcs meet the foot obliquely (the scans' 107.4 to 111); the black border shows through the rest
+   of the bite around the stamp. The
    triangle, traced off three Universes Beyond scans (WHO 57, LTC 269, LTC 75): the box's bite is a trapezoid, its
    flat top 107.9-142.5 at 316, its sides closing 0.45 a unit to 110.4-140.3 at the box's foot, the pinline's rim
    3.5 wide inside it; the stamp itself is a rounded triangle, apex down, 22 wide at 319.5 and 11.5 tall to its
@@ -222,8 +227,8 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   opacity: var(--foil-stamp);
   background: radial-gradient(ellipse at 40% 35%, #e8e8e8, #9a9a9a 60%, #6f6f6f);
   box-shadow: inset 0 0 0 .6px rgba(255,255,255,.5); }
-.stamped .textbox { clip-path: path('M.5 0 H212.3 L212.8 .5 V103.6 H119.6 A21 21 0 0 0 93.2 103.6 H0 V.5 Z'); }
-.stamped .pl-text { clip-path: path('M0 0 H216.8 V107.2 H125.6 A22.6 22.6 0 0 0 91.2 107.2 H0 Z'); }
+.stamped .textbox { clip-path: path('M.5 0 H212.3 L212.8 .5 V103.6 H123.4 A24.1 24.1 0 0 0 89.4 103.6 H0 V.5 Z'); }
+.stamped .pl-text { clip-path: path('M0 0 H216.8 V107.2 H124.15 A22.1 22.1 0 0 0 92.65 107.2 H0 Z'); }
 .stamp.triangle { top: 319.5px; width: 22px; height: 11.5px; margin-left: -11px; border-radius: 0; box-shadow: none;
   background: radial-gradient(ellipse at 45% 25%, #e8e8e8, #9a9a9a 60%, #6f6f6f);
   clip-path: path('M1.2 0 H20.8 Q22 0 21.4 1 L11.9 10.9 Q11 11.8 10.1 10.9 L.6 1 Q0 0 1.2 0 Z'); }
@@ -231,10 +236,10 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .stamp-triangle .pl-text { clip-path: path('M0 0 H216.8 V107.2 H119.9 L123.1 101.6 H94.8 L98 107.2 H0 Z'); }
 .stamp.acorn { background: none; box-shadow: none; border-radius: 0; top: 318.4px; width: 12px; height: 12px; margin-left: -6px; }
 .stamp.acorn img { display: block; width: 12px; height: 12px; }
-.stamp.circle { top: 316.5px; width: 12px; height: 12px; margin-left: -6px; box-shadow: inset 0 0 0 .6px rgba(255,255,255,.5);
+.stamp.circle { top: 316px; width: 12px; height: 12px; margin-left: -6px; box-shadow: inset 0 0 0 .6px rgba(255,255,255,.5);
   background: radial-gradient(circle at 40% 35%, #e8e8e8, #9a9a9a 60%, #6f6f6f); }
-.stamp-circle .textbox { clip-path: path('M.5 0 H212.3 L212.8 .5 V103.6 H115.9 A9.5 9.5 0 0 0 96.9 103.6 H0 V.5 Z'); }
-.stamp-circle .pl-text { clip-path: path('M0 0 H216.8 V107.2 H119.6 A11.5 11.5 0 0 0 97.2 107.2 H0 Z'); }
+.stamp-circle .textbox { clip-path: path('M.5 0 H212.3 L212.8 .5 V103.6 H115.85 A9.5 9.5 0 1 0 96.95 103.6 H0 V.5 Z'); }
+.stamp-circle .pl-text { clip-path: path('M0 0 H216.8 V107.2 H115.43 A7.5 7.5 0 1 0 101.37 107.2 H0 Z'); }
 /* --- the other layouts. Everything above is the normal frame; each of these moves its parts. --- */
 /* double-faced: the face's icon before its name, and the other face named at the foot of the text box */
 .dfc { display: inline-block; font-size: .8em; margin-right: 3px; opacity: .8; }
