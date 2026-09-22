@@ -309,6 +309,9 @@ DESIGNS = {
     "extended": (272, 179.4, "extended.css"),      # the page's width, from under the title bar to the text box's plate
     "borderless": (272, 206, "borderless.css"),    # the page's width, from its top edge to the type bar
     "fullart": (272, 372, "fullart.css"),          # the whole page
+    "textless": (272, 372, "textless.css"),        # the whole page, only the title bar and the collector line on it
+    "modern": (209, 154, "modern.css"),            # the 2003 frame (8th Edition to M14): its window, provisional
+    "retro": (209, 161, "retro.css"),              # the 1997 frame (Mirage to Scourge): its window, provisional
 }
 DESIGN_CHOICES = ("auto", *DESIGNS)  # what a set or card entry may say; auto follows the printing
 # the layouts whose art is not the window the designs move (a saga's and a class's beside the text, a split's and
@@ -318,14 +321,22 @@ DESIGNS_DIR = PKG / "designs"
 
 
 def printed_design(card):
-    """The design the printed card has, by Scryfall's markers: full art, else borderless, else extended
-    art, else the M15 frame. What `auto` resolves to."""
+    """The design the printed card has, by Scryfall's markers: textless, else full art, else borderless, else
+    extended art, else by the frame's era (1993 and 1997 retro, 2003 modern), else the M15 frame. What `auto`
+    resolves to."""
+    if card.get("textless"):
+        return "textless"
     if card.get("full_art"):
         return "fullart"
     if card.get("border_color") == "borderless":
         return "borderless"
     if "extendedart" in (card.get("frame_effects") or []):
         return "extended"
+    era = card.get("frame")
+    if era in ("1993", "1997"):
+        return "retro"
+    if era == "2003":
+        return "modern"
     return "m15"
 
 
@@ -1025,7 +1036,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
         legendary=" legendary" if legendary and not turned else "",
         pair=(" pair hybrid" if kind_b != kind else " pair") if pair else "",
         frame_vars=frame_vars or frame_css(),
-        design=f" design-{design} rarity-{rarity}", design_css=design_css(design),
+        design=f" design-{design} rarity-{rarity} kind-{frame_kind(card)}", design_css=design_css(design),
         watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout + (" tall" if tall else ""),
         stamp=stamp_html(stamp), stamped=f" stamped stamp-{stamp}" if stamp else "",
         body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else "",

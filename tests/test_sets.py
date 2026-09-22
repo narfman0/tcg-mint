@@ -318,9 +318,9 @@ def test_design_is_the_entrys_the_sets_or_the_printings():
     assert st.lookup("Alpha") == ("x:1", "borderless") and st.lookup("Beta") == (None, "extended")
     assert st.to_dict()["design"] == "extended" and st.to_dict()["cards"]["Alpha"]["design"] == "borderless"
     with pytest.raises(SetError, match="design must be one of"):
-        sets.from_dict({**BASE, "design": "retro"})
+        sets.from_dict({**BASE, "design": "showcase"})
     with pytest.raises(SetError, match=r"cards\['Alpha'\]: design"):
-        sets.from_dict({**BASE, "cards": {"Alpha": {"design": "retro"}}})
+        sets.from_dict({**BASE, "cards": {"Alpha": {"design": "showcase"}}})
 
 
 def test_generation_size_follows_the_design_unless_spelled():

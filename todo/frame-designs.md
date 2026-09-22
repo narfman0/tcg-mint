@@ -99,3 +99,22 @@ reusable came out of it.
   change frame because a basic's default printing is full art.
 - A design changes the restyle recipe hash only through the generation
   size, and only off M15.
+
+## Phase 4 -- textless, the 2003 frame, the 1997 frame (scaffolded 2026-09-22)
+
+Three more designs, named by Scryfall's markers so `auto` follows them:
+`textless` (`textless: true`; the whole page, only the title bar and the
+collector line), `modern` (`frame: "2003"`, Eighth Edition to M14) and
+`retro` (`frame: "1997"` and `"1993"`, the old border). The card now
+carries `kind-<k>` (W U B R G gold artifact land C) so a design can carry
+a palette of its own by colour, which the two era frames need, and the
+era designs choose their own fonts from the local stacks (Matrix Bold for
+2003, a Goudy Medieval stand-in for 1997; never a Google font in the
+wizards theme). The M15 pieces are all absolutely placed, so an era frame
+is a design that moves and repaints them, not a second template; if one
+turns out to need a hook in the base (a piece M15 has no element for),
+the smallest one, called out in the report. `frame.DESIGNS` holds
+provisional art rectangles for the two era frames; the agents measure
+the real ones and report them. Same rules as phase 2: one agent per
+design in a worktree, scans not eyeballing, a golden, the M15 render
+pixel-identical, `mint check` warns of a wrong-shape picture.

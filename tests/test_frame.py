@@ -278,7 +278,7 @@ def test_two_colour_frames():
 def test_two_colour_frames_in_the_page(art):
     dual = synthetic_card(colors=[], type_line="Land", produced_mana=["G", "U"], power=None)
     html = frame.build_html(dual, symbols=NoSymbols(), art_url="file://" + art)
-    assert 'class="card normal stamped stamp-oval pair design-m15 rarity-rare"' in html
+    assert 'class="card normal stamped stamp-oval pair design-m15 rarity-rare kind-land"' in html
     assert f"--pinline: {frame.FRAMES['G'][5]}" in html and f"--pinline-b: {frame.FRAMES['U'][5]}" in html
     assert f"--box: {frame.DUAL_BOX['G']}" in html and f"--box-b: {frame.DUAL_BOX['U']}" in html
     assert f"--bar: {frame.PAIR_BAR}" in html
@@ -288,7 +288,7 @@ def test_two_colour_frames_in_the_page(art):
             return "data:,"
     hybrid = synthetic_card(colors=["G", "W"], mana_cost="{G/W}")
     html = frame.build_html(hybrid, symbols=DotSymbols(), art_url="file://" + art)
-    assert 'class="card normal stamped stamp-oval pair hybrid design-m15 rarity-rare"' in html
+    assert 'class="card normal stamped stamp-oval pair hybrid design-m15 rarity-rare kind-gold"' in html
     assert f"--frame: {frame.FRAMES['G'][0]}" in html and f"--frame-b: {frame.FRAMES['W'][0]}" in html
     assert f"--box: {frame.FRAMES['G'][4]}" in html and f"--box-b: {frame.FRAMES['W'][4]}" in html
     assert html.count("data:image/svg+xml;base64,") >= 2  # the two textures
@@ -303,6 +303,11 @@ def test_designs_follow_the_printing_and_size_the_generation():
     # full art outranks borderless (a full-art card is usually borderless too), and both outrank extended art
     everything = synthetic_card(full_art=True, border_color="borderless", frame_effects=["extendedart"])
     assert frame.printed_design(everything) == "fullart"
+    assert frame.printed_design(synthetic_card(textless=True, full_art=True)) == "textless"
+    assert frame.printed_design(synthetic_card(frame="1997")) == "retro"
+    assert frame.printed_design(synthetic_card(frame="1993")) == "retro"
+    assert frame.printed_design(synthetic_card(frame="2003")) == "modern"
+    assert frame.printed_design(synthetic_card(frame="2003", full_art=True)) == "fullart"  # the markers outrank the era
     for d in frame.DESIGNS:
         w, h = frame.generation_size(d, 1248 * 912)
         assert w % 32 == 0 and h % 32 == 0
@@ -317,7 +322,7 @@ def test_build_html_carries_the_design(card, art):
     assert "design-fullart" in html and "full art" in html
     import pytest
     with pytest.raises(ValueError):
-        frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, design="retro")
+        frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, design="showcase")
 
 
 def test_stamp_follows_the_printing(card, art):
@@ -333,9 +338,9 @@ def test_stamp_follows_the_printing(card, art):
     html = page(rarity="uncommon", security_stamp="acorn")
     assert '<div class="stamp acorn"><img src="data:image/svg+xml;base64,' in html
     html = frame.build_html(synthetic_card(rarity="common"), symbols=NoSymbols(), art_url="file://" + art)
-    assert '<div class="card normal design-m15 rarity-common">' in html and 'class="stamp ' not in html
+    assert '<div class="card normal design-m15 rarity-common kind-U">' in html and 'class="stamp ' not in html
     html = frame.build_html(synthetic_card(rarity="rare", layout="split", security_stamp="oval",
                                            card_faces=[dict(name="A", type_line="Instant", mana_cost="", oracle_text="x"),
                                                        dict(name="B", type_line="Instant", mana_cost="", oracle_text="y")]),
                             symbols=NoSymbols(), art_url="file://" + art)
-    assert '<div class="card split design-m15 rarity-rare">' in html  # sideways cards carry none
+    assert '<div class="card split design-m15 rarity-rare kind-U">' in html  # sideways cards carry none

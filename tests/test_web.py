@@ -413,11 +413,11 @@ def test_design_on_the_set_and_the_card(client):
     assert "fullart" in client.get("/api/workspace").json()["designs"]
     r = client.put("/api/sets/TST/design", json={"design": "extended"})
     assert r.status_code == 200 and r.json()["design"] == "extended"
-    assert client.put("/api/sets/TST/design", json={"design": "retro"}).status_code == 400
+    assert client.put("/api/sets/TST/design", json={"design": "showcase"}).status_code == 400
     r = client.put("/api/sets/TST/cards/Alpha", json={"design": "fullart"})
     assert r.status_code == 200 and r.json()["entry"]["design"] == "fullart" and r.json()["design"] == "fullart"
     assert client.get("/api/sets/TST/cards/Beta").json()["design"] == "extended"
-    assert client.put("/api/sets/TST/cards/Beta", json={"design": "retro"}).status_code == 400
+    assert client.put("/api/sets/TST/cards/Beta", json={"design": "showcase"}).status_code == 400
     r = client.put("/api/sets/TST/design", json={"design": None})
     assert r.status_code == 200 and "design" not in r.json()
     assert client.get("/api/sets/TST/cards/Beta").json()["design"] == "m15"
