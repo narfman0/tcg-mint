@@ -1,6 +1,73 @@
-/* full art: the art under everything (the whole 272 x 372 page, bleed included); the title bar floating
-   at the top, the type bar and a translucent text plate at the foot, no plate on a card with no rules
-   text (a basic), the collector line on a black strip. The base template stacks the art at z 1 and the
-   bars, text box, P/T plate, stamp, badges, crown and footer at 2, so moving .art is enough to put it
-   under them. Phase 2 of todo/frame-designs.md fills this in, measured off scans of real full-art
-   printings. Until then a card in this design renders as M15. */
+/* full art (Scryfall full_art: true): the art under everything, the whole 272 x 372 page, bleed included; the
+   title bar floating at the top, the type bar at the foot of a basic, the type bar and a smoked-glass text
+   plate in their M15 places on a card with rules text, the collector line on a black strip. The base template
+   stacks the art at z 1 and the bars, text box, P/T plate, stamp, badges, crown and footer at 2, so moving the
+   art is enough to put it under them; the band and the art window's plate and line are hidden, nothing else
+   is restated. Coordinates are card units (1/100 in) from the card's top-left, the bleed outside them.
+
+   Measured off Scryfall's 745 x 1040 scans (2.98 px per unit) of two kinds of printing, which differ:
+   - full-art basics, the current design (Forest TDM 276, Forest ECL 278, Plains HOB 194; Wastes FIN 309
+     agrees): border 10, the art the whole width between the borders (10-240) from under the title bar to
+     the foot; title bar and its plate as M15 (bar face 17.5-34.5, plate 15-38.5, a line at 39.5); no band,
+     no art line, no text box. The type bar sits at the foot, outline 294.5-314.5 (face 295.5-312), its
+     plate to 316.5, and a mana medallion hangs off its left end: a disc of the bar colour 27 across centred
+     at (24.75, 305), a black hairline round it, then a 2-unit ring of the pinline colour (the Forest's dark
+     green, the Plains' white), the mana symbol 18 across on the face; the type text starts at 43, past the
+     ring. Black from 317 (TDM; ECL and HOB keep a 3-unit line of the frame colour to 320); the collector
+     rows at 327-330.5 and 332.5-337.
+     The 2015-2020 basics (Forest BFZ 271, ZNR 278) are the older cut: the M15 sides kept (band 10-14.5,
+     pinline 15-18.5, art line 19, art 19.5-230.5), the type bar at 286.5-306.5 with the symbol cut into its
+     middle, the band's bottom to 324. Not followed.
+   - full-art nonlands with rules text, the MagicFest promos (Llanowar Elves PRM 68039, Emmara PRM 69951,
+     Boros Challenger PRM 69953, Lavinia PRM 71588, Rakdos Firewheeler PRM 71590; the other full_art nonlands
+     on file are textless promos, Japan showcase or poster frames): the M15 frame with the art window opened
+     to the P/T -- band 10-14.5 and pinline kept at the sides, title bar at 17-37, the type bar a dark glass
+     strip 199-223.5 with a light outline, the text plate 224-329.5 x 17.5-232 with its pinline to 15 / 235,
+     white text, the P/T plate opaque, the stamp bitten out of the plate's foot, black from 333.5, the
+     collector rows lower (335-338.5, 342-346). Against the art above them the bar reads ~0.7 black and the
+     plate ~0.5 (four scans, the art under a plate is guessed from the art beside it, so +-0.1).
+   Here the bars and the plate keep their M15 positions (the promo's are 2-6 lower only because its type bar's
+   outline is thicker), so nothing about them is restated: the type bar and the text box go translucent and
+   white-lettered, the strip starts where the text box's plate ends. */
+.design-fullart { overflow: visible; }  /* the card no longer clips: the art reaches the page's edge */
+.design-fullart .art { left: -11px; top: -11px; width: 272px; height: 372px; }
+.design-fullart .art::after { display: none; }  /* no window, no window line */
+.design-fullart .pl-art { display: none; }
+/* the band becomes the footer's black strip, page-wide into the bleed, under the P/T plate and the stamp (both
+   later in the document at the same z); its texture goes, and a hybrid's second texture with it */
+.design-fullart .frame { left: -11px; right: -11px; top: 323.6px; bottom: -11px; border-radius: 0; background: #000; z-index: 2; }
+.design-fullart .frame::before, .design-fullart .frame::after { display: none; }
+/* a stamped card's text box and its plate are bitten by arcs around the stamp (template.html .stamped): the
+   box's a 21 arc, the plate's a 22.6 arc, both about (125, 338.3), the plate's rim showing between them. The
+   strip grows a black disc of the box's bite (21, 0.15 over so no hairline of art shows at the arc; the plate,
+   painted under the strip, keeps its rim) and the stamp sits on black as it does on the promos */
+.design-fullart.stamped .frame::before { display: block; content: ""; inset: auto; left: calc(50% - 21.15px); top: -6.45px;
+  width: 42.3px; height: 42.3px; border-radius: 50%; background: #000; opacity: 1; }
+
+/* --- a card with rules text: the promo's smoked glass --- */
+/* (any paragraph in the text box but a basic's big symbol) */
+.design-fullart:has(.textbox p:not(.big-sym)) .typebar { color: #fff;
+  background: linear-gradient(180deg, rgba(0,0,0,.62) 0, rgba(0,0,0,.74) 100%); }
+.design-fullart:has(.textbox p:not(.big-sym)) .textbox { color: #fff; background: rgba(0,0,0,.5); }
+/* the flavour groove, cut the other way: a light line over a dark one on dark glass */
+.design-fullart:has(.textbox p:not(.big-sym)) .flavor::before { background: rgba(255,255,255,.35);
+  box-shadow: 0 .4px 0 rgba(0,0,0,.5); }
+.design-fullart:has(.textbox p:not(.big-sym)) .textbox p.loyal:nth-child(even) { background: rgba(255,255,255,.08); }
+/* a card with no text at all (a textless promo) has no plate; the type bar stays where M15 puts it */
+.design-fullart:not(:has(.textbox p)) .textbox, .design-fullart:not(:has(.textbox p)) .pl-text { display: none; }
+
+/* --- a basic: no plate, the type bar at the foot with the mana medallion on its left end --- */
+.design-fullart:has(.big-sym) .typebar { top: 295px; padding-left: 28.5px; }
+.design-fullart:has(.big-sym) .pl-type { top: 293px; }
+.design-fullart:has(.big-sym) .pl-text { display: none; }
+.design-fullart:has(.big-sym) .frame { top: 317px; }
+/* the text box, holding only the big symbol, is the medallion: the disc's face 27 across in the bar colour,
+   the ring of the pinline colour outside a hairline, the symbol 18 across, its shadow shortened to the disc.
+   The box's chamfer clip goes (it would clip the ring); the watermark behind the symbol goes with it */
+.design-fullart:has(.big-sym) .textbox { left: 11.25px; top: 291.5px; width: 27px; height: 27px; padding: 0; border-radius: 50%;
+  clip-path: none; background: var(--bar); align-items: center;
+  box-shadow: 0 0 0 .5px #000, 0 0 0 2.5px var(--pinline), 0 0 0 2.9px rgba(0,0,0,.35); }
+.design-fullart:has(.big-sym) .textbox::before { display: none; }
+.design-fullart:has(.big-sym) .textbox .big-sym .pip,
+.design-fullart:has(.big-sym) .textbox .big-sym .pip img { width: 18px; height: 18px; }
+.design-fullart:has(.big-sym) .textbox .big-sym .pip::before { transform: translate(-.4px, 1.3px); }
