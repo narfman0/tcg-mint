@@ -17,6 +17,8 @@ from pathlib import Path
 
 from .errors import CardNotFound, MintError
 
+BUILD_WAIT = 600  # seconds a lookup waits on a rebuild in progress before "database is locked"
+
 # Universes Beyond printings (Scryfall: security_stamp == "triangle") are not
 # wanted as art, except these: Lord of the Rings fits Magic well enough.
 UB_EXEMPT = {"ltr", "ltc"}
@@ -131,27 +133,58 @@ class Cards:
         st = os.stat(self.path)
         return f"v2:{st.st_size}:{int(st.st_mtime)}"  # v2: split and adventure cards indexed by their first face too
 
+    def _stale(self, db):
+        row = db.execute("SELECT v FROM meta WHERE k = 'sig'").fetchone()
+        return not row or row[0] != self._signature()
+
+    def _connect(self):
+        # autocommit, so build() can hold one explicit transaction; the timeout is how long a
+        # lookup waits for another thread's (or process's) rebuild of a default_cards file
+        return sqlite3.connect(self.index_path, timeout=BUILD_WAIT, isolation_level=None)
+
     def db(self):
         if self._db is None:
             if not self.path.exists():
                 raise MintError(f"no card file at {self.path}; run `mint cards` or point MINT_CARDS at one")
-            db = sqlite3.connect(self.index_path)
-            db.execute("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)")
-            row = db.execute("SELECT v FROM meta WHERE k = 'sig'").fetchone()
-            if not row or row[0] != self._signature():
-                self.build(db)
+            db = self._connect()
+            try:
+                db.execute("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)")
+                if self._stale(db):
+                    self.build(db)
+            except BaseException:
+                db.close()
+                raise
             self._db = db
         return self._db
 
     def build(self, db=None):
-        """(Re)build the index from the card file. A few seconds for oracle_cards."""
-        db = db or sqlite3.connect(self.index_path)
-        db.executescript("""
-            DROP TABLE IF EXISTS cards;
-            CREATE TABLE cards (name TEXT, lname TEXT, lfull TEXT, set_code TEXT, number TEXT, illustration_id TEXT,
-                                layout TEXT, stamp TEXT, released TEXT, offset INTEGER, length INTEGER);
-            CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
-        """)
+        """(Re)build the index from the card file. A few seconds for oracle_cards, a minute
+        for default_cards. One builder at a time: the workbench opens a connection per
+        request thread, and after a `mint cards` refresh several of them notice the stale
+        index together -- the rest queue on the write lock and find it fresh when they get it."""
+        db = db or self._connect()
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if self._stale(db):  # still -- a thread ahead of us in the queue may have done it
+                db.execute("DROP TABLE IF EXISTS cards")
+                db.execute("""CREATE TABLE cards (name TEXT, lname TEXT, lfull TEXT, set_code TEXT, number TEXT,
+                                                  illustration_id TEXT, layout TEXT, stamp TEXT, released TEXT,
+                                                  offset INTEGER, length INTEGER)""")
+                rows = self._rows()
+                db.executemany("INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+                db.execute("CREATE INDEX cards_lname ON cards(lname)")
+                db.execute("CREATE INDEX cards_lfull ON cards(lfull)")
+                db.execute("CREATE INDEX cards_illustration ON cards(illustration_id)")
+                db.execute("INSERT OR REPLACE INTO meta VALUES ('sig', ?)", (self._signature(),))
+                db.execute("INSERT OR REPLACE INTO meta VALUES ('count', ?)", (str(len(rows)),))
+            count = int(db.execute("SELECT v FROM meta WHERE k = 'count'").fetchone()[0])
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+        return count
+
+    def _rows(self):
         rows = []
         with open(self.path, "rb") as f:
             offset = 0
@@ -166,14 +199,7 @@ class Cards:
                                  c.get("illustration_id"), c.get("layout"), c.get("security_stamp"),
                                  c.get("released_at"), offset, n))
                 offset += n
-        db.executemany("INSERT INTO cards VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
-        db.execute("CREATE INDEX cards_lname ON cards(lname)")
-        db.execute("CREATE INDEX cards_lfull ON cards(lfull)")
-        db.execute("CREATE INDEX cards_illustration ON cards(illustration_id)")
-        db.execute("INSERT OR REPLACE INTO meta VALUES ('sig', ?)", (self._signature(),))
-        db.execute("INSERT OR REPLACE INTO meta VALUES ('count', ?)", (str(len(rows)),))
-        db.commit()
-        return len(rows)
+        return rows
 
     def _read(self, offset, length):
         with open(self.path, "rb") as f:

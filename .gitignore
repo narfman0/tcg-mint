@@ -1,5 +1,6 @@
 # Scryfall bulk data: ~200 MB, rebuilt daily upstream; `mint cards` fetches it
 oracle-cards.jsonl*
+oracle-cards.stamp.json
 default-cards.jsonl*
 all-cards.jsonl*
 

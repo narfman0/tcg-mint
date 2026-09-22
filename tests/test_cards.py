@@ -54,6 +54,36 @@ def test_index_rebuilds_when_file_changes(bulk):
     assert c2.count() == 5 and c2.find("Beta")["name"] == "Beta"
 
 
+def test_concurrent_rebuilds_serialize(bulk, monkeypatch):
+    """The workbench opens a Cards per request thread; after a `mint cards` refresh they all
+    see a stale index at once. One builds, the rest wait and use it -- no two builders racing
+    into 'index already exists', no thread left holding the write lock."""
+    import threading
+    from mint import cards as mod
+    gate = threading.Barrier(4)
+    real = mod.Cards.build
+
+    def build(self, db=None):
+        gate.wait(5)  # every thread has seen the stale signature before any of them builds
+        return real(self, db)
+    monkeypatch.setattr(mod.Cards, "build", build)
+    results, errors = [], []
+
+    def look():
+        try:
+            results.append(Cards(bulk).find("Alpha")["set"])
+        except BaseException as e:  # noqa: BLE001 - the test wants to see any failure
+            errors.append(e)
+            gate.abort()
+    threads = [threading.Thread(target=look) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert not errors and results == ["aaa"] * 4
+    assert not bulk.with_name(bulk.name + ".idx-journal").exists()
+
+
 def test_default_printing_is_the_newest_plain_one():
     from mint.cards import default_printing, oddness
     plain = lambda **o: {"name": "X", "illustration_id": "i", "set_type": "expansion", "border_color": "black",
