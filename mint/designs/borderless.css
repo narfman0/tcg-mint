@@ -1,37 +1,44 @@
 /* borderless (Scryfall border_color "borderless", full_art false): the picture under everything, out to the cut
-   edge on all four sides -- no black border, no textured band -- with the M15 bars and text box floating on it.
-   Measured off Scryfall's 745x1040 scans of nine plain (light-bar) borderless printings, seven of them
-   planeswalkers, which is what the kind mostly is: Jace 2xm:334, Wrenn and Six 2x2:334, Ugin m21:279, Grist
-   mh2:306, Liliana dmu:373, Liliana of the Dark Realms blc:78, Chandra fra:309, Elminster clb:362, Zombify sld:2389.
-   (The collector-booster borderless cards Scryfall also flags `inverted` -- Lightning Bolt 2x2:361, Counterspell
-   mh2:308, Scavenging Ooze m21:318 -- keep the M15 positions exactly, bar 17-37.2, type 197-217, but paint the
-   bars and text box in the frame's dark colour with white text: a palette, not a geometry, so a design of its own.)
-   - The title bar rides 5.5 higher than M15's: its outline 11.1-30.9 (Jace), 10.7-30.9 (Wrenn), 11.7-31.9 (Ugin),
-     11.7-31.2 (Grist), 12.1-32.3 (Liliana blc), 12.1-31.9 (Chandra); Elminster's 8.4-28.2 is the one outlier.
-     Median 11.7-31.2, so the bar sits at 11.5 and its pinline ring 2 outside it, 9.5-33.4 (measured 8.7-33.4 Jace,
-     9.4-33.6 Ugin, 10.1-34.6 Liliana blc, 10.1-33.9 Chandra). Its face is the M15 width (218.5 Jace, 221.5 Wrenn,
-     219.1 Grist against 219.2), so only `top` moves.
-   - The type bar and text box stay put: type outline 196.0-216.5 (Wrenn), 196.0-216.1 (Ugin), 195.9-216.1 (Liliana
-     blc) against M15's 197-217; text box top 219.5 / 219.5 / 219.4 against 218.4; its right edge 231.1 (Wrenn),
-     230.6 (Jace), 232.3 (Chandra) against 231.4. Jace 2xm:334, the first box topper, is the odd one at 193.3-212.8
-     with the box straight under the bar. The text box bottom reads 317.4-320.1 across the nine (M15: 322).
-   - Around the type bar and text box the band is gone: in its place a flat plate of the pinline colour, carried
-     down from the type bar's ring, 4 beyond the box's face (right edge: 234.6 Jace, 235.4 Wrenn, 236.3 Chandra,
-     corrected for each scan's centre) and 2.5 below its bottom (321.1 Jace, 322 Wrenn, 322 Ugin, 321 Grist, 321.1
-     Elminster), the bottom corners arcs of about 20 (the plate leaves the sides near 300 and runs flat under the
-     box from x 36 -- Jace, Wrenn) with the text box's own bottom corners rounded about 9 inside them. Beyond the
-     plate, art. The two-colour plate blends the way the pinline does.
-   - The bars and the text box are somewhat translucent on the earlier printings (the bar's face tracks the art
-     beside it at a slope of .44 on Jace, .26 on Ugin, r .85; the art ghosts through Jace's and Wrenn's text
-     box) and opaque on the recent (Chandra, Grist: slope 0). The text box keeps a tenth of see-through; the
-     bars stay solid, for the text.
-   - The collector line prints in white straight on the art, which fades toward black at the bottom edge (Ugin,
-     Chandra, Liliana blc: 20-60 lum under the plate against 100-150 higher up): a black gradient from the
-     plate's foot to the cut.
+   edge on all four sides -- no black border, no textured band -- with the M15 bars and text box floating on it
+   where they always sit, and the collector line on a black foot.
+   Measured off Scryfall's 745x1040 scans (2.98 px per unit) of the two looks that share the marker, which agree on
+   the geometry: the collector-booster cards Scryfall also flags `inverted` (Lightning Bolt 2x2:361, Counterspell
+   mh2:308, Thoughtseize 2xm:344, Scavenging Ooze m21:318, Sheoldred dmu:435 -- dark bars and box, white text: a
+   palette this css does not paint) and the light-bar planeswalkers (Jace 2xm:334, Wrenn and Six 2x2:334, Ugin
+   m21:279, Grist mh2:306, Chandra fra:309, Liliana of the Dark Realms blc:78, Elminster clb:362). The booster-fun
+   creatures Scryfall flags `showcase` (Quintorius mom:314, Yedora mul:30) are borderless too but a set's own
+   frame -- horned crown, band beside the box -- and out, as showcase is.
+   - The bars keep M15's places. The planeswalkers' title bar reads 5.5 higher (outline 11.1-30.9 Jace, 11.7-31.5
+     Ugin, 12.1-31.9 Chandra) but so does the black-bordered M15 planeswalker's (Ugin m21:1 11.4-31.2, ring
+     9.4-34.2; Chandra fra:244 12.1-31.9, ring 10.1-34.6): the planeswalker frame's, not a borderless thing. The
+     inverted cards are M15 to the unit: Bolt ring 14.4-16.4, bar 17-37.2, ring 37.2-39; type ring 195-197, bar
+     197.7-217.4; Sheoldred bar 16-36. The type bar 196.0-216.5 (Wrenn), 196.0-216.1 (Ugin) against 197-217.
+   - The bars float on the art: no band, no line around a window (the ring's own shade falls on the picture).
+   - The crown closes under the bar, no tongues beside the art: on Sheoldred its badge ends at 33.2 (x 8-10),
+     33.9 (10-12), 34.6 (12-14) and meets the bar's foot (36) at the bar's end -- a shallow diagonal in from the
+     flare, against frame.CROWN's tongue to 58 that M15's band and art line were drawn for.
+   - The text box keeps M15's face (18.6-231.4, top 218.4; scans 219.4-219.5, right edge 230.6-232.3) on a flat
+     plate of the pinline colour a unit wider than M15's pinline rectangle: right edge Sheoldred 233.9, Ooze 233.2,
+     Thoughtseize 234.6, Ugin 234.2, Grist 234.2, Chandra 236.2, Jace 236.6, Bolt 237.2, Wrenn 237.6 -- median
+     234.6 against .pl-text's 233.4 -- and 2-2.7 under the box (Bolt 323.5 to 326.2, Ooze 321.5 to 323.5,
+     Counterspell 320.8 to 322.8; Jace 318 to 321, Ugin 319.5 to 322). A unit of black lines it on the art side
+     (Bolt 16.8 and 237.6, Sheoldred 15.8 and 233.2, Ooze 15.4-16.1, Thoughtseize 16.4). The type bar's pill ends
+     stick out past the plate as they do past M15's pinline. The planeswalkers round the plate's bottom corners
+     by about 20; the collector-booster cards square them, and this css follows those.
+   - The box is somewhat translucent on the 2020-21 printings (the art ghosts through Jace's and Wrenn's; the
+     bar's face tracks the art beside it at a slope of .44 on Jace, .26 on Ugin) and opaque on the recent
+     (Chandra, Grist, Bolt). The text box keeps a tenth of see-through; the bars stay solid, for the text.
+   - The foot is black, and the collector line prints on it: under the plate from 326.2 (Bolt), 323.5 (Ooze),
+     322.8 (Counterspell), 324.5 (Thoughtseize) -- M15's border line, 324 -- and beside the plate the art ends in
+     a large convex corner, the black rising to the cut edge: traced at lum 30 on Thoughtseize the art's edge runs
+     (3, 280) (5, 288) (7, 292) (9, 296) (11, 300) (13, 304) (17, 308), Ooze and Counterspell within a unit of it,
+     a 57-unit arc tangent to the cut edge at 269 and meeting the plate's foot; its edge is soft over 3-4 units.
+     The planeswalkers only darken toward the foot (Ugin, Chandra: 20-60 lum under the plate against 100-150
+     higher; Wrenn and Elminster not at all), the way the black would print through a light picture.
    The layouts that move the art (saga, class) or lie sideways (split, battle) are out: they render M15.
    Art: the picture must cover 272 x 206 (the page's width, the top edge to the type bar's ring at 195); the
-   rest of the page -- the strips beside and under the text box, where the real card shows more of the same
-   painting -- is the picture again, blown up to cover the page and blurred into a wash of its own colours. */
+   rest of the page -- the strips beside the plate, the corners -- is the picture again, blown up to cover the
+   page and blurred into a wash of its own colours, where the real card shows more of the same painting. */
 .design-borderless:not(.saga, .class, .split, .battle) {
   overflow: visible; border-radius: 0; isolation: isolate;  /* the art reaches into the bleed */
   /* the art at z -1 goes under the plate and the pinlines (z auto) and is still over the card's own black,
@@ -50,25 +57,31 @@
     background: inherit; background-size: auto 216px; background-position: center top;
     mask-image: linear-gradient(180deg, #000 206px, transparent 216px); }
   & .pl-art { display: none; }  /* no line around the art: it has no edge */
-  /* the band is the plate: the pinline colour, flat, from the type bar's ring to 2.5 under the text box, 4 out
-     from its sides; 13 rather than the ring's 12.8 so the ring's ends do not bulge past it once Chromium snaps */
-  & .frame { left: 13px; right: 13px; top: 195px; bottom: 24.5px; border-radius: 5px 5px 20px 20px;
-    background: var(--pinline); box-shadow: -1.5px 0.6px 0.4px rgba(0,0,0,.85); }
+  /* the band is the plate: the pinline colour, flat, 1.2 out from M15's pinline rectangle (15.4-234.6) and 2.5
+     under the box (324.5), its top under the type bar so the bar's outline and the pill's ring stay the edge
+     there; a unit of black around it, on the art. .legendary moves M15's band down: this wins on specificity */
+  & .frame { left: 15.4px; right: 15.4px; top: 205px; bottom: 25.5px; border-radius: 0 0 2px 2px;
+    background: var(--pinline); box-shadow: 0 0 0 1px #000; }
   & .frame::before, & .frame::after { display: none; }  /* the texture, and a hybrid's second texture */
   /* (the pinline's own two-colour blend, over 102-148, since the plate is pinline now and not band) */
   &.pair .frame { background: linear-gradient(90deg, var(--pinline) calc(50% - 23px), var(--pinline-b) calc(50% + 23px)); }
-  /* the text box a tenth see-through, its bottom corners rounded inside the plate's arcs (the box's fill is the
-     base's, and the pair's blend the base's, each with the alpha) */
-  & .textbox { border-radius: 0 0 9px 9px; background: color-mix(in srgb, var(--box) 90%, transparent); }
+  /* the text box a tenth see-through (the box's fill is the base's, and the pair's blend the base's, each with
+     the alpha) */
+  & .textbox { background: color-mix(in srgb, var(--box) 90%, transparent); }
   &.pair .textbox { background: linear-gradient(90deg, color-mix(in srgb, var(--box) 90%, transparent) calc(50% - 18px),
     color-mix(in srgb, var(--box-b) 90%, transparent) calc(50% + 18px)); }
-  & .pl-text { border-radius: 0 0 11px 11px; }
-  /* the title bar 5.5 up, its ring and the crown with it */
-  & .titlebar { top: 11.5px; }
-  & .pl-title { top: 9.5px; }
-  & .crown-o, & .crown { top: -5.5px; }
-  /* the foot: the wash darkens to the cut under the plate, and the collector line sits on that */
-  &::after { content: ""; position: absolute; left: -11px; right: -11px; top: 325.5px; bottom: -11px; pointer-events: none;
-    background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,.85)); }
-  & .footer { text-shadow: 0 0 1.2px rgba(0,0,0,.8); }
+  /* the crown ends at the bar's foot: cut at the bar's outline (37.2) under the bar, and on each side along the
+     line from the bar's bottom corner (15, 37.2) up to (7, 33) beside the flare -- a gradient's edge is a line,
+     so two angled ones, the stop where each passes those points, and the three intersected. The traced tongues
+     (frame.crown_paths' foot to 58) fall outside all three */
+  & .crown-o, & .crown { mask-image: linear-gradient(180deg, #000 37.2px, transparent 37.2px),
+    linear-gradient(207.7deg, #000 142.2px, transparent 142.2px), linear-gradient(152.3deg, #000 142.2px, transparent 142.2px);
+    mask-composite: intersect; }
+  /* the foot: black outside the picture's region, whose bottom corners are 57-unit arcs tangent to the cut edge
+     (the box sits 2 into the bleed each side for that); the spread shadow paints the black, clipped away above
+     269 where the arcs begin so the bleed above stays picture; the inset shadow softens the edge over 4. At z -1
+     with the art it paints over the art (later in the tree) and under the plate, the pieces and the footer */
+  &::after { content: ""; position: absolute; left: -2px; right: -2px; top: -11px; height: 335.5px; pointer-events: none;
+    z-index: -1; border-radius: 0 0 57px 57px; clip-path: inset(280px -9px -60px -9px);
+    box-shadow: 0 0 0 200px #000, inset 0 0 4px rgba(0,0,0,.9); }
 }
