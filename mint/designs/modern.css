@@ -1,6 +1,142 @@
-/* modern (Scryfall frame "2003", Eighth Edition to Magic 2014): the frame before M15 -- the same pieces, a squarer,
-   flatter band with a bevelled edge, the bars plain rectangles in the colour's lighter tone with no pinline plate
-   and no arcs, the art in a plain black line, a smaller P/T box, no holofoil stamp. The design carries its own
-   palette by the card's kind-<k> class and its own fonts (Matrix Bold was the title face). Phase 4 of
-   todo/frame-designs.md fills this in, measured off scans of real 2003-frame printings. Until then a card in this
-   design renders as M15. */
+/* modern (Scryfall frame "2003": Eighth Edition through Magic 2014, and every 2003-frame reprint since -- the
+   Commander decks to 2013, the Duel Decks, the Planechase sets). The frame before M15, with the same pieces on a
+   different geometry: a wider black border, a squarer band with a bevelled inner edge, a flat plate of a darker
+   tone under the pieces (the pinline's place, but a shade below the band where M15's is a shade above), the bars
+   the colour's lighter tone with a black outline and a bevel, the art in a plain black line, a lower and shorter
+   text box, no crown on a legend, no holofoil stamp, the collector line printed on the bottom band, and its own
+   palette and title face (Matrix Bold: the "wizards" stack already names it, and it is in fonts/).
+   Measured off Scryfall's 745x1040 scans (2.98 px per unit) of nineteen printings the way template.html's header
+   did for M15 -- median brightness down rows and across columns, the runs of dark and light, each edge the
+   boundary between two runs at pixel resolution (a third of a unit), then the mean: Grizzly Bears, Llanowar
+   Elves, Wrath of God, Kamahl, Pit Fighter, Forest and Howling Mine from 10E; Shivan Dragon, Serra Angel, Doom
+   Blade, Darksteel Colossus and Terramorphic Expanse from M10; Scavenging Ooze, Duress, Island and Elixir of
+   Immortality from M14; Sol Ring and Mulldrifter from CMD; Solemn Simulacrum M12; Lightning Helix RAV and Mortify
+   GPT for gold; Ulamog, the Infinite Gyre ROE for colourless; Dark Ritual (The List's DDE). Every kind agrees
+   with every other within 0.4 of a unit. In card units:
+   - the border is black to 11.7 on the left and top, from 238.2 on the right and 338.0 at the foot (the scans sit
+     a hair off centre, as M15's did): 11.8 all round, against M15's 10, and the band runs square into it at the
+     foot with no arc -- the collector line prints on the band there;
+   - the title bar's outline spans 17.0-232.9 by 18.3-38.5, 20.2 tall like M15's but 1.3 lower and 2.2 narrower
+     each side; its ends traced down the right side of Grizzly Bears and Shivan Dragon are a half-ellipse 3.5
+     deep (2.7 in at 0.2 below the top, 2.2 at 1, 1.4 at 1.9, 1.0 at 3, 0.7 at 4.5, 0.35 at 6, flat from 8:
+     an ellipse of 3.5 by 10 within 0.15 at every row, where M15's pointed oval is 0.6 deeper over the top half),
+     so the bars are rounded rectangles with a radius of 3.5 by half their height. The outline is 0.7 of black (one
+     dark scan row at the top, two at the foot), the face lit along its top (rows 19.0-20.3 read 213 to the face's
+     185 on the green scans) and in shadow along its foot (36.2-37.9 at 68), the left end a soft dark ramp 1.2
+     wide and the right end 0.4: a bevel lit from above. The name's ink starts at 23.0 (6 in from the outline);
+   - the type bar's outline spans 197.1-215.7: 18.6 tall, 1.6 shorter than the title bar (its face 198.0-213.6 on
+     every scan), the same ends and bevel;
+   - the art's black line is 20.5-229.8 by 40.5-194.8, the image inside it 21.4-228.9 by 41.4-193.9: 207.5 by
+     152.5, 1.36:1 (M15's window is 210.6 by 154 at 39.7), so an M15 picture covers it with 1.4 to spare a side;
+   - the text box is 20.5-229.2 by 218.1-315.0 (its face 219.2-313.6 with a lit rim below to 314.9, a dark line a
+     unit thick along the top -- 22 on the white scans, a quarter darker than the plate on green -- a dark wall
+     at 228.0-229.0 and a light rim at 20.5-21.0): 96.9 tall to M15's 103.6, on the same 12.6 rules face;
+   - the flat plate lies 2 outside the art's line and the text box (18.5-231.8; 38.5 to 317.2 top to bottom, the
+     gap between the bar and the art all plate), 2 above and below each bar and 1.5 beyond its ends (15.5-234.4,
+     the title's 16.3-40.5, the type's 195.1-217.7), its ends elliptical with the bar's. Outside it the band's inner
+     edge is a bevel about 1.7 wide: a light strip along the top (14.7-16.3, 155 to the band's 100) and the right
+     (231.8-233.4), a dark one down the left (16.5-18.4, 33) and along the foot (317.2-318.7, 30) -- an emboss lit
+     from the upper right, as M15's plate is, but a crisp strip rather than a soft shadow;
+   - the P/T box's face runs 187.5-229.2 by 313.5-330.5 with a light rim on its left and top, a dark foot to
+     333.4 and a ring of the plate's colour 2 wide around it over the text box and the band: the M15 plate (41.7 by
+     20, frame.pt_plate) is within a unit of it and stays, moved to 312 with its right edge at 229.6, on a ring;
+   - the collector block is two lines on the bottom band, the artist (a brush, then Matrix Bold) with its caps at
+     322.4-327.8 and the copyright line at 332.0-335.7, both from x 19.8, in black ink on every kind but black,
+     land and colourless, whose bands are dark and print white (Doom Blade, Duress, Forest, Island, Ulamog);
+   - a legend has no crown (Kamahl, Ulamog: the title bar and its plate as on any other card);
+   - the palette (band, plate, bar, text box; medians as above, the P/T face the bar's): white #c8beae #d4d3cb
+     #d8d3ca #ddd9d4 (Wrath, Serra); blue #76b6e1 #277bb2 #d1e4f3 #f2f6fb (Mulldrifter); black #2a292b #332f31
+     #ac9f96 #d9dad7 (Doom Blade, Duress, Dark Ritual); red #b04832 #c94428 #d8b59c #e1cec2 (Shivan, Kamahl); green
+     #5f684e #315438 #b5bcb2 #cfd8d2 (Grizzly, Llanowar, Ooze); artifact #929099 #cdc7c8 #a9acab #cac8c8 (the
+     medians of five: CMD's Sol Ring is the bluish 2011 silver, #a2b4c0 #e6e7ee #ccd7df #eaedf4, the other four
+     grey); gold #cdb252 band, #ddcc96 bar, #f2ece6 box (Helix, Mortify) -- its plate on the prints is the card's
+     two colours, the left's running into the right's (Helix red into white, Mortify white into black), which the
+     card's classes do not carry, so it is a darker gold here; land #a17f62 band, #bdaf9c bar, #c4b6a7 box, the
+     plate #9d8065 on Terramorphic Expanse but a basic's own colour on a basic (Forest #30513e, Island #385a84),
+     which the base already tints into --pinline (frame.land_tint), so the plate here is that tint darkened, read
+     on the plate pieces where the base's value is still in reach; colourless #a48f7e #bbb3a9 #bab2ae #beadb0
+     (Ulamog, the Rise of the Eldrazi frame).
+   The band's texture is the base's tile for the kind (frame.TEXTURES) over the 2003 colour, not redrawn: the
+   prints' tiles differ (a marble on white, a mottle on green) but the M15 veins read close enough at the knob's
+   strength. The layouts whose art is elsewhere (saga, class, split, battle) render M15: build_html drops the
+   design for them (frame.M15_LAYOUTS). */
+.design-modern { --title-font: 'Matrix Bold', 'Beleren', 'Almendra', serif; --foot-ink: #000; }
+/* the palette: the band, the flat plate, the bars and the text box, by the card's kind; the edge tone (the
+   other-face strip, an adventure's box) a darker plate */
+.design-modern.kind-W { --frame: #c8beae; --pinline: #d4d3cb; --bar: #d8d3ca; --box: #ddd9d4; }
+.design-modern.kind-U { --frame: #76b6e1; --pinline: #277bb2; --bar: #d1e4f3; --box: #f2f6fb; }
+.design-modern.kind-B { --frame: #2a292b; --pinline: #332f31; --bar: #ac9f96; --box: #d9dad7; --foot-ink: #fff; }
+.design-modern.kind-R { --frame: #b04832; --pinline: #c94428; --bar: #d8b59c; --box: #e1cec2; }
+.design-modern.kind-G { --frame: #5f684e; --pinline: #315438; --bar: #b5bcb2; --box: #cfd8d2; }
+.design-modern.kind-gold { --frame: #cdb252; --pinline: #b3962f; --bar: #ddcc96; --box: #f2ece6; }
+.design-modern.kind-artifact { --frame: #929099; --pinline: #cdc7c8; --bar: #a9acab; --box: #cac8c8; }
+.design-modern.kind-land { --frame: #a17f62; --bar: #bdaf9c; --box: #c4b6a7; --foot-ink: #fff; }
+.design-modern.kind-C { --frame: #a48f7e; --pinline: #bbb3a9; --bar: #bab2ae; --box: #beadb0; --foot-ink: #fff; }
+.design-modern { --bar-edge: color-mix(in srgb, var(--pinline) 60%, #000); --frame-dark: var(--pinline); }
+/* a land's plate: the base's --pinline is the land yellow or, on a basic, its colour (frame.land_tint), and it
+   is still that value on the plate pieces since the card's rule above leaves it alone: halved into a dark brown
+   it lands on the prints' (Forest #30513e from green's #0f724a; Terramorphic's #9d8065 comes out an olive) */
+.design-modern.kind-land .pinline { background: color-mix(in srgb, var(--pinline) 50%, #3a3128); }
+/* Chromium lays the boxes out on whole units at every dpi (the plate's 18.5 landed on 19, the bar's 18.3 on 18),
+   so every edge below is the measurement rounded to one: a third of a unit off at most */
+/* the band: to the border on all four sides, square-cornered, no arc at the foot */
+.design-modern .frame { top: 12px; left: 12px; right: 12px; bottom: 12px; border-radius: 2px; }
+/* no crown, no tongues: the title bar's plate stays on a legend */
+.design-modern .crown-o, .design-modern .crown, .design-modern .pl-crown { display: none; }
+.design-modern.legendary .pl-title { display: block; }
+/* the plate: flat, its pieces 2 outside the art and the text box, 2 above and below the bars and 2 past their
+   ends (1.5 measured; 2 keeps the ends concentric on whole units), the bars' pieces elliptical with them. The
+   band's bevel is the plate's silhouette pushed 2 down and left in black for the shade and 1.5 up and right in
+   white for the light -- one diagonal shadow each, not one per side: two chained shadows overlap along each
+   straight run and double the tone. Chromium keeps a drop-shadow's offsets to whole CSS px, so the light strip
+   lands a unit wide and its blur carries the rest; the print's light is weaker along the right (231.8-233.4 read
+   115 to the band's 100) than along the top (155), the shade the same both ways */
+.design-modern .pl-title { left: 15px; top: 16px; width: 220px; height: 24px; clip-path: none; border-radius: 5.5px / 50%; }
+.design-modern .pl-type { left: 15px; top: 195px; width: 220px; height: 23px; clip-path: none; border-radius: 5.5px / 50%; }
+.design-modern .pl-art { left: 18px; top: 38px; width: 214px; height: 158px; }
+.design-modern .pl-text { left: 18px; top: 216px; width: 214px; height: 101px; clip-path: none; }
+.design-modern .pinlines.shade { filter: drop-shadow(-2px 2px 0 rgba(0,0,0,.65)); }
+.design-modern .pinlines.light { filter: drop-shadow(1.5px -1.5px .3px rgba(255,255,255,.38)); }
+/* the bars: rounded rectangles (the base's pointed clip and its cap images go), 0.7 of black outline inside the
+   edge, the fill lit 1.3 along the top and shaded 1.7 along the foot, a soft dark ramp at the left end; the
+   gradients' stops start where the outline ends (a background offset would snap to a whole unit and leave a
+   bright row between the shade and the outline) */
+.design-modern .bar { left: 17px; width: 216px; clip-path: none; border: 0; border-radius: 3.5px / 50%; padding: 0 6px;
+  box-shadow: inset 0 0 0 .7px #000;
+  background:
+    linear-gradient(transparent .7px, rgba(255,255,255,.5) .7px, rgba(255,255,255,.4) 2px, transparent 2.7px),
+    linear-gradient(to top, transparent .7px, rgba(0,0,0,.62) .7px, rgba(0,0,0,.62) 2.4px, transparent 2.4px),
+    linear-gradient(to right, rgba(0,0,0,.3) .7px, transparent 2.3px),
+    linear-gradient(to left, rgba(0,0,0,.12) .7px, transparent 1.5px),
+    var(--bar); }
+.design-modern .titlebar { top: 18px; height: 20px; padding-right: 5px; }
+.design-modern .typebar { top: 197px; height: 19px; padding: 0 4.5px 0 6px; }
+/* the text: Matrix Bold on the prints is a size up from M15's Beleren -- Grizzly Bears' name has caps 9.1 tall
+   (23.9-33.0) to our 13.1 face's 7.7, its type line 7.2 (203.3-210.5) to our 6.4, the P/T digits 9.1
+   (317.0-326.1) to our 8.4 -- and the baselines sit at 33.0 in the title bar, 210.5 in the type bar, 326.1 in
+   the P/T box */
+.design-modern { --title-dy: -1.3px; --type-dy: -0.6px; --pt-dy: -2.5px; }
+.design-modern .name { font-size: 15.4px; }
+.design-modern .type { font-size: 11.8px; }
+.design-modern .pt { font-size: 15px; }
+/* the art window, its black line the base's ring */
+.design-modern .art { left: 21px; top: 41px; width: 208px; height: 153px; }
+/* the text box: lower and shorter, a dark line along its top and its right wall, a light rim down its left and
+   along its foot; no stamp, so no bite (the base's stamped clips are replaced by the plain chamfer). The prints'
+   rules text starts 5.4 in from the box's edge and ends 8.5 short of the other */
+.design-modern .textbox { left: 20px; top: 218px; width: 209px; height: 97px; padding: 1.5px 5px 2px;
+  box-shadow: inset 0 1px 0 rgba(0,0,0,.5), inset -1px 0 0 rgba(0,0,0,.55), inset .6px 0 0 rgba(255,255,255,.6),
+    inset 0 -1.3px 0 rgba(255,255,255,.7);
+  clip-path: polygon(.5px 0, calc(100% - .5px) 0, 100% .5px, 100% 100%, 0 100%, 0 .5px); }
+.design-modern .stamp { display: none; }
+/* the P/T plate, moved down and in, on a ring of the plate's colour 2 wide; the digits ride high in the printed
+   box (their centre 8 below its top, the foot of the box a 3-unit shadow): the nudges above, calibrated on
+   Grizzly Bears' render against its scan, put each baseline on the print's */
+.design-modern .pt { top: 312px; right: 20.4px; }
+.design-modern .pt::before { content: ""; position: absolute; inset: -2px; z-index: -1; border-radius: 6px / 50%;
+  background: var(--pinline); }
+/* the collector block on the bottom band: from x 19.8, its two lines pitched 7.9 apart with the lower's baseline
+   at 335.7, in the kind's ink; the artist's name a size up, as the print's Matrix Bold is */
+.design-modern .footer { left: 20px; right: 20px; bottom: 11.5px; line-height: 1.36; color: var(--foot-ink); }
+.design-modern .footer .collector, .design-modern .footer .collector b { color: var(--foot-ink); }
+.design-modern .footer .artist { font-size: 7px; }
