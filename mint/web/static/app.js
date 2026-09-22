@@ -368,14 +368,16 @@ function board() {
   const hasNew = c => (c.variants || []).some(v => v.kind === 'restyle' && v.recipe?.remix === 'new' &&
                                                  (lookLabel ? v.label === lookLabel : true));
   const lacks = {
+    'crops': c => !c.crop && !c.entry.art && !c.error,
     'enhance': c => !c.plain || c.plain.kind === 'crop',
     'restyle': c => lookIsRecipe ? !hasStyled(c) : !variantFor(c, state.style),
     'newcards': c => !c.entry.subject || !hasNew(c),
     'render-plain': c => !c.renders?.plain || !!c.renders.plain.stale,
     'render-styled': c => !c.renders?.styled || !!c.renders.styled.stale,
   };
-  const targets = job => state.missing ? target.filter(lacks[job]) : target;
+  const targets = job => state.missing || job === 'crops' ? target.filter(lacks[job]) : target;  // a crop fetch is only ever the missing ones
   const count = job => state.missing ? ` <small>${targets(job).length}</small>` : '';
+  const noCrop = targets('crops').length;
   const styledTitle = !anyStyle ? 'no style block: nothing styled to render'
     : !lookIsRecipe ? `renders each card's pick, else the set's recipe${all ? '' : ` (${st.style.name})`}, not ${state.style}. Make ${state.style} the set style (promote a take on a card page), or keep a ${state.style} take on each card, then render in the set's recipe`
     : cover.have < cover.total ? `${cover.total - cover.have} of ${cover.total} have no styled art yet: the set's art_filter over the crop stands in for those. Filter "no restyle" to see them`
@@ -400,6 +402,7 @@ function board() {
     <div class="toolbar jobs">
       <span class="muted">${n ? `${n} selected` : 'all cards'}:</span>
       <span class="stage" title="art jobs write variants to the art cache; nothing is rendered"><span class="lbl">art</span>
+        ${noCrop ? `<button data-job="crops" title="fetch Scryfall's art crop of the ${noCrop} card(s) without one; a new set queues this by itself">fetch crops <small>${noCrop}</small></button>` : ''}
         <button data-job="enhance" title="an ESRGAN pass on each card's crop, the plain art; the plain render picks it up">enhance crop${count('enhance')}</button>
         <button data-job="restyle" ${all ? (st.sets.some(x => x.style) || lookTemplate(null) ? '' : 'disabled') : lookTemplate(st.style) === null ? 'disabled' : ''} title="${esc(all ? 'each set in the look picked' : lookTitle(st.style))}">restyle as ${esc(lookName)}${count('restyle')}</button>${takesPicker()}
         <button data-job="newcards" ${!describer.ready || (all ? !(st.sets.some(x => x.style) || lookTemplate(null)) : lookTemplate(st.style) === null) ? 'disabled' : ''} title="${esc(!describer.ready ? `no describer: ${describer.hint}` : `net-new art: ${describer.kind} reads each card's base image and text and writes its subject line (cards that have one keep it), then a new scene from it in ${lookName} -- the new mode whatever the style says`)}">new cards as ${esc(lookName)}${count('newcards')}</button>
@@ -461,6 +464,7 @@ function board() {
         'render-plain': {kind: 'render', set: s, names: list, styled: false, dpi},
         'render-styled': styled && {kind: 'render', set: s, names: list, styled: true, dpi},
         'enhance': {kind: 'enhance', set: s, names: list, base: 'crop'},
+        'crops': {kind: 'crops', set: s, names: list},
         'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
         'newcards': lookTemplate(styled) !== null && {kind: 'describe', set: s, names: list, generate: true, template: lookTemplate(styled)},
         'printrun': {kind: 'printrun', set: s, names: list, styled: state.mode === 'styled', dpi, paper: state.paper || 'letter', stock: state.stock || null},
@@ -853,7 +857,7 @@ async function card(r) {
       <h2>images</h2>
       ${A && B ? abPanel(A, B) : `<p class="muted">Pick <b>A</b> and <b>B</b> on two images to wipe between them.</p>`}
       <div class="groups">${groups.filter(g => !g.renders && g.cols.length).map(g => `<div class="group"><h3>${esc(g.title)}${g.cols.some(x => x.kind !== 'crop') ? trashBtn('delete-group', g.title, g.title === 'source' ? 'delete the enhances of the crop' : `delete every image in ${g.title}`) : ''}</h3><div class="cols">${g.cols.map(x => columnHtml(x, c)).join('')}</div></div>`).join('')
-        || '<div class="empty">no images yet: fetch the crop (mint art) or generate one</div>'}</div>
+        || `<div class="empty">no images yet: ${c.card.illustration_id ? '<button class="small" data-cjob="crops" title="Scryfall\'s art crop of this printing into the art cache">fetch the crop</button>' : 'this printing has no art;'} or generate one</div>`}</div>
     </section>
     <section class="sect">
       <h2>card</h2>
@@ -933,6 +937,7 @@ async function card(r) {
                                  upscale: state.takes > 1 ? state.upscale : undefined,
                                  seed: c.entry.seed == null ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined}, origin + ' (generate)');
     else if (j === 'enhance-styled') submit({kind: 'enhance', set: code, names, base: styledV.hash}, origin);
+    else if (j === 'crops') submit({kind: 'crops', set: code, names}, origin);
     else if (j === 'animate-styled') animateFrom(null);
     else if (j === 'render-plain') render(false);
     else if (j === 'render-styled') render(true);

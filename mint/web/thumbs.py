@@ -6,6 +6,7 @@ fresh thumbnail. Only files inside the workspace are served.
 """
 import hashlib
 import os
+import threading
 from pathlib import Path
 
 from PIL import Image
@@ -43,7 +44,13 @@ def thumbnail(ws, path, width):
         im.draft("RGB", (width, width))  # decode at a reduced size straight away
     im = im.convert("RGB")
     im.thumbnail((width, width * 2), Image.LANCZOS)
-    tmp = out.with_suffix(".part.jpg")
-    im.save(tmp, "JPEG", quality=86, optimize=True)
-    os.replace(tmp, out)
+    # a name of this thread's own: two requests for one thumbnail at once (the printing picker's
+    # default tile and its listed twin) each write a whole file and the last rename wins
+    tmp = out.with_name(f"{out.stem}.{threading.get_ident()}.part.jpg")
+    try:
+        im.save(tmp, "JPEG", quality=86, optimize=True)
+        os.replace(tmp, out)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
     return out

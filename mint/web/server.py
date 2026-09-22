@@ -264,6 +264,7 @@ def create_app(ws):
         with S.lock:
             path, st, _ = newset.create(ws, code, body.get("name") or code, names, style_name=body.get("style") or None,
                                         private=bool(body.get("private")))
+        submit_crops(S, st, st.names(), {}, origin="new set")  # the board fills in as each crop lands
         return set_detail(S, st)
 
     @app.patch("/api/sets/{code}")
@@ -315,6 +316,8 @@ def create_app(ws):
         with S.lock:
             added = newset.add_cards(st, names)
             sets.save(st.path, st)
+        if added:
+            submit_crops(S, st, names, {}, origin=f"{st.code} edit: cards added")
         d = set_detail(S, st)
         d["added"] = added
         return d
@@ -604,10 +607,13 @@ def create_app(ws):
         st = S.find_set(body["set"]) if body.get("set") else None
         names = body.get("names") or (st.names() if st else [])
         submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes,
-                  "printrun": submit_printrun, "describe": submit_describe, "animate": submit_animate}.get(kind)
+                  "printrun": submit_printrun, "describe": submit_describe, "animate": submit_animate,
+                  "crops": submit_crops}.get(kind)
         if not submit:
             raise HTTPException(400, f"unknown job kind {kind!r}")
         job = submit(S, st, names, body)
+        if job is None:
+            raise HTTPException(400, "nothing to do: every card named has its crop")
         job.params["origin"] = body.get("origin")  # where on the page it was asked for, for the jobs list
         return job.to_dict()
 
@@ -894,6 +900,50 @@ def submit_themes(S, st, names, body):
         return {"files": done}
     return S.jobs.submit("themes", f"themes for {name}", {"set": st.code, "names": [name], "dest": out_dir,
                                                           "what": f"renders {name} once in every frame theme, side by side"}, run)
+
+
+def submit_crops(S, st, names, body, origin=None):
+    """A crops job: each card's Scryfall art crop into the art cache, skipping the ones on disk.
+    A new set or added cards queue one by themselves, so the board fills in without a render;
+    the board's button and the card page's fetch the ones still missing. Returns the job, or None
+    when every card named has its crop already."""
+    cards = S.cards()
+    todo = []
+    for name in names:
+        try:
+            card = cards.find(name, st.card({"name": name}).printing)
+        except MintError:
+            continue  # not on file: the card page says so
+        if card.get("illustration_id") and not S.art.crop(card, fetch=False).exists():
+            todo.append(name)
+    if not todo:
+        return None
+
+    def run(job):
+        cards = S.cards()
+        job.step(0, len(todo))
+        failed = []
+        for i, name in enumerate(todo):
+            card = cards.find(name, st.card({"name": name}).printing)
+            try:
+                crop = S.art.crop(card)
+            except OSError as e:
+                failed.append(name)
+                job.say(f"could not fetch {name}: {e}")
+            else:
+                job.say(f"fetched {name} <- {card['set'].upper()} {card['collector_number']}")
+                job.made(set=st.code, name=name, kind="crop", key="crop", path=str(crop))
+            job.step(i + 1)
+        if failed:
+            raise MintError(f"{len(failed)} of {len(todo)} crop(s) could not be fetched from Scryfall: {', '.join(failed[:5])}"
+                            + (" ..." if len(failed) > 5 else ""))
+        return {"fetched": len(todo)}
+    job = S.jobs.submit("crops", f"fetch {len(todo)} crop(s) for {st.code}",
+                        {"set": st.code, "names": todo, "what": f"Scryfall's art crop of {len(todo)} card(s) into the art cache",
+                         "dest": str(S.art.dir)}, run)
+    if origin:
+        job.params["origin"] = origin
+    return job
 
 
 def submit_enhance(S, st, names, body):

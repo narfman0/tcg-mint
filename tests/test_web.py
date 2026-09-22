@@ -1,10 +1,13 @@
 """The workbench's set, card and style-template CRUD, over the API with a tiny card file."""
 import json
+import threading
+import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
-from mint import sets, workspace
+from mint import scryfall, sets, workspace
 from mint.web.server import create_app
 from tests.conftest import synthetic_card
 
@@ -22,9 +25,83 @@ def client(tmp_path, monkeypatch):
     ws.cards_file.write_text("".join(json.dumps(c) + "\n" for c in cards))
     (ws.styles / "look.json").write_text(json.dumps({"name": "look", "prompt": "a look", "cfg": 4}))
     (ws.styles / "look.css").write_text(".card { color: red }")
+    # a new set queues a crops job; Scryfall is a stub that "downloads" a tiny JPEG (or the failure set here)
+    fetched, fail = [], []
+
+    def fetch(url, dest, timeout=300):
+        if fail:
+            raise OSError(fail[0])
+        fetched.append(url)
+        from PIL import Image
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (8, 6), (200, 100, 50)).save(dest, "JPEG")
+        return dest
+    monkeypatch.setattr(scryfall, "fetch", fetch)
     c = TestClient(create_app(ws))
     c.ws = ws
+    c.fetched, c.fail = fetched, fail
+    c.settle = lambda: settle(c)
     return c
+
+
+def settle(client, timeout=5):
+    """Wait until no job is queued or running."""
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if all(j["state"] in ("done", "failed", "cancelled") for j in client.get("/api/jobs").json()):
+            return
+        time.sleep(0.02)
+    raise AssertionError("jobs still running")
+
+
+def test_a_new_set_fetches_its_crops_and_the_board_knows_which_are_missing(client):
+    r = client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha", "Beta"]})
+    assert r.status_code == 200
+    client.settle()
+    jobs = client.get("/api/jobs").json()
+    assert [j["kind"] for j in jobs] == ["crops"] and jobs[0]["state"] == "done", (jobs[0]["error"], jobs[0]["log"])
+    assert jobs[0]["title"] == "fetch 2 crop(s) for TST" and jobs[0]["params"]["origin"] == "new set"
+    assert [i["name"] for i in jobs[0]["items"]] == ["Alpha", "Beta"] and jobs[0]["items"][0]["key"] == "crop"
+    assert len(client.fetched) == 2
+    d = client.get("/api/sets/TST").json()
+    assert all(c["crop"] for c in d["cards_detail"])
+    # every crop on disk: nothing to queue
+    assert client.post("/api/jobs", json={"kind": "crops", "set": "TST"}).status_code == 400
+    # cards added queue their own; a card whose fetch fails is named and the rest still land
+    client.fail.append("no route to Scryfall")
+    r = client.post("/api/sets/TST/cards", json={"names": ["Gamma", "Delta"]})
+    assert r.status_code == 200 and r.json()["added"] == 2
+    client.settle()
+    j = client.get("/api/jobs").json()[0]
+    assert j["kind"] == "crops" and j["state"] == "failed" and "2 of 2 crop(s)" in j["error"] and "Gamma" in j["error"]
+    client.fail.clear()
+    r = client.post("/api/jobs", json={"kind": "crops", "set": "TST", "names": ["Alpha", "Gamma", "Delta"]})
+    assert r.status_code == 200 and r.json()["params"]["names"] == ["Gamma", "Delta"]  # Alpha has one
+    client.settle()
+    assert all(c["crop"] for c in client.get("/api/sets/TST").json()["cards_detail"])
+
+
+def test_one_thumbnail_asked_for_twice_at_once(client, art):
+    """The printing picker shows the default printing twice (its own tile and the listed one); both
+    thumbnails land whole, neither request 500s over the other's temp file."""
+    from PIL import Image
+
+    from mint.web.thumbs import thumbnail
+    ws = client.ws
+    src = ws.home / "big.png"
+    Image.open(art).resize((2000, 1400)).save(src)
+    outs, errors = [], []
+
+    def one():
+        try:
+            outs.append(thumbnail(ws, str(src), 320))
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+    ts = [threading.Thread(target=one) for _ in range(6)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert not errors and len(set(outs)) == 1 and outs[0].exists()
+    assert Image.open(outs[0]).size[0] == 320 and not list(outs[0].parent.glob("*.part*"))
 
 
 def test_set_crud(client):

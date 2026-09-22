@@ -44,3 +44,32 @@ def test_variants_ignore_broken_sidecars(tmp_path):
     (d / "ink-deadbeef.json").write_text("{not json")
     (d / "ink-cafebabe.json").write_text('{"label": "ink"}')  # missing fields
     assert art.variants(card) == []
+
+
+def test_a_crop_wanted_twice_at_once_is_fetched_once(tmp_path, monkeypatch):
+    """The printing picker asks for the default printing's crop twice in one breath: one download,
+    both callers get the whole file, and no .part is left behind."""
+    import io
+    import threading
+    import time
+
+    from mint import scryfall
+
+    opened = []
+
+    class Slow(io.BytesIO):
+        def read(self, n=-1):
+            time.sleep(0.05)  # long enough for the second caller to arrive mid-download
+            return super().read(n)
+
+    def _open(url, timeout):
+        opened.append(url)
+        return Slow(b"jpeg bytes " * 1000)
+    monkeypatch.setattr(scryfall, "_open", _open)
+    dest = tmp_path / "art" / "abc.jpg"
+    got = []
+    ts = [threading.Thread(target=lambda: got.append(scryfall.fetch("https://x/abc.jpg", dest))) for _ in range(3)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert opened == ["https://x/abc.jpg"] and got == [str(dest)] * 3
+    assert dest.read_bytes() == b"jpeg bytes " * 1000 and list(dest.parent.iterdir()) == [dest]
