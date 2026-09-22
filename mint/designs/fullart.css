@@ -6,15 +6,24 @@
    is restated. Coordinates are card units (1/100 in) from the card's top-left, the bleed outside them.
 
    Measured off Scryfall's 745 x 1040 scans (2.98 px per unit) of two kinds of printing, which differ:
-   - full-art basics, the current design (Forest TDM 276, Forest ECL 278, Plains HOB 194; Wastes FIN 309
-     agrees): border 10, the art the whole width between the borders (10-240) from under the title bar to
-     the foot; title bar and its plate as M15 (bar face 17.5-34.5, plate 15-38.5, a line at 39.5); no band,
-     no art line, no text box. The type bar sits at the foot, outline 294.5-314.5 (face 295.5-312), its
-     plate to 316.5, and a mana medallion hangs off its left end: a disc of the bar colour 27 across centred
-     at (24.75, 305), a black hairline round it, then a 2-unit ring of the pinline colour (the Forest's dark
-     green, the Plains' white), the mana symbol 18 across on the face; the type text starts at 43, past the
-     ring. Black from 317 (TDM; ECL and HOB keep a 3-unit line of the frame colour to 320); the collector
-     rows at 327-330.5 and 332.5-337.
+   - full-art basics, the current design (Forest TDM 276, Forest ECL 278, Plains HOB 194, Island TDM 273, Swamp
+     HOB 196, Mountain ECL 282; Wastes FIN 309 agrees): border 10, the art the whole width between the borders
+     (10-240) from under the title bar to the foot; title bar and its plate as M15 (bar face 17.5-34.5, plate
+     15-38.5, a line at 39.5); no band, no art line, no text box. The type bar sits at the foot, outline
+     294.5-314.5 (face 295.5-312), its plate to 316.5, and a mana medallion hangs off its left end: a disc 27
+     across centred at (24.75, 305) in the bar's colour, a shade darker (Island 186 against the bar's 204
+     luminance, Plains 200 against 240, the others within 2%), bevelled -- lit at the upper right, shaded at
+     the lower left, like every M15 edge; a black hairline round it; a 2.5-unit ring of the pinline colour (the
+     Forest's dark green, the Plains' white) to a 34 outer diameter; on the face the symbol's glyph alone, no
+     disc, in the pinline colour with a soft shadow to the lower left (the Island's drop 0/119/178 on its ring's
+     0/118/178, 16 tall; the Plains' sun white on the grey-cream face) -- so the medallion masks the glyph out
+     of the symbol (frame.glyph_uri, the --glyph variable on a basic's text box) and paints it. The type text
+     starts at 43, past the ring. Under the type bar's plate the art goes on: a dark line 317-318 (the plate's
+     shadow), art 318-321 with its bottom corners rounded off on about a 44 radius (the Plains' and Swamp's
+     sliver ends at 213 in the row 318.2, 210 at 319.2, 203 at 320.2, 198 at 320.6: a circle tangent to the
+     black at 198 that meets the border at 292, under the plate), black from 321 on all six -- a dark ocean or
+     purple sky at 317-320 on the TDM and ECL cards is art, not border. The collector rows at 327-330.5 and
+     332.5-337.
      The 2015-2020 basics (Forest BFZ 271, ZNR 278) are the older cut: the M15 sides kept (band 10-14.5,
      pinline 15-18.5, art line 19, art 19.5-230.5), the type bar at 286.5-306.5 with the symbol cut into its
      middle, the band's bottom to 324. Not followed.
@@ -22,17 +31,23 @@
      Boros Challenger PRM 69953, Lavinia PRM 71588, Rakdos Firewheeler PRM 71590; the other full_art nonlands
      on file are textless promos, Japan showcase or poster frames): the M15 frame with the art window opened
      to the P/T -- band 10-14.5 and pinline kept at the sides, title bar at 17-37, the type bar a dark glass
-     strip 199-223.5 with a light outline, the text plate 224-329.5 x 17.5-232 with its pinline to 15 / 235,
-     white text, the P/T plate opaque, the stamp bitten out of the plate's foot, black from 333.5, the
-     collector rows lower (335-338.5, 342-346). Against the art above them the bar reads ~0.7 black and the
-     plate ~0.5 (four scans, the art under a plate is guessed from the art beside it, so +-0.1).
-   Here the bars and the plate keep their M15 positions (the promo's are 2-6 lower only because its type bar's
-   outline is thicker), so nothing about them is restated: the type bar and the text box go translucent and
-   white-lettered, the strip starts where the text box's plate ends. */
+     strip 199.5-223.5 with a light outline (its dark interior 202-221, 4.5 below M15's 197.5-216.5), the text
+     plate 224-329.5 x 17.5-232 with its pinline to 15 / 235 (its foot 7.5 below M15's 322), white text, the
+     P/T plate opaque, the stamp bitten out of the plate's foot, black from 333.5, the collector rows lower
+     (335-338.5, 342-346). Against the art above them the bar reads ~0.7 black and the plate ~0.5 (four scans,
+     the art under a plate is guessed from the art beside it, so +-0.1). The two legendary promos (Emmara,
+     Lavinia) print a plain title bar: no crown.
+   Here the bars, the plate and the P/T keep their M15 positions -- one frame's geometry, not two, and the
+   promo's 4.5-10 lower pieces would put the P/T plate on the strip -- so nothing about them is restated: the
+   type bar and the text box go translucent and white-lettered, the strip starts where the text box's plate
+   ends (323.6, so the black foot is 26 tall where the promo's is 16). */
 .design-fullart { overflow: visible; }  /* the card no longer clips: the art reaches the page's edge */
 .design-fullart .art { left: -11px; top: -11px; width: 272px; height: 372px; }
 .design-fullart .art::after { display: none; }  /* no window, no window line */
 .design-fullart .pl-art { display: none; }
+/* no crown, as on the legendary promos; the title bar's plate comes back where the crown had replaced it */
+.design-fullart .crown-o, .design-fullart .crown { display: none; }
+.design-fullart.legendary .pl-title { display: block; }
 /* the band becomes the footer's black strip, page-wide into the bleed, under the P/T plate and the stamp (both
    later in the document at the same z); its texture goes, and a hybrid's second texture with it */
 .design-fullart .frame { left: -11px; right: -11px; top: 323.6px; bottom: -11px; border-radius: 0; background: #000; z-index: 2; }
@@ -45,9 +60,10 @@
   width: 42.3px; height: 42.3px; border-radius: 50%; background: #000; opacity: 1; }
 
 /* --- a card with rules text: the promo's smoked glass --- */
-/* (any paragraph in the text box but a basic's big symbol) */
-.design-fullart:has(.textbox p:not(.big-sym)) .typebar { color: #fff;
-  background: linear-gradient(180deg, rgba(0,0,0,.62) 0, rgba(0,0,0,.74) 100%); }
+/* (any paragraph in the text box but a basic's big symbol). The type bar keeps its outline, caps, bevel and grain
+   (template.html .bar paints them as background layers over the fill): only the fill's colour changes, through
+   the variable the fill is drawn from, to glass */
+.design-fullart:has(.textbox p:not(.big-sym)) .typebar { --bar: rgba(0,0,0,.66); color: #fff; }
 .design-fullart:has(.textbox p:not(.big-sym)) .textbox { color: #fff; background: rgba(0,0,0,.5); }
 /* the flavour groove, cut the other way: a light line over a dark one on dark glass */
 .design-fullart:has(.textbox p:not(.big-sym)) .flavor::before { background: rgba(255,255,255,.35);
@@ -60,14 +76,27 @@
 .design-fullart:has(.big-sym) .typebar { top: 295px; padding-left: 28.5px; }
 .design-fullart:has(.big-sym) .pl-type { top: 293px; }
 .design-fullart:has(.big-sym) .pl-text { display: none; }
-.design-fullart:has(.big-sym) .frame { top: 317px; }
-/* the text box, holding only the big symbol, is the medallion: the disc's face 27 across in the bar colour,
-   the ring of the pinline colour outside a hairline, the symbol 18 across, its shadow shortened to the disc.
-   The box's chamfer clip goes (it would clip the ring); the watermark behind the symbol goes with it */
+/* black from 321, the art showing under the bar's plate to there. The printed art's rounded bottom corners are
+   not drawn: their arcs (44 radius, tangent to the black at 198 / 52 and meeting the border at 292, under the
+   bar's plate) are black against the border, and this design has none -- outside the plate's end the arc would
+   be a black notch in the art, so the sliver runs square to the page's edge */
+.design-fullart:has(.big-sym) .frame { top: 321px; }
+/* the text box, holding only the big symbol, is the medallion: the disc's face 27 across, the bar colour a shade
+   darker with the M15 bevel (dark at the lower left, light at the upper right), the pinline ring outside a
+   hairline, a faint dark edge outside that. The box's chamfer clip goes (it would clip the ring); the watermark
+   behind the symbol goes with it */
 .design-fullart:has(.big-sym) .textbox { left: 11.25px; top: 291.5px; width: 27px; height: 27px; padding: 0; border-radius: 50%;
-  clip-path: none; background: var(--bar); align-items: center;
-  box-shadow: 0 0 0 .5px #000, 0 0 0 2.5px var(--pinline), 0 0 0 2.9px rgba(0,0,0,.35); }
+  clip-path: none; background: color-mix(in srgb, var(--bar) 92%, #000); align-items: center;
+  box-shadow: inset 1.1px -1.1px 1.4px rgba(0,0,0,.28), inset -.9px .9px 1px rgba(255,255,255,.4),
+    0 0 0 .5px #000, 0 0 0 3px var(--pinline), 0 0 0 3.5px rgba(0,0,0,.35); }
 .design-fullart:has(.big-sym) .textbox::before { display: none; }
+/* the glyph alone on the face, 20 to the symbol's box (the Island's drop fills 80% of it: 16 tall), in the pinline
+   colour with its shadow to the lower left: the symbol image is hidden and its glyph (--glyph, the disc dropped)
+   masks two fills in its place, the pip's own shadow disc becoming the glyph's shadow */
 .design-fullart:has(.big-sym) .textbox .big-sym .pip,
-.design-fullart:has(.big-sym) .textbox .big-sym .pip img { width: 18px; height: 18px; }
-.design-fullart:has(.big-sym) .textbox .big-sym .pip::before { transform: translate(-.4px, 1.3px); }
+.design-fullart:has(.big-sym) .textbox .big-sym .pip img { width: 20px; height: 20px; }
+.design-fullart:has(.big-sym) .textbox .big-sym .pip img { visibility: hidden; }
+.design-fullart:has(.big-sym) .textbox .big-sym .pip::before { border-radius: 0; background: rgba(0,0,0,.45);
+  mask: var(--glyph) center / 100% 100% no-repeat; transform: translate(-.4px, 1.3px); }
+.design-fullart:has(.big-sym) .textbox .big-sym .pip::after { content: ""; position: absolute; inset: 0;
+  background: var(--pinline); mask: var(--glyph) center / 100% 100% no-repeat; }

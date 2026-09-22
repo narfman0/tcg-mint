@@ -666,14 +666,32 @@ def layout_of(card):
     return "normal"
 
 
+def basic_symbol(card):
+    """A basic land's one mana symbol ("{G}") from its "({T}: Add {G}.)" line, shown big in place of the text;
+    None for any other card."""
+    m = re.fullmatch(r"\(\{T\}: Add (\{[WUBRGC]\})\.\)", (card.get("oracle_text") or "").strip())
+    return m.group(1) if card["type_line"].startswith("Basic") and m else None
+
+
+def glyph_uri(uri):
+    """A mana symbol's data URI with the disc dropped: the first shape under Scryfall's root group is the disc,
+    the glyph's paths follow it. A design that prints the symbol bare, in the frame's colour (fullart's medallion),
+    masks with this; the M15 frame never reads it. A URI that is not base64 SVG (a test's stand-in) passes as it is."""
+    head, _, body = uri.partition(",")
+    if head != "data:image/svg+xml;base64":
+        return uri
+    svg = re.sub(rb"<(circle|path)\b[^>]*/>", b"", base64.b64decode(body), count=1)
+    return head + "," + base64.b64encode(svg).decode()
+
+
 def render_text(card, symbols, flavor=None, layout="normal"):
     def syms(s):
         return re.sub(r"\{[^}]+\}", lambda m: f'<img class="sym" src="{symbols.data_uri(m.group(0))}">', esc(s))
     text = card.get("oracle_text") or ""
     # a basic land shows one big mana symbol instead of its "({T}: Add {G}.)" line
-    m = re.fullmatch(r"\(\{T\}: Add (\{[WUBRGC]\})\.\)", text.strip())
-    if card["type_line"].startswith("Basic") and m:
-        return f'<p class="big-sym"><span class="pip"><img src="{symbols.data_uri(m.group(1))}"></span></p>'
+    sym = basic_symbol(card)
+    if sym:
+        return f'<p class="big-sym"><span class="pip"><img src="{symbols.data_uri(sym)}"></span></p>'
     paras = []
     if layout == "planeswalker":  # each loyalty ability a row with its cost in a badge; static ones plain
         for p in text.split("\n") if text else []:
@@ -787,8 +805,11 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
     if layout in ("saga", "class"):
         return f'{title(card)}<div class="art"></div><div class="textbox" id="text">{text}</div>{typebar(card)}{other}'
     cls = "has-pt" if pt_html else ""
+    # a basic's text box carries its symbol's glyph alone as a css variable (glyph_uri), for a design's use
+    sym = basic_symbol(card)
+    glyph = f' style="--glyph: url({glyph_uri(symbols.data_uri(sym))})"' if sym else ""
     return (f'{PINLINES}{crown}{title(card)}<div class="art"></div>{typebar(card)}'
-            f'<div class="textbox {cls}" id="text">{text}{other}</div>{pt_html}')
+            f'<div class="textbox {cls}" id="text"{glyph}>{text}{other}</div>{pt_html}')
 
 
 # The security stamp at the foot of the text box, by Scryfall's security_stamp: the holofoil oval of every rare and
