@@ -5,78 +5,136 @@
    the colour's lighter tone with a black outline and a bevel, the art in a plain black line, a lower and shorter
    text box, no crown on a legend, no holofoil stamp, the collector line printed on the bottom band, and its own
    palette and title face (Matrix Bold: the "wizards" stack already names it, and it is in fonts/).
-   Measured off Scryfall's 745x1040 scans (2.98 px per unit) of nineteen printings the way template.html's header
-   did for M15 -- median brightness down rows and across columns, the runs of dark and light, each edge the
-   boundary between two runs at pixel resolution (a third of a unit), then the mean: Grizzly Bears, Llanowar
-   Elves, Wrath of God, Kamahl, Pit Fighter, Forest and Howling Mine from 10E; Shivan Dragon, Serra Angel, Doom
-   Blade, Darksteel Colossus and Terramorphic Expanse from M10; Scavenging Ooze, Duress, Island and Elixir of
-   Immortality from M14; Sol Ring and Mulldrifter from CMD; Solemn Simulacrum M12; Lightning Helix RAV and Mortify
-   GPT for gold; Ulamog, the Infinite Gyre ROE for colourless; Dark Ritual (The List's DDE). Every kind agrees
-   with every other within 0.4 of a unit. In card units:
+   Measured off Scryfall's 745x1040 scans the way template.html's header did for M15 -- median brightness down rows
+   and across columns, the runs of dark and light, each edge the boundary between two runs at pixel resolution
+   (a third of a unit), then the mean. A scan is the card without its bleed, so a pixel is the card's width over
+   250 across and its height over 350 down: 2.98 both ways at this size, but taken per axis, which is 0.29% off
+   calibrate.py's one ppu = width/250 -- a tenth of a unit at the title bar, a whole one at the foot. Every number
+   below is the per-axis reading (the foot at 338.0 is calibrate.py's 337.0).
+   The geometry came off twenty-two printings, all agreeing within 0.4 of a unit: Grizzly Bears, Llanowar Elves,
+   Wrath of God, Kamahl, Pit Fighter, Forest and Howling Mine from 10E; Shivan Dragon, Serra Angel, Doom Blade,
+   Darksteel Colossus and Terramorphic Expanse from M10; Scavenging Ooze, Duress, Island and Elixir of Immortality
+   from M14; Sol Ring and Mulldrifter from CMD; Solemn Simulacrum M12; Lightning Helix RAV; Mortify GPT; Ulamog,
+   the Infinite Gyre ROE; Dark Ritual (The List's DDE). In card units:
    - the border is black to 11.7 on the left and top, from 238.2 on the right and 338.0 at the foot (the scans sit
      a hair off centre, as M15's did): 11.8 all round, against M15's 10, and the band runs square into it at the
-     foot with no arc -- the collector line prints on the band there;
-   - the title bar's outline spans 17.0-232.9 by 18.3-38.5, 20.2 tall like M15's but 1.3 lower and 2.2 narrower
-     each side; its ends traced down the right side of Grizzly Bears and Shivan Dragon are a half-ellipse 3.5
+     foot with no arc -- the collector line prints on the band there. Not a crop artefact of the 2003 scans: the
+     same estimator (the half-way crossing down the left and right edges, medians over y 60-300) reads 9.7-10.4 on
+     M15 scans -- Cyclonic Rift RVR 40, Rhystic Study J22 114, Demonic Tutor CMM 509, Consecrated Sphinx 2X2 427,
+     Llanowar Elves FDC 213, the template's 10 -- and 11.7-12.8 on eleven 2003 ones;
+   - the title bar's outline spans 17.0-232.9 by 18.2-38.7 (the mean of the half-way crossing on six scans whose
+     plate is light enough to read it against, 18.17-18.19 and 38.70), 20.5 tall to M15's 20.2 but 1.2 lower and
+     2.2 narrower each side; the css rounds it to 18-38, which is 0.2 low at the top and 0.7 short at the foot
+     -- the cost of whole units, which the art's line pays too (its top lands at 39.9 against the print's 40.4).
+     Its ends, traced down the right side of Grizzly Bears and Shivan Dragon, are a half-ellipse 3.5
      deep (2.7 in at 0.2 below the top, 2.2 at 1, 1.4 at 1.9, 1.0 at 3, 0.7 at 4.5, 0.35 at 6, flat from 8:
      an ellipse of 3.5 by 10 within 0.15 at every row, where M15's pointed oval is 0.6 deeper over the top half),
      so the bars are rounded rectangles with a radius of 3.5 by half their height. The outline is 0.7 of black (one
      dark scan row at the top, two at the foot), the face lit along its top (rows 19.0-20.3 read 213 to the face's
      185 on the green scans) and in shadow along its foot (36.2-37.9 at 68), the left end a soft dark ramp 1.2
      wide and the right end 0.4: a bevel lit from above. The name's ink starts at 23.0 (6 in from the outline);
-   - the type bar's outline spans 197.1-215.7: 18.6 tall, 1.6 shorter than the title bar (its face 198.0-213.6 on
+   - the type bar's outline spans 197.1-215.7: 18.6 tall, 1.7 shorter than the title bar (its face 198.0-213.6 on
      every scan), the same ends and bevel;
-   - the art's black line is 20.5-229.8 by 40.5-194.8, the image inside it 21.4-228.9 by 41.4-193.9: 207.5 by
+   - the art's black line is 20.4-229.8 by 40.4-194.8, the image inside it 21.4-228.9 by 41.4-193.9: 207.5 by
      152.5, 1.36:1 (M15's window is 210.6 by 154 at 39.7), so an M15 picture covers it with 1.4 to spare a side;
-   - the text box is 20.5-229.2 by 218.1-315.0 (its face 219.2-313.6 with a lit rim below to 314.9, a dark line a
+   - the text box is 20.5-229.2 by 218.0-315.0 (its face 219.2-313.6 with a lit rim below to 314.9, a dark line a
      unit thick along the top -- 22 on the white scans, a quarter darker than the plate on green -- a dark wall
-     at 228.0-229.0 and a light rim at 20.5-21.0): 96.9 tall to M15's 103.6, on the same 12.6 rules face;
+     at 228.0-229.0 and a light rim at 20.5-21.0): 97.0 tall to M15's 103.6, on the same 12.6 rules face;
    - the flat plate lies 2 outside the art's line and the text box (18.5-231.8; 38.5 to 317.2 top to bottom, the
      gap between the bar and the art all plate), 2 above and below each bar and 1.5 beyond its ends (15.5-234.4,
      the title's 16.3-40.5, the type's 195.1-217.7), its ends elliptical with the bar's. Outside it the band's inner
      edge is a bevel about 1.7 wide: a light strip along the top (14.7-16.3, 155 to the band's 100) and the right
      (231.8-233.4), a dark one down the left (16.5-18.4, 33) and along the foot (317.2-318.7, 30) -- an emboss lit
      from the upper right, as M15's plate is, but a crisp strip rather than a soft shadow;
-   - the P/T box's face runs 187.5-229.2 by 313.5-330.5 with a light rim on its left and top, a dark foot to
+   - the P/T box's face runs 187.4-229.2 by 314.2-330.5 with a light rim on its left and top, a dark foot to
      333.4 and a ring of the plate's colour 2 wide around it over the text box and the band: the M15 plate (41.7 by
-     20, frame.pt_plate) is within a unit of it and stays, moved to 312 with its right edge at 229.6, on a ring;
+     20, frame.pt_plate) is within 4 of its face in width and 1.7 in height and stays, moved to 312 with its right
+     edge at 229.6, on a ring. It reads a little heavier than the print's, whose rim is light where the ring is dark;
    - the collector block is two lines on the bottom band, the artist (a brush, then Matrix Bold) with its caps at
      322.4-327.8 and the copyright line at 332.0-335.7, both from x 19.8, in black ink on every kind but black,
-     land and colourless, whose bands are dark and print white (Doom Blade, Duress, Forest, Island, Ulamog);
-   - a legend has no crown (Kamahl, Ulamog: the title bar and its plate as on any other card);
-   - the palette (band, plate, bar, text box; medians as above, the P/T face the bar's): white #c8beae #d4d3cb
-     #d8d3ca #ddd9d4 (Wrath, Serra); blue #76b6e1 #277bb2 #d1e4f3 #f2f6fb (Mulldrifter); black #2a292b #332f31
-     #ac9f96 #d9dad7 (Doom Blade, Duress, Dark Ritual); red #b04832 #c94428 #d8b59c #e1cec2 (Shivan, Kamahl); green
-     #5f684e #315438 #b5bcb2 #cfd8d2 (Grizzly, Llanowar, Ooze); artifact #929099 #cdc7c8 #a9acab #cac8c8 (the
-     medians of five: CMD's Sol Ring is the bluish 2011 silver, #a2b4c0 #e6e7ee #ccd7df #eaedf4, the other four
-     grey); gold #cdb252 band, #ddcc96 bar, #f2ece6 box (Helix, Mortify) -- its plate on the prints is the card's
-     two colours, the left's running into the right's (Helix red into white, Mortify white into black), which the
-     card's classes do not carry, so it is a darker gold here; land #a17f62 band, #bdaf9c bar, #c4b6a7 box, the
-     plate #9d8065 on Terramorphic Expanse but a basic's own colour on a basic (Forest #30513e, Island #385a84),
-     which the base already tints into --pinline (frame.land_tint), so the plate here is that tint darkened, read
-     on the plate pieces where the base's value is still in reach; colourless #a48f7e #bbb3a9 #bab2ae #beadb0
-     (Ulamog, the Rise of the Eldrazi frame).
+     land and colourless, whose bands are dark at the foot and print white;
+   - a legend has no crown (Kamahl, Ulamog: the title bar and its plate as on any other card).
+   The palette was measured again for the merge over seventy-four printings, four to thirteen a kind, each colour
+   the median of a region: the band both side rails (12.4-14.4 and 233.9-235.9, y 60-180), the plate the strips
+   beside the art (18.8-20.2 and 230.3-231.6), the bar the type bar's face (150-190 by 201-212: the title bar's
+   own median reads 2-6 darker, which is its name's ink, not its fill), the text box its lower right (205-226 by
+   296-308), the bottom band 150-225 by 321-336. Sampling one rail is not enough on an artifact, whose band is lit
+   from the left (Solemn Simulacrum M12 reads #acafb4 down the left rail and #8b8d91 down the right; every other
+   kind is even within 4), and one printing is not enough anywhere: CMD's Mulldrifter is a blue 25 brighter than
+   the other eleven, and CMD's Sol Ring the bluish 2011 silver among twelve grey artifacts. The medians, band /
+   plate / bar / box, and what they came off:
+   - white #cac2af #dcd9d3 #dedbd6 #ddd8d4 (Wrath of God 10E, Pacifism 10E, Serra Angel M10, Safe Passage M11,
+     Divine Verdict M13, Siege Mastodon M14);
+   - blue #678eb9 #306195 #b1becc #d1d5df (Air Elemental 10E and M10, Cancel 10E and M14, Azure Drake M11, Mind
+     Control M12, Ponder M12, Divination M14, Essence Scatter M10 and M14, Negate M14, Mulldrifter CMD);
+   - black #21201f #2e2824 #b3a89f #dad5d5 (Doom Blade M10, Sengir Vampire 10E and M14, Diabolic Tutor M12, Duress
+     M14, Mind Rot M14, Dark Ritual DDE);
+   - red #b14a36 #d1462e #e2bba3 #e4d3c8 (Lava Axe 10E, Shock 10E and M14, Shivan Dragon M10, Chandra's Outrage M12);
+   - green #606a4e #315437 #b8bfb1 #ccd5ce (Grizzly Bears 10E, Llanowar Elves 10E, Naturalize M13, Giant Growth M14,
+     Scavenging Ooze M14);
+   - gold #cdb056 (plate below) #d0b16b #e5e4d6 (Lightning Helix RAV and MMA, Putrefy RAV and DGM, Mortify GPT and
+     CMD, Agony Warp ARC, Terminate ARB, Vithian Renegades ARB, Rhox War Monk ALA, Bant Charm ALA) -- the print's
+     plate is the card's two colours, the left's running into the right's, and its text box is tinted the same way
+     (Helix's is nearly white, Putrefy's green), which the card's classes do not carry: the plate is a darker gold
+     here and the box the neutral median. Cards whose gold frame is really another kind are out of the median:
+     Sphinx of the Steel Wind ARB (a gold artifact, a grey band) and the Ravnica hybrids;
+   - artifact #8e8e96 #cfc9ca #b4b5b4 #cdcbcc (Jayemdae Tome 10E and M13, Howling Mine 10E and M10, Millstone 10E
+     and M14, Elixir of Immortality M11 and M14, Darksteel Colossus M10, Steel Overseer M11, Sword of Vengeance
+     M11, Solemn Simulacrum M12, Sol Ring CMD);
+   - land #a68064 #9b7e66 #c6b6ac #c4bdab off the four plain ones (Terramorphic Expanse M10, Rootbound Crag M12,
+     Tectonic Edge WWK, Evolving Wilds ROE); a basic's band is the same (#a78570 over the five 10E basics) but its
+     plate, bar and box take its colour (Forest #2e5340 #b5beb8 #b7c7b9, Island #2c71a9 #b9cedc #b5cae0), which the
+     base's land_tint already does to --pinline, so the plate follows it here and the bar and box do not;
+   - colourless #a28b75 #beb3a6 #b6a99d #b7aba4 (Ulamog, Kozilek, It That Betrays, Pathrazer, Artisan of Kozilek and
+     Hand of Emrakul, all ROE: the Eldrazi stone is mottled far wider than any other kind, 52 to 215 down one rail).
+   The band's tone holds down the card on every kind but two: the foot band (321-336) reads 1.04 of the side rails
+   on white, 1.09 on blue, 1.12 on red, 1.10 on green, 1.35 on black, 0.95 on an artifact and 0.90 on gold -- inside
+   the tile's own mottle -- but 0.66 on a land and 0.34 on a colourless, which darken all the way down (a land's
+   rails run 150 at the top to 85 at the foot, an Eldrazi's 150 to 54). That is why their collector line prints in
+   white, so those two kinds get a vertical gradient on the band and the rest stay flat.
    The band's texture is the base's tile for the kind (frame.TEXTURES) over the 2003 colour, not redrawn: the
-   prints' tiles differ (a marble on white, a mottle on green) but the M15 veins read close enough at the knob's
-   strength. The layouts whose art is elsewhere (saga, class, split, battle) render M15: build_html drops the
-   design for them (frame.M15_LAYOUTS). */
+   prints' tiles differ (a marble on white, a fine mottle on green, a brushed metal on an artifact, Eldrazi stone on
+   a colourless) and the M15 veins read as blotches beside them at the knob's strength -- the largest thing still
+   between this and a print, and a follow-up (a tile a kind, as frame.TEXTURES does).
+   A two-colour card (a hybrid spell, a dual land) is left to the base: build_html works its bars and its two text
+   box halves out of the M15 palette (PAIR_BAR, DUAL_BOX, both colours' FRAMES) and hands them over as --bar,
+   --box/--box-b and --pinline/--pinline-b, and this file carries no second colour to answer with -- a 2003 hybrid
+   band (RAV, SHM) is unmeasured -- so the kind palettes here stand aside for .pair rather than run a 2003 colour
+   into an M15 one, and only the land band, which the base leaves alone on a dual, is the design's.
+   The layouts whose art is elsewhere (saga, class, split, battle) render M15: build_html drops the design for them
+   (frame.M15_LAYOUTS). */
 .design-modern { --title-font: 'Matrix Bold', 'Beleren', 'Almendra', serif; --foot-ink: #000; }
 /* the palette: the band, the flat plate, the bars and the text box, by the card's kind; the edge tone (the
-   other-face strip, an adventure's box) a darker plate */
-.design-modern.kind-W { --frame: #c8beae; --pinline: #d4d3cb; --bar: #d8d3ca; --box: #ddd9d4; }
-.design-modern.kind-U { --frame: #76b6e1; --pinline: #277bb2; --bar: #d1e4f3; --box: #f2f6fb; }
-.design-modern.kind-B { --frame: #2a292b; --pinline: #332f31; --bar: #ac9f96; --box: #d9dad7; --foot-ink: #fff; }
-.design-modern.kind-R { --frame: #b04832; --pinline: #c94428; --bar: #d8b59c; --box: #e1cec2; }
-.design-modern.kind-G { --frame: #5f684e; --pinline: #315438; --bar: #b5bcb2; --box: #cfd8d2; }
-.design-modern.kind-gold { --frame: #cdb252; --pinline: #b3962f; --bar: #ddcc96; --box: #f2ece6; }
-.design-modern.kind-artifact { --frame: #929099; --pinline: #cdc7c8; --bar: #a9acab; --box: #cac8c8; }
-.design-modern.kind-land { --frame: #a17f62; --bar: #bdaf9c; --box: #c4b6a7; --foot-ink: #fff; }
-.design-modern.kind-C { --frame: #a48f7e; --pinline: #bbb3a9; --bar: #bab2ae; --box: #beadb0; --foot-ink: #fff; }
+   other-face strip, an adventure's box) a darker plate. A two-colour card stands aside (.pair): the base has
+   already put both its colours in these variables and the design has no second colour of its own */
+.design-modern.kind-W:not(.pair) { --frame: #cac2af; --pinline: #dcd9d3; --bar: #dedbd6; --box: #ddd8d4; }
+.design-modern.kind-U:not(.pair) { --frame: #678eb9; --pinline: #306195; --bar: #b1becc; --box: #d1d5df; }
+.design-modern.kind-B:not(.pair) { --frame: #21201f; --pinline: #2e2824; --bar: #b3a89f; --box: #dad5d5;
+  --foot-ink: #fff; }
+.design-modern.kind-R:not(.pair) { --frame: #b14a36; --pinline: #d1462e; --bar: #e2bba3; --box: #e4d3c8; }
+.design-modern.kind-G:not(.pair) { --frame: #606a4e; --pinline: #315437; --bar: #b8bfb1; --box: #ccd5ce; }
+.design-modern.kind-gold:not(.pair) { --frame: #cdb056; --pinline: #b3962f; --bar: #d0b16b; --box: #e5e4d6; }
+.design-modern.kind-artifact:not(.pair) { --frame: #8e8e96; --pinline: #cfc9ca; --bar: #b4b5b4; --box: #cdcbcc; }
+/* a dual land keeps the design's band -- the base leaves a land's band alone whatever it makes -- and the base's
+   two-colour plate and box halves */
+.design-modern.kind-land { --frame: #a68064; --foot-ink: #fff; }
+.design-modern.kind-land:not(.pair) { --bar: #c6b6ac; --box: #c4bdab; }
+.design-modern.kind-C { --frame: #a28b75; --pinline: #beb3a6; --bar: #b6a99d; --box: #b7aba4; --foot-ink: #fff; }
 .design-modern { --bar-edge: color-mix(in srgb, var(--pinline) 60%, #000); --frame-dark: var(--pinline); }
+/* the two kinds whose band darkens down the card (a land 0.66 of its rails at the foot, an Eldrazi 0.34), which is
+   what the white collector line is printed on; every other kind's foot is within the tile's own mottle and stays
+   flat. Down the rails a land holds its tone to about the art's foot and falls from there (156 at 20, 142 at 140,
+   96 at 240, 78 at the foot band), an Eldrazi the same way but steeper (142, 132, 64, 54), so the gradient holds
+   the measured colour -- which is the median of the rails beside the art -- to 45% of the band and falls to the
+   foot's tone at the bottom edge. Straight, where the print's fall steepens below the box: 10 light at 240 */
+.design-modern.kind-land .frame, .design-modern.kind-C .frame {
+  background: linear-gradient(var(--frame) 0 45%, var(--frame-foot) 100%); }
+.design-modern.kind-land { --frame-foot: color-mix(in srgb, var(--frame) 60%, #000); }
+.design-modern.kind-C { --frame-foot: color-mix(in srgb, var(--frame) 12%, #000); }
 /* a land's plate: the base's --pinline is the land yellow or, on a basic, its colour (frame.land_tint), and it
    is still that value on the plate pieces since the card's rule above leaves it alone: halved into a dark brown
-   it lands on the prints' (Forest #30513e from green's #0f724a; Terramorphic's #9d8065 comes out an olive) */
-.design-modern.kind-land .pinline { background: color-mix(in srgb, var(--pinline) 50%, #3a3128); }
+   it lands on the prints' (Forest #30513e from green's #0f724a; Terramorphic's #9b7e66 comes out an olive) */
+.design-modern.kind-land:not(.pair) .pinline { background: color-mix(in srgb, var(--pinline) 50%, #3a3128); }
 /* Chromium lays the boxes out on whole units at every dpi (the plate's 18.5 landed on 19, the bar's 18.3 on 18),
    so every edge below is the measurement rounded to one: a third of a unit off at most */
 /* the band: to the border on all four sides, square-cornered, no arc at the foot */
@@ -94,7 +152,7 @@
 .design-modern .pl-title { left: 15px; top: 16px; width: 220px; height: 24px; clip-path: none; border-radius: 5.5px / 50%; }
 .design-modern .pl-type { left: 15px; top: 195px; width: 220px; height: 23px; clip-path: none; border-radius: 5.5px / 50%; }
 .design-modern .pl-art { left: 18px; top: 38px; width: 214px; height: 158px; }
-.design-modern .pl-text { left: 18px; top: 216px; width: 214px; height: 101px; clip-path: none; }
+.design-modern:not(.planeswalker) .pl-text { left: 18px; top: 216px; width: 214px; height: 101px; clip-path: none; }
 .design-modern .pinlines.shade { filter: drop-shadow(-2px 2px 0 rgba(0,0,0,.65)); }
 .design-modern .pinlines.light { filter: drop-shadow(1.5px -1.5px .3px rgba(255,255,255,.38)); }
 /* the bars: rounded rectangles (the base's pointed clip and its cap images go), 0.7 of black outline inside the
@@ -124,11 +182,34 @@
 /* the text box: lower and shorter, a dark line along its top and its right wall, a light rim down its left and
    along its foot; no stamp, so no bite (the base's stamped clips are replaced by the plain chamfer). The prints'
    rules text starts 5.4 in from the box's edge and ends 8.5 short of the other */
-.design-modern .textbox { left: 20px; top: 218px; width: 209px; height: 97px; padding: 1.5px 5px 2px;
+.design-modern:not(.planeswalker) .textbox { left: 20px; top: 218px; width: 209px; height: 97px; padding: 1.5px 5px 2px;
   box-shadow: inset 0 1px 0 rgba(0,0,0,.5), inset -1px 0 0 rgba(0,0,0,.55), inset .6px 0 0 rgba(255,255,255,.6),
     inset 0 -1.3px 0 rgba(255,255,255,.7);
   clip-path: polygon(.5px 0, calc(100% - .5px) 0, 100% .5px, 100% 100%, 0 100%, 0 .5px); }
 .design-modern .stamp { display: none; }
+/* a planeswalker keeps the base's text block. Its sheet, its badges and its loyalty shield are placed off the
+   box's own edges, so moving the box alone left the black sheet sticking out past it; and the printed 2003
+   planeswalker puts that block within 4 of where M15 puts it anyway. Measured on Ajani Goldmane M11 1, Jace
+   Beleren M10 58 and Karn Liberated NPH 1, all three within 0.4: the art's line ends at 200.6, the type bar runs
+   203.3-221.4, the box's outline 223.5-319.7 by 31.9-229.5 (M15's: 219.3-319.5 by 29.3-231.3), and below the box
+   the card is black to its edge from 322.2 -- no bottom band, the collector line printed white on it. So the box,
+   its strip and its shield stay where the base has them, six above the print, and only the band's foot moves.
+   The bars and the art keep this design's places, so the gap under the type bar comes out 3 where the print's
+   is 2. */
+.design-modern.planeswalker .frame { bottom: 28px; }
+.design-modern.planeswalker { --foot-ink: #fff; }
+/* and the stamp's bite goes with the stamp: the cascade cannot reach back past .planeswalker.stamped to the
+   unstamped shapes, so the three are cut again here -- the only lines in this file that copy the base's, and the
+   ones to redraw if its planeswalker box ever moves */
+.design-modern.planeswalker.stamped .pw-line { clip-path: none; }
+.design-modern.planeswalker.stamped .textbox {
+  clip-path: path('M-20 0 H200 V89.9 A38 8.5 0 0 1 162 98.4 H38 A38 8.5 0 0 1 0 89.9 V98.4 H-20 Z'); }
+.design-modern.planeswalker.stamped .pl-text {
+  clip-path: path('M0 0 H219.6 V93.1 C219.6 105.1 182.4 108.1 170.4 108.1 H49.2 C37.2 108.1 0 105.1 0 93.1 Z'); }
+.design-modern.planeswalker.tall.stamped .textbox {
+  clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H38 A38 8.5 0 0 1 0 113.4 V121.9 H-20 Z'); }
+.design-modern.planeswalker.tall.stamped .pl-text {
+  clip-path: path('M0 0 H219.6 V116.6 C219.6 128.6 182.4 131.6 170.4 131.6 H49.2 C37.2 131.6 0 128.6 0 116.6 Z'); }
 /* the P/T plate, moved down and in, on a ring of the plate's colour 2 wide; the digits ride high in the printed
    box (their centre 8 below its top, the foot of the box a 3-unit shadow): the nudges above, calibrated on
    Grizzly Bears' render against its scan, put each baseline on the print's */
