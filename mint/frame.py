@@ -448,29 +448,36 @@ CROWN_SIDE = [
 # against scans of Jaxis (SNC) and Thalia (VOW), which lie a unit higher and blur; the two sides mirror
 # within 0.3. Below the bar the badge is not the tongue beside the art: that is the pinline plate's
 # (template.html .pl-crown), and the badge ends 1.6 under the bar with its bottom edge at 38.8, the outline
-# under it a 0.5 line to 39.3 (thinner than the 1.3 round the top -- the tongue's dark upper edge starts right
-# under it). At each side the tail comes to a point at 41.8, its inside running back up to the bottom edge.
+# under it a 0.5 line to 39.3, thinner than the 1.3 round the top and grey, not black: over the rail it reads
+# 25-45% of the pinline on the renders (Talrand 11-14 of 31, Rishkar 7-12 of 26, Gonti 5-9 of 20) where the
+# bar's outline reads 2-5, and the true black under the badge from x 18.6 is the art window's own line. The
+# tongue's dark upper edge starts right under it. At each side the tail comes to a point at 41.8, its inside
+# running back up to the bottom edge.
 CROWN_FOOT = [(11.4, 41.8), (12.0, 41.0), (12.5, 40.0), (13.2, 39.4), (14.3, 38.9), (16.6, 38.8)]
 # ... and the outline's, from the tail's tip: the line rounds the tail's inside (1.3 thick, the renders cut it
-# 2.2-3.5 wide on the slant) to reach the tongue's edge at (12.2, 44), then runs down that edge to 54 as a
-# wedge over the band out to the border, black beside the tail and fading down (.crown-o's gradient): the
-# renders show the band shaded there on both sides, to ~15% of its brightness at 44, ~45% at 48, clear by 54.
-CROWN_FOOT_O = [(10.0, 42.0), (9.5, 43.0), (9.5, 54.0), (12.2, 54.0), (12.2, 44.0), (12.6, 43.0), (13.2, 42.0),
-                (13.9, 41.0), (14.9, 40.0), (16.3, 39.5), (17.5, 39.3)]
+# 2.2-3.5 wide on the slant) to reach the tongue's edge at (12.2, 44). Below the tip the two sides differ, the
+# light being from the upper right. On the left the line runs on down the tongue's edge to 54 as a wedge over the
+# band out to the border, fading with depth (.crown-o's gradient): the renders show the band beside the tail at
+# ~10% of its brightness at 43-44, ~25% at 48, ~35% at 52 and clear by 54, half of which is the plate's own
+# shadow. On the right the band is clear -- 60-90% at 44 and clear by 45.5 on Talrand, Rishkar, Etali (FDN) and
+# Jaxis -- with only a soft grey smudge under the tip, so the wedge there ends at 45.5, where the gradient is 0.
+CROWN_HOOK = [(12.2, 44.0), (12.6, 43.0), (13.2, 42.0), (13.9, 41.0), (14.9, 40.0), (16.3, 39.5), (17.5, 39.3)]
+CROWN_FOOT_O = [(10.0, 42.0), (9.5, 43.0), (9.5, 54.0), (12.2, 54.0)] + CROWN_HOOK
+CROWN_FOOT_O_R = [(10.0, 42.0), (9.5, 43.0), (9.5, 45.5), (12.2, 45.5)] + CROWN_HOOK
 
 
 def crown_paths():
     """(fill, outline) CSS path() strings for the crown badge, in card units from the card's top-left: from
     the bottom edge out along the left foot, up the left side, along the traced top edge, down the mirrored
     right side and foot, closed along the bottom edge; the outline is the same shape pushed out 1.3 around
-    the top and sides, with its own traced foot (CROWN_FOOT_O)."""
-    def path(o, foot):
+    the top and sides, with its own traced feet (CROWN_FOOT_O on the left, CROWN_FOOT_O_R on the right)."""
+    def path(o, foot, foot_r):
         top = [(CROWN_X0 + i, y - o) for i, y in enumerate(CROWN) if 14 <= CROWN_X0 + i <= 236]
         side = [(x - o, y) for y, x in CROWN_SIDE]
         left = list(reversed(foot)) + list(reversed(side))
-        right = [(250 - x, y) for x, y in side] + [(250 - x, y) for x, y in foot]
+        right = [(250 - x, y) for x, y in side] + [(250 - x, y) for x, y in foot_r]
         return "M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in left + top + right) + " Z"
-    return path(0, CROWN_FOOT), path(1.3, CROWN_FOOT_O)
+    return path(0, CROWN_FOOT, CROWN_FOOT), path(1.3, CROWN_FOOT_O, CROWN_FOOT_O_R)
 
 
 def pt_plate(text):
