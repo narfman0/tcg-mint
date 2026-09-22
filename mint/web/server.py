@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from .. import (
     PKG,
     animate,
+    cleanup,
     comfy,
     describe,
     export,
@@ -634,6 +635,26 @@ def create_app(ws):
         p.unlink()
         return {"deleted": str(p)}
 
+    # --- cleanup --------------------------------------------------------------------------
+    @app.get("/api/cleanup")
+    def cleanup_list(keep_days: int = cleanup.KEEP_DAYS, set: str | None = None):
+        """What could be removed, grouped, with what each weighs. Reads only -- nothing here runs
+        by itself and nothing comes back selected."""
+        if keep_days < 0:
+            raise HTTPException(400, "keep_days cannot be negative")
+        return cleanup.grouped(cleanup.candidates(ws, keep_days, set))
+
+    @app.post("/api/cleanup")
+    def cleanup_remove(body: dict):
+        """Delete the ids given, and only those. An id that is no longer a candidate -- it became a
+        card's pin, or something else removed it -- comes back under `missed` instead."""
+        ids = body.get("ids") or []
+        if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+            raise HTTPException(400, "ids is a list of candidate ids")
+        with S.lock:
+            out = cleanup.remove(ws, ids, int(body.get("keep_days") or cleanup.KEEP_DAYS), body.get("set"))
+        return out
+
     @app.get("/api/jobs")
     def jobs_list():
         return S.jobs.list()
@@ -747,11 +768,14 @@ def set_detail(S, st):
     d["frame"] = dataclasses.asdict(st.frame or sets.Frame())
     d["motion_knobs"] = {k: v for k, v in dataclasses.asdict(st.motion or sets.Motion()).items() if k != "explicit"}
     d["out_dir"] = str(S.out_dir(st))
-    d["cards_detail"] = [card_detail(S, st, n, cards=None) for n in st.names()]
+    # the whole board off one read of the set's manifest and one hash of its frame, rather than
+    # one of each per card -- a 600-card set was 600 of both
+    shared = Manifest(S.out_dir(st)), frame_hash(st.css, frame.frame_css(st.frame))
+    d["cards_detail"] = [card_detail(S, st, n, cards=None, shared=shared) for n in st.names()]
     return d
 
 
-def card_detail(S, st, name, cards=None):
+def card_detail(S, st, name, cards=None, shared=None):
     entry = st.card({"name": name})
     info = {"name": name, "number": entry.number, "entry": {k: v for k, v in dataclasses.asdict(entry).items()
                                                             if v is not None}}
@@ -790,11 +814,11 @@ def card_detail(S, st, name, cards=None):
         styled = art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art))
         info["plain"], info["styled"] = source_dict(plain), source_dict(styled)
         want = {"plain": plain.hash, "styled": styled.hash}
-    info["renders"] = renders_for(S, st, name, want)
+    info["renders"] = renders_for(S, st, name, want, shared=shared)
     return info
 
 
-def renders_for(S, st, name, want=None):
+def renders_for(S, st, name, want=None, shared=None):
     """Every render the set's out/ dir holds for this card, newest first, under `all`; the one each of
     plain and styled resolves to now -- the card's pinned render when it is of that kind, else its
     newest -- under `plain` and `styled`; and its proof and theme sheet. `want` is the art hash each of
@@ -802,9 +826,9 @@ def renders_for(S, st, name, want=None):
     knobs, set css) or that art has changed since it was made, and a pinned one never is: it is the
     render the card was told to print as."""
     out = {}
-    fh = frame_hash(st.css, frame.frame_css(st.frame))
+    manifest, fh = shared or (None, frame_hash(st.css, frame.frame_css(st.frame)))
     pin = st.card({"name": name}).render
-    every = renders.for_card(S.out_dir(st), name, pin)
+    every = renders.for_card(S.out_dir(st), name, pin, manifest)
     if want is not None:
         for r in every:
             r["stale"] = renders.stale(r, fh, want)

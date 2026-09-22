@@ -24,6 +24,7 @@ const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mod
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
                takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false,
                mpcStock: '', mpcDpi: 800,  // MakePlayingCards' cardstock and the export's resolution
+               clean: null,  // the cleanup page: {report, sel:Set, days, set, busy}
                motion: {loop: '', length: 0, takes: 1}};  // the card page's animate knobs for this run ('' / 0 = the block's)
 
 async function api(path, opts = {}) {
@@ -117,6 +118,7 @@ function route() {
   if (!p[0]) return {view: 'home'};
   if (p[0] === 'jobs') return {view: 'jobs'};
   if (p[0] === 'styles') return {view: 'styles', name: p[1]};
+  if (p[0] === 'cleanup') return {view: 'cleanup'};
   if (p[0] === 'all') return p[1] === 'view' ? {view: 'viewer', code: ALL, inSet: p[2], name: p[3]} : {view: 'board', code: ALL};
   if (p[0] === 'set') return {view: p[2] === 'view' ? 'viewer' : p[2] || 'board', code: p[1], name: p[3], key: p[4] === 'view' ? p[5] : undefined};
   return {view: 'home'};
@@ -126,7 +128,7 @@ async function go() {
   try {
     if (!state.ws) await loadWorkspace();
     if (r.code && (!state.set || state.set.code.toLowerCase() !== r.code.toLowerCase())) { await loadSet(r.code); state.sel.clear(); }
-    const views = {home, board, card, lab, frame, jobs, viewer, edit, styles, pdfs};
+    const views = {home, board, card, lab, frame, jobs, viewer, edit, styles, pdfs, cleanup};
     if (r.view !== 'viewer' && !(r.view === 'card' && r.key)) closeViewer();
     (views[r.view] || home)(r);
     renderNav();
@@ -143,7 +145,8 @@ function renderNav() {
   const r = route();
   $('#setnav').innerHTML = (state.ws?.sets || []).map(s =>
     `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}">${esc(s.code)}</a>`).join('') +
-    (STATIC ? '' : `<a href="#/all" class="all ${r.code === ALL ? 'on' : ''}" title="every set on one board">all</a><a href="#/styles" class="all ${r.view === 'styles' ? 'on' : ''}" title="style templates">styles</a>`);
+    (STATIC ? '' : `<a href="#/all" class="all ${r.code === ALL ? 'on' : ''}" title="every set on one board">all</a><a href="#/styles" class="all ${r.view === 'styles' ? 'on' : ''}" title="style templates">styles</a>` +
+     `<a href="#/cleanup" class="all ${r.view === 'cleanup' ? 'on' : ''}" title="what could be removed, and what it weighs">cleanup</a>`);
   $('#comfy').className = 'dot' + (state.ws?.comfy?.alive ? ' on' : '');
   $('#comfy').title = `ComfyUI ${state.ws?.comfy?.url}: ${state.ws?.comfy?.alive ? 'running' : 'not running'}`;
 }
@@ -1636,6 +1639,82 @@ function itemHtml(it) {
   const what = it.label ? `${it.label}-${it.key}` : it.file || it.kind || '';
   return `<a class="it ${it.kind === 'render' || it.kind === 'theme' ? 'card' : ''}" href="${href}" ${it.path ? `data-src="${img(it.path, 320)}"` : ''}>
       ${esc(it.name)} <span class="mono muted">${esc(what)}</span>${it.path ? '<span class="peek"><img alt=""></span>' : ''}</a>`;
+}
+
+/* --- cleanup: what could go, and what it weighs ------------------------------------------
+   Nothing here happens on its own and nothing starts selected. The server lists candidates with
+   their size; you tick what goes and press remove, and it deletes those ids and nothing else. */
+function bytes(n) {
+  if (!n) return '—';
+  const u = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return `${i ? n.toFixed(1) : n.toFixed(0)} ${u[i]}`;
+}
+async function cleanup() {
+  const C = state.clean || (state.clean = {report: null, sel: new Set(), days: 3, set: '', busy: false});
+  if (!C.report) {
+    $('#main').innerHTML = '<div class="empty">looking through the workspace…</div>';
+    C.report = await api(`/api/cleanup?keep_days=${C.days}${C.set ? `&set=${encodeURIComponent(C.set)}` : ''}`);
+    C.sel = new Set();
+  }
+  const R = C.report, all = R.groups.flatMap(g => g.items);
+  const byId = Object.fromEntries(all.map(i => [i.id, i]));
+  const picked = [...C.sel].map(id => byId[id]).filter(Boolean);
+  const pickedBytes = picked.reduce((n, i) => n + i.bytes, 0);
+  const row = i => `<label class="clean-row ${C.sel.has(i.id) ? 'on' : ''}">
+      <input type="checkbox" data-pick="${esc(i.id)}" ${C.sel.has(i.id) ? 'checked' : ''}>
+      <span class="mono size">${bytes(i.bytes)}</span>
+      <span class="age">${i.age_days == null ? '—' : i.age_days + 'd'}</span>
+      <span class="where">${esc([i.set, i.card].filter(Boolean).join(' · ')) || '<span class="muted">—</span>'}</span>
+      <span class="what mono">${esc(i.what)}</span>
+      <span class="muted why">${esc(i.why || '')}</span></label>`;
+  $('#main').innerHTML = `
+    <div class="row"><h1>Cleanup</h1>
+      <span class="muted">${R.count} item(s), ${bytes(R.bytes)} in all — nothing is removed until you say so</span>
+      <span style="margin-left:auto"></span>
+      <label class="muted" title="anything made more recently than this is never offered, whatever else is true">keep the last
+        <input type="number" id="cdays" min="0" max="365" value="${C.days}" style="width:5em"> days</label>
+      <select id="cset" title="one set's art and renders, or everything"><option value="">every set</option>${(state.ws.sets || []).map(x => `<option ${C.set === x.code ? 'selected' : ''}>${esc(x.code)}</option>`).join('')}</select>
+      <button class="small" id="crefresh">look again</button>
+    </div>
+    ${R.errors.length ? `<div class="panel"><b class="warn">skipped</b><div class="muted">${R.errors.map(esc).join('<br>')}</div></div>` : ''}
+    ${R.groups.length ? R.groups.map(g => {
+      const on = g.items.every(i => C.sel.has(i.id));
+      return `<div class="panel clean">
+        <h2><label><input type="checkbox" data-group="${esc(g.key)}" ${on ? 'checked' : ''}> ${esc(g.title)}</label>
+          <span class="muted">${g.count} · ${bytes(g.bytes)}</span></h2>
+        <p class="muted">${esc(g.why)}</p>
+        <div class="clean-rows">${g.items.map(row).join('')}</div></div>`;
+    }).join('') : '<div class="empty">nothing to remove — the workspace is as lean as it gets</div>'}
+    ${R.count ? `<div class="clean-bar"><span><b>${picked.length}</b> selected · <b>${bytes(pickedBytes)}</b></span>
+      <button class="small" id="call">select everything</button>
+      <button class="small" id="cnone" ${picked.length ? '' : 'disabled'}>clear</button>
+      <button class="primary" id="cgo" ${picked.length && !C.busy ? '' : 'disabled'}>${C.busy ? 'removing…' : 'remove selected'}</button></div>` : ''}`;
+  const redraw = () => cleanup();
+  $('#cdays').onchange = e => { C.days = Math.max(0, +e.target.value || 0); C.report = null; redraw(); };
+  $('#cset').onchange = e => { C.set = e.target.value; C.report = null; redraw(); };
+  $('#crefresh').onclick = () => { C.report = null; redraw(); };
+  document.querySelectorAll('[data-pick]').forEach(b => b.onchange = () => {
+    C.sel.has(b.dataset.pick) ? C.sel.delete(b.dataset.pick) : C.sel.add(b.dataset.pick); redraw();
+  });
+  document.querySelectorAll('[data-group]').forEach(b => b.onchange = () => {
+    const g = R.groups.find(x => x.key === b.dataset.group);
+    g.items.forEach(i => b.checked ? C.sel.add(i.id) : C.sel.delete(i.id));
+    redraw();
+  });
+  if ($('#call')) $('#call').onclick = () => { all.forEach(i => C.sel.add(i.id)); redraw(); };
+  if ($('#cnone')) $('#cnone').onclick = () => { C.sel.clear(); redraw(); };
+  if ($('#cgo')) $('#cgo').onclick = async () => {
+    if (!confirm(`Remove ${picked.length} item(s) and free ${bytes(pickedBytes)}? The files are deleted from the workspace; art can be generated again and cards rendered again, but this does not undo.`)) return;
+    C.busy = true; redraw();
+    try {
+      const out = await api('/api/cleanup', {method: 'POST', body: {ids: [...C.sel], keep_days: C.days, set: C.set || null}});
+      toast(`removed ${out.removed} item(s), freed ${bytes(out.bytes)}`);
+      if (out.missed.length) toast(`${out.missed.length} were no longer safe to remove and were left`, true);
+    } catch (e) { toast(e.message, true); }
+    C.busy = false; C.report = null; C.sel = new Set(); redraw();
+  };
 }
 
 /* --- boot ------------------------------------------------------------------------------- */

@@ -365,3 +365,24 @@ body.viewing { overflow: hidden; }
   #viewer .vbottom { font-size: .8em; }
   #viewer .vrecipe div { max-width: 100%; }
 }
+
+/* --- cleanup: rows you tick, a bar that says what goes ------------------------------------ */
+.panel.clean h2 { display: flex; align-items: baseline; gap: 10px; }
+.panel.clean h2 label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.clean-rows { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
+.clean-row { display: grid; grid-template-columns: auto 5.5em 3em minmax(8em, 14em) minmax(10em, 1fr) minmax(0, 1.4fr);
+  gap: 10px; align-items: center; padding: 4px 6px; border-radius: 3px; cursor: pointer; font-size: .92em; }
+.clean-row:hover { background: var(--panel-2); }
+.clean-row.on { background: rgba(120,170,255,.12); }
+.clean-row .size { text-align: right; color: var(--ink-2); }
+.clean-row .age, .clean-row .why { color: var(--muted); }
+.clean-row .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clean-bar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; margin-top: 14px;
+  padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 -6px 18px rgba(0,0,0,.35); }
+.clean-bar span { margin-right: auto; }
+@media (max-width: 800px) {
+  .clean-row { grid-template-columns: auto 5em 3em 1fr; }
+  .clean-row .what, .clean-row .why { grid-column: 2 / -1; }
+  .clean-row .why { display: none; }
+}

@@ -21,15 +21,16 @@ from .errors import MintError
 from .manifest import Manifest, frame_hash
 
 
-def for_card(directory, name, pin=None):
+def for_card(directory, name, pin=None, manifest=None):
     """Every render `directory`'s manifest holds for this card, newest first. Each entry is the
     manifest's, plus `file`, `path`, `mode` ("plain" or "styled") and `pinned`. A double-faced
     card's back is filed under the back face's own name, so it is not one of these; `backs_of`
-    finds it. Renders in another frame theme (a --compare sheet) are not the card's render."""
+    finds it. Renders in another frame theme (a --compare sheet) are not the card's render.
+    Pass `manifest` to walk a whole set off one read of the file."""
     d = Path(directory)
     out = []
     mine = {name, name.split(" // ")[0]}  # a render is filed under the face's name
-    for fn, e in Manifest(d).entries.items():
+    for fn, e in (manifest or Manifest(d)).entries.items():
         if e.get("card") not in mine or e.get("back"):
             continue
         if e.get("theme") and e.get("theme") != "wizards":
@@ -79,14 +80,15 @@ def chosen(renders, mode="plain"):
     return next((r for r in of if r["pinned"]), None) or (of[0] if of else None)
 
 
-def state(directory, st, cards, art, name, *, mode="plain"):
+def state(directory, st, cards, art, name, *, mode="plain", manifest=None, fhash=None):
     """Everything about this card's renders in one call: (all, chosen, stale_reason). `cards` is a
-    Cards; a name the card file does not know raises MintError."""
+    Cards; a name the card file does not know raises MintError. `manifest` and `fhash` are passed in
+    when walking a whole set, so the file is read and the frame hashed once rather than per card."""
     entry = st.card({"name": name})
     card = cards.find(name, *st.lookup(name))
-    fhash = frame_hash(st.css, frame.frame_css(st.frame))
+    fhash = fhash or frame_hash(st.css, frame.frame_css(st.frame))
     want = want_hashes(st, card, art, entry)
-    every = for_card(directory, name, entry.render)
+    every = for_card(directory, name, entry.render, manifest)
     for r in every:
         r["stale"] = stale(r, fhash, want)
     pick = chosen(every, mode)
@@ -97,9 +99,11 @@ def needing(directory, st, cards, art, names, *, mode="plain"):
     """The names whose chosen render is missing or stale -- what a print run or an export has to
     render before it can go ahead."""
     out = []
+    m = Manifest(directory)                                   # one read for the whole walk
+    fh = frame_hash(st.css, frame.frame_css(st.frame))
     for name in names:
         try:
-            _, pick, why = state(directory, st, cards, art, name, mode=mode)
+            _, pick, why = state(directory, st, cards, art, name, mode=mode, manifest=m, fhash=fh)
         except MintError:
             continue  # the card file does not know it; the caller reports that on its own
         if not pick or why:

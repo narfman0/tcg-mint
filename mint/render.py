@@ -71,11 +71,15 @@ def stamp(base, out_dir, html, browser):
 
 
 def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",), dpi=1200, out_dir=".",
-                 compare=False, year=None, on_rendered=None, back_faces=False):
+                 compare=False, year=None, on_rendered=None, back_faces=False, design=None):
     """Render `names` (or the whole set when empty) into out_dir. Returns a list of
     Rendered; `on_rendered` is called with each one as it finishes. With back_faces,
-    a double-faced card's back is rendered too, as its own card numbered "<n>b"."""
+    a double-faced card's back is rendered too, as its own card numbered "<n>b".
+    `design` overrides the set's, for rendering the same card in one frame after another
+    (`mint calibrate --design`)."""
     st = sets.load(set_path) if set_path else sets.SetFile(code=ws.maker_code + "1")
+    if design:
+        st.design = design
     names = list(names) or st.names()
     if not names:
         raise MintError("give card names or a --set with cards")

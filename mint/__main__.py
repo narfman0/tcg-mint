@@ -18,6 +18,7 @@ COMMANDS = {
     "fonts":     ("report which frame fonts are present", "fonts"),
     "doctor":    ("check the card file, fonts, Chromium, ComfyUI and its models", "doctor"),
     "gc":        ("report and remove unneeded variants and stale renders", "gc"),
+    "cleanup":   ("list what could be removed, with what it weighs; removes nothing", "cleanup"),
     "back":      ("render the BLS card back", "back"),
     "impose":    ("lay rendered PNGs out 3x3 on a printable PDF", "impose"),
     "export":    ("a set as a folder MPC Autofill's desktop tool can upload", "export"),

@@ -21,8 +21,7 @@ from . import frame, sets, workspace
 from .art import Art
 from .cards import Cards, warnings
 from .errors import MintError
-
-ORDER_DPI = 800  # what `mint export` writes for MPC Autofill, and where MakePlayingCards' press tops out
+from .export import MAX_DPI as ORDER_DPI  # what `mint export` writes for MPC Autofill
 
 
 def art_fit(path, design):

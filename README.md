@@ -156,10 +156,11 @@ ollama_url = "http://127.0.0.1:11434"
 | `mint check` | validate set files and say which image each card renders with, plain and styled |
 | `mint style` | save a set's art style as a template in `styles/` for other sets to start from; `list` and `show` them |
 | `mint migrate` | move a pre-variant art cache (`art/<id>.<style>.png`) into `art/<id>/` with recipe sidecars |
-| `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in |
+| `mint calibrate` | measure title / type / P/T text placement on real Scryfall scans vs ours, in 1/100 in; `--design NAME` measures any design's band boundaries instead |
 | `mint cards` | fetch or refresh Scryfall's bulk card file (`--kind default_cards` for per-printing art) |
 | `mint fonts` | report which frame fonts are present; `--repair` fixes the community copies |
 | `mint gc` | report variants no card picks, renders with, or starts from, and renders gone stale (a pinned render never is); `--delete` removes them |
+| `mint cleanup` | the same question as a list you pick from, with what each item weighs; prints only — the workbench's Cleanup page is where things are removed |
 | `mint doctor` | check the card file, the fonts, a Chromium launch, ComfyUI's nodes, every model file the styles name, and the Wan files and ffmpeg when a set has a motion block |
 | `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
@@ -286,6 +287,19 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   Desktop unless `mint.toml` says otherwise) on the workbench's machine, for
   another PDF app to print from; it asks before replacing a file already
   there. *Delete* removes a PDF; the renders it was made from stay.
+- **Cleanup** (*cleanup* in the nav) — everything that could be thrown away,
+  grouped by why it is safe to go, each item with its size, its age and which
+  card it belongs to: art no card picks, renders or starts a restyle from;
+  variant directories for cards no set has; renders gone stale; **renders a
+  card no longer prints** (it keeps every render it has ever had — these are
+  the ones it is not pinned to and not the newest of their kind); the frame
+  page's proofs and theme sheets; and PNGs under `out/` no manifest knows.
+  Nothing runs on its own and nothing arrives selected: tick what goes, watch
+  the running total, and press *remove selected*. Anything in use is never
+  offered — a pinned render, the render a card prints as, the styled art, the
+  recipe's variant, the base chain behind either, and anything newer than the
+  *keep the last N days* box. A selection is re-checked when it is sent, so an
+  item that became a card's pin in the meantime is left alone and reported.
 - **Jobs** — what is queued and running, with logs and cancel.
 
 `mint gallery --set sets/x.json` exports the Sets and Compare views as a
@@ -686,9 +700,17 @@ which `--back` takes as `auto` (`mint back`), `none`, or an image of your own.
 
 ## What's not here yet
 
-- IP-Adapter style anchoring for set-wide consistency
-- layouts beyond `normal`: split, adventure, planeswalker, saga (double-faced
-  cards render both faces in the normal frame with `--faces`)
+- a second frame template: the seven designs all move the M15 template's
+  pieces, and a genuinely different card shape (a token, a non-Magic game)
+  would want its own
+- ordering history: `mint export` writes a folder, but nothing records which
+  export went to MakePlayingCards, when, or what came back
+
+Two things this list used to claim that are in fact here: the layouts beyond
+`normal` (split, adventure, planeswalker, saga, class, battle, and both faces
+of transform and modal double-faced cards) all render, and IP-Adapter
+anchoring is the `inspire` remix mode — a set-wide `base` pointing at one
+image file anchors every card in the set to that reference.
 
 ## Legal
 

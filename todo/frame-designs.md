@@ -87,9 +87,11 @@ can style by rarity (extended's set-symbol halo, which had used "not
 stamped" as a stand-in); `frame.DESIGNS` holds the measured rectangles
 (extended 272 x 179.4, borderless 272 x 206); fullart's stamp disc follows
 the re-measured bite. The plate opacities differ by design on purpose --
-each is what its printings do. README section written. Not done: `mint
-calibrate --design` -- the agents measured with one-off scripts, nothing
-reusable came out of it.
+each is what its printings do. README section written. `mint calibrate
+--design` landed 2026-09-22: the agents measured with one-off scripts, so the
+half-way-point rule they used is now a band finder in calibrate.py that runs
+against any design (calibrate.bands / edges), matched against the printings
+whose own frame is that design.
 
 ## Decisions
 

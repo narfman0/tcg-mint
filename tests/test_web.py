@@ -530,3 +530,39 @@ def test_the_board_exports_a_set_for_mpc_autofill(client):
     with Image.open(mpc / ids[0]) as im:
         assert im.size == (816, 1110)   # 2.72 x 3.70in at 300 DPI
     assert client.post("/api/jobs", json={"kind": "export", "set": "TST", "stock": "(S99) Glitter"}).status_code == 400
+
+
+def test_the_cleanup_page_lists_what_could_go_and_removes_only_what_is_picked(client):
+    """It reads by default and never selects for you; a POST takes ids and nothing else."""
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"]})
+    client.settle()
+    st = sets.load(client.ws.sets / "tst.json")
+    fh = frame_hash(st.css, frame.frame_css(st.frame))
+    out = client.ws.home / "out" / "tst"
+    out.mkdir(parents=True)
+    m = Manifest(out)
+    render_entry(m, out, "TST-001_Alpha-new.png", at="2026-09-20T00:00:00+00:00", fhash=fh)
+    render_entry(m, out, "TST-001_Alpha-old.png", at="2020-01-01T00:00:00+00:00", fhash=fh)
+    m.save()
+
+    r = client.get("/api/cleanup", params={"keep_days": 3}).json()
+    assert r["count"] == 1 and r["bytes"] > 0
+    block = r["groups"][0]
+    assert block["key"] == "render-superseded" and block["why"] and block["count"] == 1
+    item = block["items"][0]
+    assert item["what"] == "TST-001_Alpha-old.png" and item["bytes"] > 0 and item["age_days"] > 1000
+    assert item["set"] == "TST" and item["card"] == "Alpha"
+    assert (out / "TST-001_Alpha-old.png").exists()   # listing removed nothing
+
+    assert client.post("/api/cleanup", json={"ids": "nope"}).status_code == 400
+    assert client.get("/api/cleanup", params={"keep_days": -1}).status_code == 400
+    # a long enough keep window offers nothing at all
+    assert client.get("/api/cleanup", params={"keep_days": 100000}).json()["count"] == 0
+
+    done = client.post("/api/cleanup", json={"ids": [item["id"]], "keep_days": 3}).json()
+    assert done["removed"] == 1 and done["bytes"] == item["bytes"] and done["missed"] == []
+    assert not (out / "TST-001_Alpha-old.png").exists() and (out / "TST-001_Alpha-new.png").exists()
+    assert client.get("/api/cleanup", params={"keep_days": 3}).json()["count"] == 0
+    # an id that is no longer a candidate comes back under `missed`
+    again = client.post("/api/cleanup", json={"ids": [item["id"]], "keep_days": 3}).json()
+    assert again["removed"] == 0 and again["missed"] == [item["id"]]
