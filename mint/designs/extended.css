@@ -2,13 +2,14 @@
    on). The art runs off the card's sides -- there is no side border and no band between the title bar and the type
    bar -- while the title bar, the text box and the band above and below stay the M15 ones. Measured off sixteen
    scans (ZNR 347, CMR 627/632/644/689/700, THB 308, MID 373, MKM 399, OTJ 314/358, BLB 357, M3C 65, PIP 387, EOC
-   40, MSC 359), the way template.html's header did for M15: brightness rows and columns, edges at the half-way
-   point. In card units:
+   40, MSC 359), plus NEO 501, SNC 412 and MSC 354 in review and eight legendaries for the crown (NEO 501, OTJ 358,
+   FDN 476, TMT 264, WHO 419, LTC 146, FIN 471, MSC 414), the way template.html's header did for M15: brightness
+   rows and columns, edges at the half-way point. In card units:
    - the art reaches x 0 and x 250, the cut edges, on every scan (the card's own corners are the only thing black
      beside it), so here it spans the whole 272 page, bleed included, and the card lets it out of its box;
    - under the title bar it starts where M15's does: bar outline 36-37.2, pinline 36.6-38.4, then the one black line
      38.5-39.6, image from 39.7 (ZNR 39.6, MKM 40.0, MID 39.9, EOC 40.0). Outside the bar's plate it rises to about
-     36-37 (ZNR x 11: 36.5; MID 35; OTJ 34), beside the bar's arcs;
+     36-37 (ZNR x 11: 36.5; MID 35), beside the bar's arcs;
    - at the foot the image runs into the type bar's own outline (196.3-196.6) with no line and no pinline round the
      bar: the plate's type piece is gone, the text box's plate shows below the bar as before (its top edge, the
      pinline 216.4-218.4, on every scan). Beside the bar the art continues to the text box's plate at 216.4;
@@ -16,11 +17,21 @@
      deep. Its half-way line runs from (x 0, y 38.5) up to (x 9, y 32) at the top (ZNR 41.6-36.6, EOC 37-31, OTJ
      33-27, MKM 35-29, MID 36-37) and from (x 0, y 206) down to (x 9, y 211) at the bottom (OTJ 207-215, MID 210-212,
      MKM 210-211, ZNR 197-205), inside the border's own 10, so a 21 x 20 patch per corner in the bleed and border;
-   - the type bar is black: a near-black face tinted with the bar's colour at the top (ZNR 38,26,20 under a bar of
-     237,201,192; OTJ 53,35,30; MKM 37,38,49; EOC 33,25,15) running to 0,0,0 at the foot, a 1.4 rim of the bar's
-     colour at half strength along its top (197.2-198.6: ZNR 128,91,77; OTJ 131,103,82; MKM 101,88,114; EOC
-     107,95,81), the outline where M15's is (196.6 / 216.1), white text. The title bar keeps its colour. A common's
-     black set symbol gets a white edge on it (CMR 632).
+   - the type bar is black glass over the art, not a black bar: its rim (197.2-198.6) is the art through a light
+     wash -- a row's colour is 0.65 of the art's just above the bar plus 60, on every card and along the bar
+     (MSC 354 prints a green rim on a black card, NEO 501 a blue one on a land, OTJ 358 a brown one) -- and its face
+     is the art under a black that thickens down the bar: fitted row by row over 25 x-segments of eight scans,
+     face = k * art + c with k 0.52 at 199.4, 0.40 at 202, 0.31 at 204, 0.18 at 208, 0.07 at 211.4, 0.05 from
+     213.4, c near 20 down to 212 and under 10 at the foot -- a dark grey at half strength going to solid black over
+     the bottom units, the mean face 56,55,51 at 200 to 12,12,10 at 215. The outline is where M15's is (196.6 /
+     216.1), the text white. A common's black set symbol gets a white edge on it (CMR 632);
+   - a legendary's crown loses its tongue: on all eight scans the badge is cut on a curve from its flare beside the
+     bar (x 10 at y 33) to the bar's lower corner (x 16.6 at y 41.7: 11.5 at 34, 13.2 at 35.4, 14.3 at 36.7, 15.0 at
+     38, 15.6 at 39.4, 16.0 at 40.7), a black line a unit wide along the cut, and the art runs straight under it.
+     The plate under the bar is not flat: it bows down to 41.7 at the ends (x 16.6-34, seven of eight scans; NEO
+     501 sits 0.6 higher throughout) and rises to the M15 line by x 73 (41 -> 40.6, 49 -> 39.7, 57 -> 39.3,
+     65 -> 39.0, 73 -> 38.7; 38.0-38.3 across the middle), the black line under it a unit thick, mirrored on the
+     right. Beside the crown the art comes up to 33.
    The CMR and MID printings drop the type bar to 213-231 and shorten the text box to 234-322 instead (nine of the
    sixteen sit on the M15 bars, all from ZNR, THB and 2023 on): this design keeps the M15 bars. The layouts whose art
    is elsewhere (saga, class, split, battle) stay M15, as todo/frame-designs.md says. */
@@ -48,12 +59,40 @@
     linear-gradient(331deg, #000 36%, transparent 68%) 100% 100% / 21px 20px no-repeat; }
 /* no pinline round the type bar: it sits on the art with its own outline, and the text box's plate shows beneath */
 .design-extended:is(.normal, .planeswalker, .adventure) .pl-type { display: none; }
-/* the black type bar: the tinted-black face, the rim of the bar's colour along the top instead of the M15 bevel,
-   white text; the grain and rarity tint stay, and do nothing on black */
-.design-extended:is(.normal, .planeswalker, .adventure) .typebar { color: #fff;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bar) 20%, #000), #000);
-  box-shadow: inset 0 1.4px 0 color-mix(in srgb, var(--bar) 55%, #000); }
+/* the black glass type bar: the bar's fill goes clear, so the M15 outline and its lit top edge stand on the art,
+   and the rarity tint's layer (nothing to tint on black) becomes the glass: a third of black over the rim, where
+   the bevel's light would otherwise be twice the print's, then the measured grey-to-black down the face (the
+   bevel's tail keeps 199.4-200.4 a shade lighter than the print; the fill's own stack cannot be trimmed from
+   here). White text; the grain stays */
+.design-extended:is(.normal, .planeswalker, .adventure) .typebar { --bar: transparent; color: #fff; }
+.design-extended:is(.normal, .planeswalker, .adventure) .typebar::before { mix-blend-mode: normal; opacity: 1;
+  background: linear-gradient(180deg, rgba(0,0,0,.35) 0, rgba(0,0,0,.35) 1.4px, rgba(32,32,32,.5) 1.4px,
+    rgba(28,28,28,.68) 6px, rgba(26,26,26,.83) 10px, rgba(18,18,18,.93) 13.4px, rgba(10,10,10,.96) 16px, #000 100%); }
 /* a common's set symbol is black on black: the printed one carries a white edge (the halo lands on an uncommon's
    silver too, the class list not naming the rarity; it is faint there) */
 .design-extended:is(.normal, .planeswalker, .adventure):not(.stamped) .typebar .setsym {
   filter: drop-shadow(0 0 .3px #fff) drop-shadow(0 0 .3px #fff); }
+/* the legendary crown: its badge (frame.crown_paths, an inline clip path) is masked to the measured cut, the fill
+   and its outline each to their own edge, the outline's a unit outside the fill's and a unit below its foot so the
+   black line along the cut and under the corner is the outline showing past the fill. The fill's foot stops at 16
+   (the corner is 16.0-16.1 from 40.7 down), 0.6 short of the badge's own wall at 16.6; the outline is kept off
+   the notch's edges (38.4 between 16 and 234) so the fill's anti-aliased foot does not show black through it */
+.design-extended.legendary:is(.normal, .planeswalker, .adventure) .crown {
+  mask: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 250 60%22%3E%3Cpath d=%22M0 0 H250 V32.5 H242 L240 33 L238.5 34 L236.8 35.4 L235.7 36.7 L235 38 L234.4 39.4 L234 40.7 V41.7 H16 V40.7 L15.6 39.4 L15 38 L14.3 36.7 L13.2 35.4 L11.5 34 L10 33 L8 32.5 H0 Z%22/%3E%3C/svg%3E") 0 0 / 250px 60px no-repeat; }
+.design-extended.legendary:is(.normal, .planeswalker, .adventure) .crown-o {
+  mask: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 250 60%22%3E%3Cpath d=%22M0 0 H250 V32.5 H243 L241 33 L239.5 34 L237.8 35.4 L236.7 36.7 L236 38 L235.4 39.4 L235 40.7 V42.7 H234 V38.4 H16 V42.7 H15 V40.7 L14.6 39.4 L14 38 L13.3 36.7 L12.2 35.4 L10.5 34 L9 33 L7 32.5 H0 Z%22/%3E%3C/svg%3E") 0 0 / 250px 60px no-repeat; }
+/* ... and the bowed plate under the bar is the art plate (.pl-art, the pinline colour the crown's ends are) showing
+   where the art's clip follows the bow; the art's black line becomes a black box cut to the bow a unit lower, so
+   it runs along the plate's underside, with a stub at 16-16.6 under the fill's foot that joins the outline's.
+   Beside the crown the art shows from 33 on the scans, so the window starts there on a legendary (its picture
+   hangs from 33: four more units of its top go under the bar; the corner fades stay where they are) */
+.design-extended.legendary:is(.normal, .planeswalker, .adventure) .art { top: 33px; height: 183.4px;
+  clip-path: polygon(0 0, 27.6px 0, 27.6px 8.7px, 45px 8.7px, 52px 7.6px, 60px 6.7px, 68px 6.3px, 76px 6px, 84px 5.7px,
+    188px 5.7px, 196px 6px, 204px 6.3px, 212px 6.7px, 220px 7.6px, 227px 8.7px, 244.4px 8.7px, 244.4px 0, 100% 0,
+    100% 100%, 0 100%); }
+.design-extended.legendary:is(.normal, .planeswalker, .adventure) .art::before { inset: -7px 0 0; }
+.design-extended.legendary:is(.normal, .planeswalker, .adventure) .art::after { top: 0; height: 10px; box-shadow: none;
+  background: #000;
+  clip-path: polygon(27px 7.7px, 27.6px 7.7px, 27.6px 0, 244.4px 0, 244.4px 7.7px, 245px 7.7px, 245px 9.7px, 227px 9.7px,
+    220px 8.6px, 212px 7.7px, 204px 7.3px, 196px 7px, 188px 6.7px, 84px 6.7px, 76px 7px, 68px 7.3px, 60px 7.7px, 52px 8.6px,
+    45px 9.7px, 27px 9.7px); }

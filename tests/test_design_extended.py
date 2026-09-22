@@ -1,6 +1,7 @@
-"""The extended-art design (mint/designs/extended.css): golden renders of a creature and a legend in it,
-compared pixel-wise against tests/golden/design-extended-*.png the way tests/test_golden.py does, and
-the proof that a layout whose art lives elsewhere (a saga) still renders as M15 in it.
+"""The extended-art design (mint/designs/extended.css): golden renders of a creature, a legend and a common in
+it, compared pixel-wise against tests/golden/design-extended-*.png the way tests/test_golden.py does, the
+features read off the renders (the art in the bleed, the glass type bar, the crown's cut), and the proof that
+a layout whose art lives elsewhere (a saga) still renders as M15 in it.
 
 After an intentional change to the design, regenerate its goldens and commit them:
 
@@ -65,22 +66,44 @@ def test_golden_extended(name, art, tmp_path, browser):
     check(out, GOLDEN / f"design-extended-{name}.png", tmp_path, f"design-extended-{name}")
 
 
+def pixel(im, x, y):
+    """The pixel under a point in card units, at 150 dpi (1.5 px per unit, the card at 11,11 in the page)."""
+    return im.getpixel((int((x + 11) * 1.5), int((y + 11) * 1.5)))
+
+
 @pytest.mark.render
-def test_extended_art_reaches_the_bleed_and_the_type_bar_is_black(art, tmp_path, browser):
-    """The art at the page's edges beside the window, the type bar's face near black, the M15 window's pieces
-    (the coloured band beside the art, the pinline round the type bar) gone: read straight off the render, at
-    150 dpi (1.5 px per card unit, the card at 11,11 in the page)."""
+def test_extended_art_reaches_the_bleed_and_the_type_bar_is_black_glass(art, tmp_path, browser):
+    """The art at the page's edges beside the window, the type bar a black glass over it (its face carries the
+    art's own colour, fading to black at the foot), the M15 window's pieces (the coloured band beside the art,
+    the pinline round the type bar) gone: read straight off the render."""
     out, _ = render("creature", art, tmp_path, browser)
     im = Image.open(out).convert("RGB")
-    u = lambda x, y: im.getpixel((round((x + 11) * 1.5), round((y + 11) * 1.5)))  # card units to a pixel
+    u = lambda x, y: pixel(im, x, y)
     # the M15 art is a gradient from black at its top-left, never grey: the page's edge beside the art carries it
     assert u(-10, 120) != (0, 0, 0) and u(259, 120) != (0, 0, 0)
     assert u(-10, 25) == (0, 0, 0) and u(-10, 300) == (0, 0, 0)  # the bleed is black above and below
-    # the type bar's face, right of its text: near black, well under the M15 bar's light fill
-    r, g, b = u(190, 212)
-    assert max(r, g, b) < 40
+    # the glass: the fixture art's red rises with x, and so does the bar's face just under the rim, darker than
+    # the art above the bar at the same x; at the foot the face is near black whatever the art
+    assert u(60, 192)[0] < u(180, 192)[0]
+    assert u(60, 201)[0] < u(180, 201)[0] < u(180, 192)[0]
+    assert 0.3 < u(180, 201)[0] / u(180, 192)[0] < 0.8
+    assert max(u(190, 214)) < 32
     # and its text is light
     assert any(sum(u(x, 207)) > 600 for x in range(24, 60))
+
+
+@pytest.mark.render
+def test_extended_crown_stops_at_the_bar(art, tmp_path, browser):
+    """A legendary's crown has no tongue beside the art: at y 50 both sides are art (the fixture's flat blue,
+    128, in every art pixel); the plate under the bar bows to 41.7 at the ends, in the crown's own colour, with
+    the black line beneath it."""
+    out, _ = render("legend", art, tmp_path, browser)
+    im = Image.open(out).convert("RGB")
+    u = lambda x, y: pixel(im, x, y)
+    assert all(abs(u(x, 50)[2] - 128) <= 2 for x in (12, 14, 16, 234, 236, 238))
+    assert u(24, 40) == u(24, 38) and u(226, 40) == u(226, 38)  # the plate is the crown at its ends
+    assert u(24, 40)[2] != 128 and max(u(24, 42)) < 40  # not art, and the line under it
+    assert max(u(125, 39.2)) < 40 and abs(u(125, 41)[2] - 128) <= 2  # the middle keeps the M15 line and image
 
 
 @pytest.mark.render
