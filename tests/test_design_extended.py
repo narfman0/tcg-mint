@@ -37,7 +37,8 @@ def render(name, art, tmp_path, browser, design="extended"):
     fonts_css = frame.local_fonts(tmp_path / "no-workspace-fonts")
     html = frame.build_html(card, symbols=DotSymbols(), art_url="file://" + art, theme="wizards", fonts_css=fonts_css,
                             set_size=3, maker="tester", year="2026", design=design)
-    assert f"design-{design}" in html
+    if frame.layout_of(card) not in frame.M15_LAYOUTS:
+        assert f"design-{design}" in html
     out = tmp_path / f"{name}-{design}.png"
     return out, browser.render(html, out)
 
@@ -114,8 +115,15 @@ def test_other_layouts_stay_m15_in_extended(art, tmp_path, browser):
     assert mean < MEAN_TOL and outliers < OUTLIER_FRAC
 
 
-def test_extended_css_is_scoped_to_the_window_layouts():
-    css = frame.design_css("extended")
-    assert ".design-extended:is(.normal, .planeswalker, .adventure)" in css
-    for layout in ("saga", "class", "split", "battle"):
-        assert f".{layout}" not in css.replace("(saga, class, split, battle)", "")
+def test_the_frame_keeps_m15_for_the_layouts_whose_art_is_elsewhere(art):
+    """build_html drops the design for a saga, class, split or battle (frame.M15_LAYOUTS), so no design css
+    needs a layout in its selectors."""
+    from tests.test_golden import DotSymbols
+    for name in ("saga", "split"):
+        card = synthetic_card(**test_golden.CARDS[name])
+        html = frame.build_html(card, symbols=DotSymbols(), art_url="file://" + art, design="extended")
+        assert "design-m15" in html and "design-extended" not in html
+    for d in ("extended", "borderless", "fullart"):
+        css = frame.design_css(d)
+        for layout in frame.M15_LAYOUTS:
+            assert f".{layout}" not in css

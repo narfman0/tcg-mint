@@ -52,12 +52,13 @@
    later in the document at the same z); its texture goes, and a hybrid's second texture with it */
 .design-fullart .frame { left: -11px; right: -11px; top: 323.6px; bottom: -11px; border-radius: 0; background: #000; z-index: 2; }
 .design-fullart .frame::before, .design-fullart .frame::after { display: none; }
-/* a stamped card's text box and its plate are bitten by arcs around the stamp (template.html .stamped): the
-   box's a 21 arc, the plate's a 22.6 arc, both about (125, 338.3), the plate's rim showing between them. The
-   strip grows a black disc of the box's bite (21, 0.15 over so no hairline of art shows at the arc; the plate,
-   painted under the strip, keeps its rim) and the stamp sits on black as it does on the promos */
-.design-fullart.stamped .frame::before { display: block; content: ""; inset: auto; left: calc(50% - 21.15px); top: -6.45px;
-  width: 42.3px; height: 42.3px; border-radius: 50%; background: #000; opacity: 1; }
+/* a stamped card's text box and its plate are bitten by arcs around the stamp (template.html .stamp): the oval's
+   a 24.1 arc about (125, 339.1), the plate's the same arc 2 in, its rim lining the bite. The strip grows a black
+   disc of the box's bite (24.1, 0.15 over so no hairline of art shows at the arc; the plate, painted under the
+   strip, keeps its rim) and the stamp sits on black as it does on the promos. The triangle's and the circle's
+   bites are smaller than the oval's, so the disc covers theirs too */
+.design-fullart.stamped .frame::before { display: block; content: ""; inset: auto; left: calc(50% - 24.25px); top: -8.75px;
+  width: 48.5px; height: 48.5px; border-radius: 50%; background: #000; opacity: 1; }
 
 /* --- a card with rules text: the promo's smoked glass --- */
 /* (any paragraph in the text box but a basic's big symbol). The type bar keeps its outline, caps, bevel and grain

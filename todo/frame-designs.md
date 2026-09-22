@@ -15,8 +15,8 @@ Named after Scryfall's vocabulary, so `auto` can follow the printed card:
 | design | what it is | Scryfall says | art the picture must cover (card units, bleed included where it reaches it) |
 |---|---|---|---|
 | `m15` | the frame as it is | `frame: 2015`, black border | 210.6 x 154 (the window) |
-| `extended` | the art off the card's sides between the title bar and a black type bar, everything else M15 | `frame_effects: extendedart` | 272 x 179 (the page's width, y 37-216; measured phase 2: the printed art reaches the cut edge, and `frame.DESIGNS` still says 230 x 154) |
-| `borderless` | no border and no band: the art runs off the card's edges between the title bar and the type bar; the bars and text box sit where they always do | `border_color: borderless`, `full_art: false` | 272 x 200 |
+| `extended` | the art off the card's sides between the title bar and a black glass type bar, everything else M15 | `frame_effects: extendedart` | 272 x 179.4 (the page's width, y 37-216.4) |
+| `borderless` | no border and no band: the art runs off the card's edges from its top to the type bar; the bars and text box float on it where they always sit, on a pinline plate, the collector line on a black foot | `border_color: borderless`, `full_art: false` | 272 x 206 (the page's width, its top edge to the type bar) |
 | `fullart` | the art under everything; the title bar floating at the top, the type bar and a translucent text plate at the foot; a card with no rules text (a basic) has no plate | `full_art: true` | 272 x 372 (the whole card) |
 
 `auto` (the set default is `m15`; `auto` is opt-in) resolves from the
@@ -76,13 +76,20 @@ each:
 Layouts stay M15 in this pass: a saga, split or battle card in a non-M15
 design renders M15 and `check` says so.
 
-## Phase 3 -- merge and review (merged 2026-09-21; the review pass and the sheet remain)
+## Phase 3 -- merge and review (done 2026-09-22)
 
-Merge the three; render designs x {normal, basic, legendary, rare with
-stamp} into one sheet; one review pass across the three css files so
-their conventions agree (plate opacity, pinline handling, footer strip);
-README section; `mint calibrate` gains a `--design` if the agents made
-measuring reusable.
+Merged the three onto the crown fix; the sheet (designs x creature, legend,
+basic, stamped rare, saga) rendered and looked over; the conventions
+reconciled: the layouts whose art is elsewhere fall back to M15 in
+`build_html` (`frame.M15_LAYOUTS`) instead of each css scoping its own
+selectors three different ways; the card carries `rarity-<r>` so a design
+can style by rarity (extended's set-symbol halo, which had used "not
+stamped" as a stand-in); `frame.DESIGNS` holds the measured rectangles
+(extended 272 x 179.4, borderless 272 x 206); fullart's stamp disc follows
+the re-measured bite. The plate opacities differ by design on purpose --
+each is what its printings do. README section written. Not done: `mint
+calibrate --design` -- the agents measured with one-off scripts, nothing
+reusable came out of it.
 
 ## Decisions
 

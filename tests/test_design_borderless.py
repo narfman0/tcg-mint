@@ -36,7 +36,8 @@ def render(name, art, tmp_path, browser):
     fonts_css = frame.local_fonts(tmp_path / "no-workspace-fonts")
     html = frame.build_html(card, symbols=DotSymbols(), art_url="file://" + art, theme="wizards", fonts_css=fonts_css,
                             set_size=len(LAYOUTS), maker="tester", year="2026", design="borderless")
-    assert "design-borderless" in html and "the picture under everything" in html  # the class, and the css with it
+    if name != "saga":  # the frame keeps M15 for a saga (frame.M15_LAYOUTS)
+        assert "design-borderless" in html and "the picture under everything" in html  # the class, and the css with it
     out = tmp_path / f"design-borderless-{name}.png"
     return out, browser.render(html, out)
 

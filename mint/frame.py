@@ -305,12 +305,15 @@ def stack(families):
 # a restyle or a clip follows its aspect (generation_size), and `check` warns of a crop too far from it.
 #   name: (art width, art height, css file or None for the base frame alone)
 DESIGNS = {
-    "m15": (210.6, 154, None),               # the art window
-    "extended": (230, 154, "extended.css"),  # the window widened to the border, x 10-240
-    "borderless": (272, 200, "borderless.css"),  # off the card's edges between the title bar and the type bar
-    "fullart": (272, 372, "fullart.css"),    # the whole card
+    "m15": (210.6, 154, None),                     # the art window
+    "extended": (272, 179.4, "extended.css"),      # the page's width, from under the title bar to the text box's plate
+    "borderless": (272, 206, "borderless.css"),    # the page's width, from its top edge to the type bar
+    "fullart": (272, 372, "fullart.css"),          # the whole page
 }
 DESIGN_CHOICES = ("auto", *DESIGNS)  # what a set or card entry may say; auto follows the printing
+# the layouts whose art is not the window the designs move (a saga's and a class's beside the text, a split's and
+# a battle's sideways): they render M15 whatever the design, and `check` says so
+M15_LAYOUTS = ("saga", "class", "split", "battle")
 DESIGNS_DIR = PKG / "designs"
 
 
@@ -972,6 +975,8 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
     title, body = THEMES[theme]
     if design not in DESIGNS:
         raise ValueError(f"no frame design {design!r}; one of {', '.join(DESIGNS)}")
+    if layout_of(card) in M15_LAYOUTS:
+        design = "m15"
     kind = frame_kind(card)
     frame, frame_dark, bar, bar_edge, box, pinline = FRAMES[kind]
     tint = land_tint(card)
@@ -1020,7 +1025,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
         legendary=" legendary" if legendary and not turned else "",
         pair=(" pair hybrid" if kind_b != kind else " pair") if pair else "",
         frame_vars=frame_vars or frame_css(),
-        design=f" design-{design}", design_css=design_css(design),
+        design=f" design-{design} rarity-{rarity}", design_css=design_css(design),
         watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout + (" tall" if tall else ""),
         stamp=stamp_html(stamp), stamped=f" stamped stamp-{stamp}" if stamp else "",
         body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else "",

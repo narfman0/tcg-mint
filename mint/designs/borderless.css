@@ -35,11 +35,12 @@
      a 57-unit arc tangent to the cut edge at 269 and meeting the plate's foot; its edge is soft over 3-4 units.
      The planeswalkers only darken toward the foot (Ugin, Chandra: 20-60 lum under the plate against 100-150
      higher; Wrenn and Elminster not at all), the way the black would print through a light picture.
-   The layouts that move the art (saga, class) or lie sideways (split, battle) are out: they render M15.
+   The layouts that move the art (saga, class) or lie sideways (split, battle) render M15: build_html drops the
+   design for them (frame.M15_LAYOUTS).
    Art: the picture must cover 272 x 206 (the page's width, the top edge to the type bar's ring at 195); the
    rest of the page -- the strips beside the plate, the corners -- is the picture again, blown up to cover the
    page and blurred into a wash of its own colours, where the real card shows more of the same painting. */
-.design-borderless:not(.saga, .class, .split, .battle) {
+.design-borderless {
   overflow: visible; border-radius: 0; isolation: isolate;  /* the art reaches into the bleed */
   /* the art at z -1 goes under the plate and the pinlines (z auto) and is still over the card's own black,
      since the card isolates; the frame's pieces stay at 2 */

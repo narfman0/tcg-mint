@@ -434,6 +434,29 @@ Three recipes ship in `mint newset`: `neon` (canny control), `ink`
 (lineart control, monochrome), `glass` (canny). They are starting points;
 the block in the set file is the source of truth once created.
 
+### Frame designs
+
+The frame is M15, and a set (or one card) can ask for one of its modern
+variants with `design`; each is measured off Scryfall scans of real
+printings of its kind, and `mint/designs/<name>.css` carries the numbers:
+
+- `extended` — the art off the card's sides, from under the title bar to
+  the text box; a black-glass type bar over it, the corners feathered
+  black, a legendary's crown cut to the bar (2019+ Commander decks and
+  collector boosters).
+- `borderless` — the picture out to the cut edge on all sides, the M15
+  bars and text box floating on it on a pinline plate, the collector line
+  on a black foot with the picture's corners arced into it.
+- `fullart` — the art under everything; a basic gets the type bar at the
+  foot with the mana medallion, a card with rules text a smoked-glass
+  type bar and text plate, the collector line on a black strip.
+- `auto` — each card takes its printing's design (`full_art`,
+  `border_color`, `frame_effects: extendedart`).
+
+A design steers the default printing to its own kind and sizes restyles
+and clips to its art rectangle. Sagas, classes, splits and battles keep
+the M15 frame whatever the design.
+
 ### Style templates
 
 A style you want to reuse lives in `styles/<name>.json` — a bare style block,

@@ -34,52 +34,52 @@
      right. Beside the crown the art comes up to 33.
    The CMR and MID printings drop the type bar to 213-231 and shorten the text box to 234-322 instead (nine of the
    sixteen sit on the M15 bars, all from ZNR, THB and 2023 on): this design keeps the M15 bars. The layouts whose art
-   is elsewhere (saga, class, split, battle) stay M15, as todo/frame-designs.md says. */
-.design-extended:is(.normal, .planeswalker, .adventure) { overflow: visible; }  /* the art into the bleed */
+   is elsewhere (saga, class, split, battle) render M15: build_html drops the design for them (frame.M15_LAYOUTS),
+   so no rule here needs a layout in its selector. */
+.design-extended { overflow: visible; }  /* the art into the bleed */
 /* the window: the page's width, from 37 beside the bars down to the text box's plate. Its top steps down to the
    black line under the title bar's plate between the feet of the plate's arcs (x 17-233: the arc's underside is
    above 37 outside that), so the plate's bottom 2 stay in view and the art comes up to 37 beside the arcs; the
    corner fades (the ::before) reach above the box into the border. A picture of the M15 shape (1.37:1) is shorter
    than this box: hung from the top, cover crops only its foot, and that lands under the type bar */
-.design-extended:is(.normal, .planeswalker, .adventure) .art { left: -11px; top: 37px; width: 272px; height: 179.4px;
+.design-extended .art { left: -11px; top: 37px; width: 272px; height: 179.4px;
   background-position: center top;
   clip-path: polygon(0 -11px, 28px -11px, 28px 1.7px, 244px 1.7px, 244px -11px, 100% -11px, 100% 100%, 0 100%); }
 /* the art's one black line survives only under the title bar's plate: the ring is pushed down to the image's top
    (39.7) and clipped to its top edge across the step */
-.design-extended:is(.normal, .planeswalker, .adventure) .art::after { top: 2.7px; clip-path: inset(-1px 28px 100% 28px); }
+.design-extended .art::after { top: 2.7px; clip-path: inset(-1px 28px 100% 28px); }
 /* the border's feathered corners over the art's ends: four 21 x 20 patches in the outer 10 of the card and the
    bleed, each a black-to-clear gradient across the measured diagonal (the mid line at 52-58% of the gradient's run,
    4.5 units of feather each side: the scans' airbrush is that soft, and above the art at x < 10 it fades into the
    border's own black) */
-.design-extended:is(.normal, .planeswalker, .adventure) .art::before { content: ""; position: absolute; inset: -11px 0 0;
+.design-extended .art::before { content: ""; position: absolute; inset: -11px 0 0;
   pointer-events: none;
   background: linear-gradient(144deg, #000 42%, transparent 74%) 0 0 / 21px 20px no-repeat,
     linear-gradient(216deg, #000 42%, transparent 74%) 100% 0 / 21px 20px no-repeat,
     linear-gradient(29deg, #000 36%, transparent 68%) 0 100% / 21px 20px no-repeat,
     linear-gradient(331deg, #000 36%, transparent 68%) 100% 100% / 21px 20px no-repeat; }
 /* no pinline round the type bar: it sits on the art with its own outline, and the text box's plate shows beneath */
-.design-extended:is(.normal, .planeswalker, .adventure) .pl-type { display: none; }
+.design-extended .pl-type { display: none; }
 /* the black glass type bar: the bar's fill goes clear, so the M15 outline and its lit top edge stand on the art,
    and the rarity tint's layer (nothing to tint on black) becomes the glass: a third of black over the rim, where
    the bevel's light would otherwise be twice the print's, then the measured grey-to-black down the face (the
    bevel's tail keeps 199.4-200.4 a shade lighter than the print; the fill's own stack cannot be trimmed from
    here). White text; the grain stays */
-.design-extended:is(.normal, .planeswalker, .adventure) .typebar { --bar: transparent; color: #fff; }
-.design-extended:is(.normal, .planeswalker, .adventure) .typebar::before { mix-blend-mode: normal; opacity: 1;
+.design-extended .typebar { --bar: transparent; color: #fff; }
+.design-extended .typebar::before { mix-blend-mode: normal; opacity: 1;
   background: linear-gradient(180deg, rgba(0,0,0,.35) 0, rgba(0,0,0,.35) 1.4px, rgba(32,32,32,.5) 1.4px,
     rgba(28,28,28,.68) 6px, rgba(26,26,26,.83) 10px, rgba(18,18,18,.93) 13.4px, rgba(10,10,10,.96) 16px, #000 100%); }
-/* a common's set symbol is black on black: the printed one carries a white edge (the halo lands on an uncommon's
-   silver too, the class list not naming the rarity; it is faint there) */
-.design-extended:is(.normal, .planeswalker, .adventure):not(.stamped) .typebar .setsym {
+/* a common's set symbol is black on black: the printed one carries a white edge */
+.design-extended.rarity-common .typebar .setsym {
   filter: drop-shadow(0 0 .3px #fff) drop-shadow(0 0 .3px #fff); }
 /* the legendary crown: its badge (frame.crown_paths, an inline clip path) is masked to the measured cut, the fill
    and its outline each to their own edge, the outline's a unit outside the fill's and a unit below its foot so the
    black line along the cut and under the corner is the outline showing past the fill. The fill's foot stops at 16
    (the corner is 16.0-16.1 from 40.7 down), 0.6 short of the badge's own wall at 16.6; the outline is kept off
    the notch's edges (38.4 between 16 and 234) so the fill's anti-aliased foot does not show black through it */
-.design-extended.legendary:is(.normal, .planeswalker, .adventure) .crown {
+.design-extended.legendary .crown {
   mask: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 250 60%22%3E%3Cpath d=%22M0 0 H250 V32.5 H242 L240 33 L238.5 34 L236.8 35.4 L235.7 36.7 L235 38 L234.4 39.4 L234 40.7 V41.7 H16 V40.7 L15.6 39.4 L15 38 L14.3 36.7 L13.2 35.4 L11.5 34 L10 33 L8 32.5 H0 Z%22/%3E%3C/svg%3E") 0 0 / 250px 60px no-repeat; }
-.design-extended.legendary:is(.normal, .planeswalker, .adventure) .crown-o {
+.design-extended.legendary .crown-o {
   mask: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 250 60%22%3E%3Cpath d=%22M0 0 H250 V32.5 H243 L241 33 L239.5 34 L237.8 35.4 L236.7 36.7 L236 38 L235.4 39.4 L235 40.7 V42.7 H234 V38.4 H16 V42.7 H15 V40.7 L14.6 39.4 L14 38 L13.3 36.7 L12.2 35.4 L10.5 34 L9 33 L7 32.5 H0 Z%22/%3E%3C/svg%3E") 0 0 / 250px 60px no-repeat; }
 /* ... and the bowed plate under the bar is the art plate (.pl-art, the pinline colour the crown's ends are) showing
    where the art's clip follows the bow; the art's black line becomes a black box cut to the bow a unit lower, so
@@ -88,14 +88,14 @@
    hangs from 33: four more units of its top go under the bar; the corner fades stay where they are) */
 /* the M15 tongues under the crown's feet (the plate's .pl-crown piece) have no place on the cut badge, and the
    art's plate keeps its M15 top (the base drops it to 43 under the tongues): it is the bowed plate here */
-.design-extended.legendary:is(.normal, .planeswalker, .adventure) .pl-crown { display: none; }
-.design-extended.legendary:is(.normal, .planeswalker, .adventure) .pl-art { top: 37.4px; height: 159px; }
-.design-extended.legendary:is(.normal, .planeswalker, .adventure) .art { top: 33px; height: 183.4px;
+.design-extended.legendary .pl-crown { display: none; }
+.design-extended.legendary .pl-art { top: 37.4px; height: 159px; }
+.design-extended.legendary .art { top: 33px; height: 183.4px;
   clip-path: polygon(0 0, 27.6px 0, 27.6px 8.7px, 45px 8.7px, 52px 7.6px, 60px 6.7px, 68px 6.3px, 76px 6px, 84px 5.7px,
     188px 5.7px, 196px 6px, 204px 6.3px, 212px 6.7px, 220px 7.6px, 227px 8.7px, 244.4px 8.7px, 244.4px 0, 100% 0,
     100% 100%, 0 100%); }
-.design-extended.legendary:is(.normal, .planeswalker, .adventure) .art::before { inset: -7px 0 0; }
-.design-extended.legendary:is(.normal, .planeswalker, .adventure) .art::after { top: 0; height: 10px; box-shadow: none;
+.design-extended.legendary .art::before { inset: -7px 0 0; }
+.design-extended.legendary .art::after { top: 0; height: 10px; box-shadow: none;
   background: #000;
   clip-path: polygon(27px 7.7px, 27.6px 7.7px, 27.6px 0, 244.4px 0, 244.4px 7.7px, 245px 7.7px, 245px 9.7px, 227px 9.7px,
     220px 8.6px, 212px 7.7px, 204px 7.3px, 196px 7px, 188px 6.7px, 84px 6.7px, 76px 7px, 68px 7.3px, 60px 7.7px, 52px 8.6px,
