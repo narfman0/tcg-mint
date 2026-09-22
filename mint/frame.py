@@ -574,6 +574,11 @@ def _badge_path(cx, apex, shoulder, waist, corner, middle, pointed, flip=None):
     return f"{top} {right_side} {bottom} {left_side} {close}"
 
 
+def loyalty_rows(card):
+    """How many rows a planeswalker's text box holds: one per paragraph, loyalty ability or static."""
+    return len((card.get("oracle_text") or "").split("\n"))
+
+
 def loyalty_badge(cost):
     """The badge beside a loyalty ability, an inline SVG under the number: a black face in a silver rim, pointed at
     the top for a "+" ability, at the bottom for a "-", flat both ends for "0". Traced off Chandra, Flameshaper
@@ -600,11 +605,17 @@ def loyalty_badge(cost):
         num_y = (3.8 + 16.3) / 2 + 0.8  # the number sits 0.8 toward the flat end from the face's centre
         if kind == "down":
             num_y = h - num_y
+    # the body's centre (the face without its point: shoulders to flat end), which the row centres (template .lcost)
+    body = (rings[2][1][1] + rings[2][3][1]) / 2
+    if kind == "down":
+        body = h - body
     flip = h if kind == "down" else None
     rim, mid, face = (_badge_path(cx, *ring, pointed=kind != "zero", flip=flip) for ring in rings)
     svg = (f'<svg class="shield" viewBox="0 0 26 {h}" width="26" height="{h}">'
            f'<path d="{rim}" fill="url(#lorim)"/><path d="{mid}" fill="#c4c4c4"/><path d="{face}" fill="#000"/></svg>')
-    return f'<span class="lcost {kind}" style="height:{h}px">{svg}<b style="top:{num_y:.2f}px">{esc(cost)}</b></span>'
+    # the colon the printed card keeps after the badge goes with it (template.html .lcost .colon), level with the number
+    return (f'<span class="lcost {kind}" style="height:{h}px;--body:{body:.2f}px">{svg}'
+            f'<b style="top:{num_y:.2f}px">{esc(cost)}</b><span class="colon" style="top:{num_y:.2f}px">:</span></span>')
 
 
 def loyalty_box(text):
@@ -794,14 +805,14 @@ def render_text(card, symbols, flavor=None, layout="normal"):
     if sym:
         return f'<p class="big-sym"><span class="pip"><img src="{symbols.data_uri(sym)}"></span></p>'
     paras = []
-    if layout == "planeswalker":  # each loyalty ability a row: its cost in a badge, the colon, the text; static ones plain
-        for p in text.split("\n") if text else []:
+    if layout == "planeswalker":  # each loyalty ability a row: its cost in a badge (with the colon), the text; static ones plain
+        for p in text.split("\n") if text else []:  # each row's text is one span, so a mana pip in it stays inline
             m = LOYALTY_RE.match(p)
             if m:
                 badge = loyalty_badge(m.group(1).replace("-", "−"))
-                paras.append(f'<p class="loyal">{badge}<span class="colon">:</span><span>{syms(smart(p[m.end():]))}</span></p>')
+                paras.append(f'<p class="loyal">{badge}<span>{syms(smart(p[m.end():]))}</span></p>')
             else:
-                paras.append(f'<p class="static">{syms(ability_word(smart(p)))}</p>')
+                paras.append(f'<p class="static"><span>{syms(ability_word(smart(p)))}</span></p>')
         return "".join(paras)
     if layout == "saga":  # the reminder line, then a row per chapter with its numerals in a badge
         for p in text.split("\n") if text else []:
@@ -900,7 +911,7 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
     text = render_text(card, symbols, flavor, layout)
     if layout == "planeswalker":  # the box's black outline is a plate of its own under it (template.html .pw-line)
         return (f'{PINLINES}{crown}{title(card)}<div class="art"></div>{typebar(card)}{LOYALTY_DEFS}'
-                f'<div class="pw-line"></div><div class="textbox" id="text">{text}</div>'
+                f'<div class="pw-line"></div><div class="textbox rows{loyalty_rows(card)}" id="text">{text}</div>'
                 f'{loyalty_box(str(card.get("loyalty")))}{other}')
     if layout in ("saga", "class"):
         return f'{title(card)}<div class="art"></div><div class="textbox" id="text">{text}</div>{typebar(card)}{other}'
@@ -984,7 +995,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
     # a planeswalker with four rows or more gets the tall text box, the type bar and the box 23.5 higher and the
     # art that much shorter (measured on Jace, the Mind Sculptor A25 62, Gideon Blackblade WAR 13 and Chandra,
     # Awakened Inferno M20 127, against the three-row Chandra, Flameshaper, Karn and Teferi)
-    tall = layout == "planeswalker" and (card.get("oracle_text") or "").count("\n") >= 3
+    tall = layout == "planeswalker" and loyalty_rows(card) >= 4
     pt = pt_plate(f'{card["power"]}/{card["toughness"]}') if card.get("power") is not None else ""
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
     # the collector line carried through from the printed card: its number and set in a wide sans, the

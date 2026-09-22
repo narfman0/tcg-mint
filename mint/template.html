@@ -302,13 +302,15 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
 .pw-line { position: absolute; left: 29.3px; top: 219.3px; width: 202px; height: 100.2px; background: #000; z-index: 2;
   border-radius: 0 0 39px 39px / 0 0 9.5px 9.5px; }
 .planeswalker .textbox { left: 30.3px; top: 220.2px; width: 200px; height: 98.4px; padding: 0; box-shadow: none;
-  overflow: visible; border-radius: 0 0 38px 38px / 0 0 8.5px 8.5px; font-size: 9.4px;
-  /* the clip reaches 20 left of the box for the badges' overhang; the corners are the ellipses of the border-radius */
-  clip-path: path('M-20 0 H200 V89.9 A38 8.5 0 0 1 162 98.4 H38 A38 8.5 0 0 1 0 89.9 H-20 Z'); }
+  overflow: visible; border-radius: 0 0 38px 38px / 0 0 8.5px 8.5px; font-size: 8.8px;
+  /* the clip reaches 20 left of the box for the badges' overhang, and there runs to the foot's level: a last row's
+     badge points down past the corner's ellipse (Chandra's -4 ends 7 above the foot on the print), over the strip,
+     whose own foot is 3.4 lower still; the corners are the ellipses of the border-radius */
+  clip-path: path('M-20 0 H200 V89.9 A38 8.5 0 0 1 162 98.4 H38 A38 8.5 0 0 1 0 89.9 V98.4 H-20 Z'); }
 /* the stamp's bite in the box's foot and the strip's, the same arcs as the normal frame's about the same centre;
    the stamp rides 2.6 above the box's bottom edge as it does on a creature */
 .planeswalker.stamped .textbox {
-  clip-path: path('M-20 0 H200 V89.9 A38 8.5 0 0 1 162 98.4 H107.9 A21 21 0 0 0 81.5 98.4 H38 A38 8.5 0 0 1 0 89.9 H-20 Z'); }
+  clip-path: path('M-20 0 H200 V89.9 A38 8.5 0 0 1 162 98.4 H107.9 A21 21 0 0 0 81.5 98.4 H38 A38 8.5 0 0 1 0 89.9 V98.4 H-20 Z'); }
 .planeswalker.stamped .pw-line { clip-path: path('M0 0 H202 V100.2 H111.4 A22 22 0 0 0 80 100.2 H0 Z'); }
 .planeswalker.stamped .pl-text {
   clip-path: path('M0 0 H219.6 V93.1 C219.6 105.1 182.4 108.1 170.4 108.1 H127.4 A22.6 22.6 0 0 0 93 108.1 H49.2 C37.2 108.1 0 105.1 0 93.1 Z'); }
@@ -323,44 +325,96 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
   clip-path: path('M0 0 H219.6 V116.6 C219.6 128.6 182.4 131.6 170.4 131.6 H49.2 C37.2 131.6 0 128.6 0 116.6 Z'); }
 .planeswalker.tall .pw-line { top: 195.8px; height: 123.7px; }
 .planeswalker.tall .textbox { top: 196.7px; height: 121.9px;
-  clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H38 A38 8.5 0 0 1 0 113.4 H-20 Z'); }
+  clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H38 A38 8.5 0 0 1 0 113.4 V121.9 H-20 Z'); }
 .planeswalker.tall.stamped .textbox {
-  clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H107.9 A21 21 0 0 0 81.5 121.9 H38 A38 8.5 0 0 1 0 113.4 H-20 Z'); }
+  clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H107.9 A21 21 0 0 0 81.5 121.9 H38 A38 8.5 0 0 1 0 113.4 V121.9 H-20 Z'); }
 .planeswalker.tall.stamped .pw-line { clip-path: path('M0 0 H202 V123.7 H111.4 A22 22 0 0 0 80 123.7 H0 Z'); }
 .planeswalker.tall.stamped .pl-text {
   clip-path: path('M0 0 H219.6 V116.6 C219.6 128.6 182.4 131.6 170.4 131.6 H127.4 A22.6 22.6 0 0 0 93 131.6 H49.2 C37.2 131.6 0 128.6 0 116.6 Z'); }
-/* the rows fill the box top to bottom, each its text centred in its band, every second band shaded (the printed
-   sheet is a shade more transparent there: 214 against 226 over Chandra's art). Rules text is MPlantin at 9.4:
-   an x-height of 4.0 and a line pitch of 8.7 measured on Chandra; the fit shrinks the long ones. A loyalty row is
-   the badge overhanging the box's left edge (its 26-unit box spans 12.4-38.4, centred on the printed badges'
-   25.4), the colon centred in the 7.6 to the text at 46, then the text; a static row's text starts at 34.4 */
-.planeswalker .textbox p { flex: 1 1 auto; display: flex; align-items: center; margin: 0; padding: 0 4px 0 0;
+/* the rows: the printed box is a template of slots, not rows that hug their text. On every three-row scan the
+   bands break at 30.25 and 64.7 below the box's face (Chandra, Flameshaper FDN 81 with 3/3/3 lines, Ajani Steadfast
+   M15 1 3/3/3, Ajani, Caller of the Pride FDN 134 1/2/2, Ajani M20 2, Karn DOM 1, Teferi DOM 207 within 1.5); on
+   every four-row tall box at 30.4, 60.1 and 87.1 (Jace, the Mind Sculptor A25 62 with 3/2/1/3 lines, Garruk, Apex
+   Predator M15 210 1/2/2/3, Chandra, Awakened Inferno M20 127); a two-row card breaks at 26.2 (Narset, Parter of
+   Veils CMM 853). A row grows past its slot only when its text must (Vivien Reid FDN 234's four-line +1: 38.3;
+   Chandra, Dressed to Kill INR 148's five-line -7: 43.1), and then the other slots give way toward their own text
+   (Vivien's -3 row: 26.6) before the text shrinks; the last row takes what is left; a card of five rows or more
+   (Kaito, Bane of Nightmares DSK 220, Ugin, Eye of the Storms TDM 1) shares the leftover out equally over its
+   text. The slots here are the scans' at 0.988 (our box is 98.4 to the scans' 99.6), as flex bases: a flex item's
+   automatic minimum is its content, so a slot holds its text at least. Each row's text is centred in its band
+   (within 1 on every scan); every second band is shaded (the printed sheet is a shade more transparent there:
+   214 against 226 over Chandra's art). Rules text is MPlantin at 8.8: the print's "Chandra deals 8 damage divided
+   as you" runs 151.5 wide to our 162.6 at 9.4 (0.932, word for word), its x-height 3.7 to our 4.0; the line pitch
+   is 8.75 on the scan, the base .98 once the box's 0.988 is taken off; the fit shrinks the long ones. A loyalty
+   row's text starts at 46 past the badge and its colon (below) and runs to 227.5 (the print's lines reach 226.8,
+   and ours are 0.5% wider word for word: the margin lets the same words share a line); a static row's starts at
+   34.4. */
+.planeswalker .textbox p { flex: 1 0 auto; display: flex; align-items: center; margin: 0; padding: 0 2.8px 0 0;
   position: relative; z-index: 0; }
+/* a loyalty row is never shorter than its badge with its ride (2 x 11.15): a badge poking past the row's foot would
+   be scrollable overflow, and the fit would shrink the text to the floor chasing it. The print's short rows
+   (Ugin's +2 and 0 at 21.2 and 17.8) let the badges overlap the neighbouring bands instead. The floor is an empty
+   flex item of that height, not a min-height: a min-height of its own would replace a flex item's automatic
+   minimum (its content), and a slot could then squeeze a row's text out of it */
+.planeswalker .textbox p.loyal { padding-left: 15.7px; }
+.planeswalker .textbox p.loyal::after { content: ""; flex: none; width: 0; height: 22.4px; }
+/* the first row's text starts 3.3-4 below the box's top on the scans (Chandra, Ajani M15 1, Jace A25 62), a
+   unit lower than centred; the last row's keeps 4.7-6 clear of the foot (Chandra, Ugin TDM 1) and so of the
+   stamp's bite, which the fit does not look at */
+.planeswalker .textbox p:first-child { padding-top: 2px; }
+.planeswalker .textbox p:last-child { padding-top: 3px; padding-bottom: 3px; }
 .planeswalker .textbox p.static { padding-left: 4.1px; }
+.planeswalker .rows2 p:last-child, .planeswalker .rows3 p:last-child, .planeswalker .rows4 p:last-child { flex: 1 1 auto; }
+.planeswalker .rows2 p:nth-child(1) { flex: 0 1 25.9px; }
+.planeswalker .rows3 p:nth-child(1) { flex: 0 1 29.9px; }
+.planeswalker .rows3 p:nth-child(2) { flex: 0 1 34px; }
+.planeswalker .rows4 p:nth-child(1) { flex: 0 1 30px; }
+.planeswalker .rows4 p:nth-child(2) { flex: 0 1 29.3px; }
+.planeswalker .rows4 p:nth-child(3) { flex: 0 1 26.7px; }
 /* the shaded band is a layer under the row's text, torn along its top and bottom by the noise filter in
    frame.LOYALTY_DEFS. It fills the row exactly: a layer poking out of it would count toward the box's scrollHeight and
     the fit would shrink the text to the floor; the filter's ink beyond the row is not layout, and the box's clip
    cuts what a last row's tear pushes past the foot */
 .planeswalker .textbox p:nth-child(even)::before { content: ""; position: absolute; inset: 0; z-index: -1;
   background: rgba(0,0,0,.06); filter: url(#lotear); }
-.planeswalker .textbox p .colon { flex: none; width: 7.6px; text-align: center; }
-.planeswalker .textbox p > span:last-child { flex: 1 1 auto; }
-/* a badge (frame.loyalty_badge draws it as an inline SVG): the number white in the title face, Beleren digits 7.6
-   tall on the scans (0.72 em), centred on the face and nudged down as the P/T is */
-.lcost { position: relative; flex: none; width: 26px; margin-left: -17.9px;
-  filter: drop-shadow(.6px .8px .5px rgba(0,0,0,.4)); }
-.lcost .shield { position: absolute; left: 0; top: 0; width: 26px; display: block; }
+.planeswalker .textbox p > span { flex: 1 1 auto; }
+/* a badge (frame.loyalty_badge draws it as an inline SVG) overhangs the box's left edge, its 26-unit box spanning
+   12.4-38.4 (centred on the printed badges' 25.4). It is the body of the badge -- the face without its point,
+   shoulders to flat end -- that sits centred on the row, so a "+" badge rides up and a "-" badge down by the
+   point (measured against the bands on Chandra FDN 81: the bodies 0.9 above, 2.0 and 0.7 below their bands'
+   centres; on Vivien Reid FDN 234: 1.0, 0.2 and 1.3 above; --body is the body's centre in the badge's box, from
+   frame.loyalty_badge). It takes no part in the row's flow: a row's height is its text's or its slot's. The number
+   is white in the title face, Beleren digits 7.6 tall on the scans (0.72 em), centred on the face and nudged down
+   as the P/T is; the colon that follows is the rules face's at 13 (its dots 1.7 tall and 6 from top to bottom on
+   the scan, the rules text's are 1.1 and 3.7), centred on 41.25 (40.5-42 on the print), level with the number
+   (the printed colons sit within 0.7 of the badges' bodies' centres on Chandra, Ajani M15 1 and Karn DOM 1) */
+.lcost { position: absolute; left: -17.9px; top: 50%; margin-top: calc(-1 * var(--body)); width: 26px; }
+/* in a short last row a "-" badge's point would reach the box's foot: it rides up until the point clears it by 6
+   (a row under 34.5 tall; the print's Kaito, Bane of Nightmares DSK 220 keeps its -2 badge 6.3 above the foot
+   in a 28.3 row, 3.4 above the row's centre) */
+.planeswalker .textbox p:last-child .lcost.down { top: min(50%, calc(100% - 17px)); }
+/* the badge's shadow is a hard dark band 2.4 deep straight under it on the print (46 over the strip's 191, 88 over
+   the face's 226 at every x under the +2, a shade at 0.5 off the right edge): a drop 2 down, barely blurred, on
+   the plate alone (the colon casts none). Chromium floors a drop-shadow's offsets to whole CSS px, so the values
+   are whole */
+.lcost .shield { position: absolute; left: 0; top: 0; width: 26px; display: block;
+  filter: drop-shadow(0 2px .6px rgba(0,0,0,.6)); }
 .lcost b { position: absolute; left: 0; width: 26px; text-align: center; line-height: 1;
   transform: translateY(calc(-50% + var(--pt-dy))); color: #fff; font-family: var(--title-font); font-weight: 700;
   font-size: 10.5px; }
+.lcost .colon { position: absolute; left: 25px; width: 7.6px; text-align: center; line-height: 1;
+  transform: translateY(-50%); color: var(--ink); font-size: 13px; }
 /* the loyalty shield (frame.loyalty_box): 36 x 23 with the horn tips at y 2.2, placed so the tips sit at 309.2 and
-   the point at 327.5 (15.3 above and 3 below the frame's foot), centred on x 218.9; its number Beleren at 12.1,
-   0.5 below the shape's centre; the credit line of the footer keeps under it (.footer.has-pt) */
+   the point at 327.5 (15.3 above and 3 below the frame's foot), centred on x 218.9 (the face's edges land within
+   0.4 of the scan's down five columns). Its number is Beleren at 13.7: the printed "6" is 9.76 tall (315.7-325.4
+   on the scan, 9.1-9.8 on Karn, Ajani, Teferi and Jace), ours 9.83, its centre 10.35 below the horn tips on the
+   print; Chromium snaps text to whole CSS px, so the nearest it lands is 0.5 low. The credit line of the footer
+   keeps under it (.footer.has-pt) */
 .loyalty { position: absolute; left: 200.9px; top: 307px; width: 36px; height: 23px; color: #fff;
   filter: drop-shadow(.5px .7px .5px rgba(0,0,0,.35)); }
 .loyalty .shield { position: absolute; left: 0; top: 0; width: 36px; height: 23px; display: block; }
-.loyalty span { position: absolute; left: 0; width: 36px; top: 12.55px; text-align: center; line-height: 1;
-  transform: translateY(calc(-50% + var(--pt-dy))); font-family: var(--title-font); font-weight: 700; font-size: 12.1px; }
+.loyalty span { position: absolute; left: 0; width: 36px; top: 13.6px; text-align: center; line-height: 1;
+  transform: translateY(calc(-50% + var(--pt-dy))); font-family: var(--title-font); font-weight: 700; font-size: 13.7px; }
 /* saga: chapters down the left, the art the full height on the right, the type line under both */
 .saga .art { left: 125.6px; top: 38.7px; width: 109px; height: 262px; }
 .saga .textbox { left: 15.4px; top: 38.7px; width: 109px; height: 262px; padding: 5px 4px; font-size: 9.6px; justify-content: flex-start; }
