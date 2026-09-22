@@ -772,6 +772,37 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
             f'<div class="textbox {cls}" id="text">{text}{other}</div>{pt_html}')
 
 
+# The security stamp at the foot of the text box, by Scryfall's security_stamp: the holofoil oval of every rare and
+# mythic since M15 (oval), Universes Beyond's triangle at every rarity, the Un-sets' acorn in the oval's bite, the
+# Signature Spellbooks' circle; a heart stamp takes the oval's place. Arena's stamp is a digital marking and a paper
+# card has none. A rare or mythic whose printing predates the stamp (no field) still takes the oval: the card is
+# drawn in the M15 frame, where a rare has one.
+STAMPS = {"oval": "oval", "triangle": "triangle", "acorn": "acorn", "circle": "circle", "heart": "oval", "arena": None}
+
+
+def stamp_kind(card):
+    """Which security stamp a card's foot carries: a key of STAMPS' values, or None."""
+    s = card.get("security_stamp")
+    if s in STAMPS:
+        return STAMPS[s]
+    return "oval" if card.get("rarity") in ("rare", "mythic") else None
+
+
+# the acorn, drawn in a 12 x 12 box: a domed cap over a rounded nut, the stalk on top
+ACORN = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12">'
+         '<path d="M6 .4 Q6.9 1.2 6.3 2.2" fill="none" stroke="#dcdcdc" stroke-width=".8" stroke-linecap="round"/>'
+         '<path d="M1.6 5.6 Q6 1.2 10.4 5.6 Q6 6.8 1.6 5.6 Z" fill="#e6e6e6"/>'
+         '<path d="M2.4 5.9 Q6 7 9.6 5.9 Q9.2 10 6 11.6 Q2.8 10 2.4 5.9 Z" fill="#bdbdbd"/></svg>')
+
+
+def stamp_html(kind):
+    """The stamp element for a kind, "" for none."""
+    if not kind:
+        return ""
+    inner = f'<img src="data:image/svg+xml;base64,{base64.b64encode(ACORN.encode()).decode()}" alt="">' if kind == "acorn" else ""
+    return f'<div class="stamp {kind}">{inner}</div>'
+
+
 def collector_number(card):
     """The number as the card prints it: three digits for a plain number, as-is for A1 or 12★."""
     n = card["collector_number"]
@@ -822,7 +853,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
               f'{BRUSH}<span class="artist">{esc(card["artist"])}</span></span>'
               f'<span class="credit">{year} · {esc(maker)}</span></div>')
     turned = layout in ("split", "battle")  # sideways: no stamp or crown; a battle's footer rides inside the turned box
-    stamped = rarity in ("rare", "mythic") and not turned
+    stamp = stamp_kind(card) if not turned else None
     tpl = string.Template((PKG / "template.html").read_text())
     return tpl.substitute(
         font_link=font_link(title + body), local_fonts=fonts_css,
@@ -835,7 +866,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
         frame_vars=frame_vars or frame_css(),
         design=f" design-{design}", design_css=design_css(design),
         watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout,
-        stamp='<div class="stamp"></div>' if stamped else "", stamped=" stamped" if stamped else "",
+        stamp=stamp_html(stamp), stamped=f" stamped stamp-{stamp}" if stamp else "",
         body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else "",
                        crown=crown_html() if legendary and not turned else "", set_icon=set_icon),
         footer="" if layout == "battle" else footer,

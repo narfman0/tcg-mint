@@ -100,7 +100,10 @@ kind of entry; `sets/` and `styles/` are yours and git ignores both):
   artifacts and gold, sand on lands, grain on colorless; generated, not
   copied), `art_bevel` (the black line around the art),
   `box_grain` (linen grain over the bars and text box), `foil_stamp` (the
-  holofoil oval under the text box on rares and mythics) and `rarity_tint`
+  security stamp under the text box: the holofoil oval of a rare or mythic,
+  or the printing's own -- Universes Beyond's triangle at any rarity, the
+  Un-sets' acorn, the Signature Spellbooks' circle -- each with its bite out
+  of the text box) and `rarity_tint`
   (the bars tinted silver, gold or orange by rarity). The defaults are the
   texture, the bevel, the grain and the stamp on; each reaches the frame as a CSS custom property of
   the same name (`--art-bevel`), so the set's css can still override any.

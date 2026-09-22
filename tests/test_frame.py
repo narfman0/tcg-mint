@@ -236,9 +236,9 @@ def test_frame_knobs_reach_the_page_as_custom_properties(card, art):
     assert "--watermark: 0.3;" in frame.frame_css({"watermark": 0.3})
     html = frame.build_html({**card, "rarity": "common"}, symbols=NoSymbols(), art_url="file://" + art,
                             frame_vars=frame.frame_css({"art_bevel": 0}))
-    assert "--art-bevel: 0;" in html and 'class="stamp"' not in html      # a common: no foil stamp
+    assert "--art-bevel: 0;" in html and 'class="stamp ' not in html      # a common: no foil stamp
     rare = frame.build_html({**card, "rarity": "mythic"}, symbols=NoSymbols(), art_url="file://" + art)
-    assert 'class="stamp"' in rare and "--rarity-hi: #f7a23c" in rare and "--art-bevel: 1.0;" in rare
+    assert 'class="stamp oval"' in rare and "--rarity-hi: #f7a23c" in rare and "--art-bevel: 1.0;" in rare
 
 
 def test_mono_colour_lands_take_their_colours_pinline():
@@ -278,7 +278,7 @@ def test_two_colour_frames():
 def test_two_colour_frames_in_the_page(art):
     dual = synthetic_card(colors=[], type_line="Land", produced_mana=["G", "U"], power=None)
     html = frame.build_html(dual, symbols=NoSymbols(), art_url="file://" + art)
-    assert 'class="card normal stamped pair design-m15"' in html
+    assert 'class="card normal stamped stamp-oval pair design-m15"' in html
     assert f"--pinline: {frame.FRAMES['G'][5]}" in html and f"--pinline-b: {frame.FRAMES['U'][5]}" in html
     assert f"--box: {frame.DUAL_BOX['G']}" in html and f"--box-b: {frame.DUAL_BOX['U']}" in html
     assert f"--bar: {frame.PAIR_BAR}" in html
@@ -288,7 +288,7 @@ def test_two_colour_frames_in_the_page(art):
             return "data:,"
     hybrid = synthetic_card(colors=["G", "W"], mana_cost="{G/W}")
     html = frame.build_html(hybrid, symbols=DotSymbols(), art_url="file://" + art)
-    assert 'class="card normal stamped pair hybrid design-m15"' in html
+    assert 'class="card normal stamped stamp-oval pair hybrid design-m15"' in html
     assert f"--frame: {frame.FRAMES['G'][0]}" in html and f"--frame-b: {frame.FRAMES['W'][0]}" in html
     assert f"--box: {frame.FRAMES['G'][4]}" in html and f"--box-b: {frame.FRAMES['W'][4]}" in html
     assert html.count("data:image/svg+xml;base64,") >= 2  # the two textures
@@ -318,3 +318,24 @@ def test_build_html_carries_the_design(card, art):
     import pytest
     with pytest.raises(ValueError):
         frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, design="retro")
+
+
+def test_stamp_follows_the_printing(card, art):
+    assert frame.stamp_kind(synthetic_card(rarity="rare")) == "oval"  # no field: the M15 rare's oval
+    assert frame.stamp_kind(synthetic_card(rarity="common")) is None
+    assert frame.stamp_kind(synthetic_card(rarity="common", security_stamp="triangle")) == "triangle"
+    assert frame.stamp_kind(synthetic_card(rarity="rare", security_stamp="arena")) is None
+    assert frame.stamp_kind(synthetic_card(rarity="uncommon", security_stamp="acorn")) == "acorn"
+    assert frame.stamp_kind(synthetic_card(rarity="rare", security_stamp="heart")) == "oval"
+    page = lambda **o: frame.build_html(synthetic_card(**o), symbols=NoSymbols(), art_url="file://" + art)
+    html = page(rarity="common", security_stamp="triangle")
+    assert "stamped stamp-triangle" in html and '<div class="stamp triangle"></div>' in html
+    html = page(rarity="uncommon", security_stamp="acorn")
+    assert '<div class="stamp acorn"><img src="data:image/svg+xml;base64,' in html
+    html = frame.build_html(synthetic_card(rarity="common"), symbols=NoSymbols(), art_url="file://" + art)
+    assert '<div class="card normal design-m15">' in html and 'class="stamp ' not in html
+    html = frame.build_html(synthetic_card(rarity="rare", layout="split", security_stamp="oval",
+                                           card_faces=[dict(name="A", type_line="Instant", mana_cost="", oracle_text="x"),
+                                                       dict(name="B", type_line="Instant", mana_cost="", oracle_text="y")]),
+                            symbols=NoSymbols(), art_url="file://" + art)
+    assert '<div class="card split design-m15">' in html  # sideways cards carry none
