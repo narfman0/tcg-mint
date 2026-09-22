@@ -59,6 +59,7 @@ def test_concurrent_rebuilds_serialize(bulk, monkeypatch):
     see a stale index at once. One builds, the rest wait and use it -- no two builders racing
     into 'index already exists', no thread left holding the write lock."""
     import threading
+
     from mint import cards as mod
     gate = threading.Barrier(4)
     real = mod.Cards.build
