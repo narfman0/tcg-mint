@@ -70,8 +70,7 @@ def main(argv=None):
         server.require()
         cards, art = Cards(ws.cards_file), Art(ws.art)
         for name in names:
-            entry = st.card({"name": name}) if st else sets.CardEntry()
-            card = cards.find(name, entry.printing)
+            card = cards.find(name, *(st.lookup(name) if st else (None, None)))
             v, made = enhance(server, art, card, a.model, a.base, a.force)
             print(f"{'enhanced' if made else 'cached  '} {card['name']} -> {os.path.relpath(v.path)}")
     except MintError as e:

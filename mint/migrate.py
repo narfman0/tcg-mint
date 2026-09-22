@@ -35,9 +35,8 @@ def claims_for_set(cards, art, st, dry_run=False):
         if not dry_run:
             sets.save(st.path, st)
     for name in st.names():
-        entry = st.card({"name": name})
         try:
-            card = cards.find(name, entry.printing)
+            card = cards.find(name, *st.lookup(name))
         except MintError as e:
             print(f"  skip {name}: {e}")
             continue

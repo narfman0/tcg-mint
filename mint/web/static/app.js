@@ -844,6 +844,9 @@ async function card(r) {
           <span>printing</span><span class="printing"><button class="small" id="printing" title="which Scryfall printing's art this card starts from">
             ${c.entry.printing ? esc(c.entry.printing.toUpperCase()) : `${esc(c.card.set.toUpperCase())} ${esc(c.card.collector_number)} · default`} ▾</button>
             <span class="muted" id="printing-n"></span><div class="printings" id="printings" hidden></div></span>
+          <span title="the frame design this card renders in: the set's unless the card says; auto follows the printing">design</span><span class="row">
+            <select id="design">${designOptions(c.entry.design, `the set's (${st.design || 'm15'})`)}</select>
+            <span class="muted">renders as <b>${esc(c.design || 'm15')}</b>${c.design && c.design !== 'm15' ? ' — phase 2 of todo/frame-designs.md draws it; until then it is M15' : ''}</span></span>
           <span>subject</span><span class="row"><input type="text" id="subject" style="width:36em;max-width:100%" value="${esc(c.entry.subject || '')}" placeholder="this card's own words, ahead of the style prompt: who is in it, the pose, the scene">
             <button class="small" id="describe" ${describer.ready ? '' : 'disabled'} title="${esc(describer.ready ? `${describer.kind} (${describer.model}) reads the ${esc(c.entry.base || st.base || 'crop')} image and the card's text and writes the subject line${c.entry.subject ? ', replacing this one' : ''}` : `no describer: ${describer.hint}`)}">from the picture</button></span>
           ${motionRow(c)}
@@ -880,7 +883,7 @@ async function card(r) {
     const tile = (p, key, head, note, on) => `<div class="p ${on ? 'on' : ''} ${p.penalty >= 100 ? 'unusable' : ''}" data-p="${key}" title="${esc(p.set_name || '')}">
         <div class="pic">${p.illustration_id ? `<img loading="lazy" src="${cardUrl}/printings/${p.set}:${encodeURIComponent(p.collector_number)}/crop?w=320" alt="">` : '<span class="none">no art</span>'}</div>
         <div class="cap"><b>${head}</b> <span class="muted">${esc(p.artist || '')}</span><small>${esc(note)}</small></div></div>`;
-    const note = p => [p.released_at?.slice(0, 4), ...(p.odd || [])].filter(Boolean).join(' · ');
+    const note = p => [p.released_at?.slice(0, 4), p.design && p.design !== 'm15' ? `${p.design} design` : '', ...(p.odd || [])].filter(Boolean).join(' · ');
     box.innerHTML = (d ? tile(d, '', `default → ${d.set.toUpperCase()} ${d.collector_number}`, 'the newest plain printing; follows the card file', !c.entry.printing) : '') +
       ps.map(p => tile(p, `${p.set}:${p.collector_number}`, `${p.set.toUpperCase()} ${p.collector_number}`, note(p), p.selected)).join('');
     box.querySelectorAll('.p').forEach(el => el.onclick = () => { box.hidden = true; put({printing: el.dataset.p || null}); });
@@ -894,6 +897,7 @@ async function card(r) {
   document.querySelectorAll('details.menu').forEach(d => d.onclick = e => e.stopPropagation());
   document.onkeydown = e => { if (e.key === 'Escape' && $('#printings') && !$('#printings').hidden) { $('#printings').hidden = true; e.preventDefault(); } };
   $('#subject').onchange = e => put({subject: e.target.value || null});
+  $('#design').onchange = e => put({design: e.target.value || null});
   $('#motion').onchange = e => put({motion: e.target.value || null});
   $('#mloop').onchange = e => { state.motion.loop = e.target.value; };
   $('#mlength').onchange = e => { state.motion.length = +e.target.value; };
@@ -1125,6 +1129,11 @@ function frame() {
     <div class="row"><h1>${esc(code)} <span class="muted">frame</span></h1><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a>
       <select id="fcard">${st.cards_detail.map(x => `<option ${x.name === F.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
     <div class="panel" style="margin-bottom:16px">
+      <h2>frame design</h2>
+      <div class="toolbar"><select id="sdesign">${designOptions(st.design, 'm15')}</select>
+        <span class="muted">which frame the set's cards render in (frame.DESIGNS): the M15 frame, its art window widened (extended), the art off the card's sides (borderless), or under everything (fullart); <span class="mono">auto</span> follows each card's printing. A card's own page can override it. The designs beyond M15 are drawn in phase 2 of todo/frame-designs.md; until then they render as M15</span></div>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
       <h2>frame knobs</h2>
       ${knobsHtml(knobs, fr)}
       <div class="toolbar"><span class="muted">each a strength, 0 = off; saved to the set's frame block as you let go, and a proof shows them. The css below can still override any (<span class="mono">--art-bevel</span> and so on)</span>
@@ -1152,6 +1161,9 @@ function frame() {
       </div>
     </div>`;
   $('#fcard').onchange = e => { F.name = e.target.value; frame(); };
+  $('#sdesign').onchange = e => api(`/api/sets/${code}/design`, {method: 'PUT', body: {design: e.target.value || null}})
+    .then(d => { Object.assign(st, d); toast(`design: ${st.design || 'm15'}`); if (route().view === 'frame') frame(); })
+    .catch(e => toast(e.message, true));
   const putFrame = body => api(`/api/sets/${code}/frame`, {method: 'PUT', body})
     .then(d => { st.frame = d; toast('frame knobs saved'); if (route().view === 'frame') frame(); })  // not if the page moved on meanwhile
     .catch(e => toast(e.message, true));
@@ -1164,6 +1176,12 @@ function frame() {
   $('#getscan').onclick = () => api(`/api/sets/${code}/cards/${encodeURIComponent(F.name)}/scan`, {method: 'POST'}).then(d => { F.scan = d.path; frame(); }).catch(e => toast(e.message, true));
   $('#op').oninput = e => { F.opacity = +e.target.value; const o = $('#ours'); if (o) o.style.opacity = 1 - F.opacity / 100; };
   document.querySelectorAll('[data-open]').forEach(p => p.onclick = () => window.open(file(p.dataset.open), '_blank'));
+}
+
+/* the frame design select: the workspace's names (frame.DESIGN_CHOICES), an empty first option for "unset" */
+function designOptions(value, unset) {
+  return [['', unset], ...(state.ws.designs || []).map(d => [d, d])]
+    .map(([v, t]) => `<option value="${v}" ${(value || '') === v ? 'selected' : ''}>${esc(t)}</option>`).join('');
 }
 
 /* --- the frame knobs: a slider per sets.Frame field, on the frame page and the styles page --- */

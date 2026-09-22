@@ -7,11 +7,14 @@
       "motion": {...},                     the animate recipe (Motion below; animate.py explains the knobs)
       "base": "spore",                     what every restyle starts from: a restyle label (that card's newest
                                            variant with it) or a variant hash; default the crop
+      "design": "m15",                     the frame design (frame.DESIGNS: m15, extended, borderless, fullart)
+                                           or "auto" to follow each card's printing; default m15
       "cards": {
         "Card Name": {"number": 1, "flavor": "...", "art": "path.png", "art_filter": "...",
                       "subject": "what the picture is of", "printing": "rvr:40",
                       "base": "<variant hash>", "pose": "<variant hash>", "seed": 123,
-                      "pick": "<variant hash>", "motion": "what moves in this card's clip"}
+                      "pick": "<variant hash>", "motion": "what moves in this card's clip",
+                      "design": "fullart"}
       }
     }
 
@@ -86,6 +89,8 @@ class Style:
     controlnet: str = "controlnet-union-sdxl-promax.safetensors"
     upscaler: str = "4x-UltraSharp.pth"
     loras: list = field(default_factory=list)  # [{"name": "x.safetensors", "strength": 0.7}]
+    # the generation size. Left at the defaults it follows the card's frame design (frame.generation_size:
+    # 1248x912 on the M15 window, portrait on full art); spelled out in the file, it is used as written
     width: int = 1248
     height: int = 912
     grayscale_source: bool = False
@@ -151,8 +156,8 @@ class Motion:
     prompt: str = "hair drifts as if underwater, fabric sways, the figure breathes slowly; the camera is still"
     negative: str = "static, still image, frozen, blurry, low quality, text, watermark, flicker, jump cut"
     remix: str = "animate"                 # MOTION_REMIX: animate the styled art (I2V) | new: from words alone (T2V)
-    width: int = 832                       # the art window is 1.42:1; both multiples of 32
-    height: int = 576
+    width: int = 832                       # multiples of 32; left at the defaults they follow the card's frame
+    height: int = 576                      # design (frame.generation_size), as Style's do
     length: int = 49                       # frames, 4n+1; 49 at 24 fps is two seconds, 81 is ~3.4 s
     fps: int = 24
     steps: int = 20
@@ -229,6 +234,7 @@ class CardEntry:
     remix: str | None = None         # this card's remix mode (REMIX), instead of the style's
     pick: str | None = None          # the variant hash --styled renders use, instead of the recipe's
     motion: str | None = None        # animate: what moves in this card's clip, in place of the motion prompt
+    design: str | None = None        # this card's frame design (frame.DESIGNS or "auto"), instead of the set's
 
 
 @dataclass
@@ -242,6 +248,7 @@ class SetFile:
     motion: Motion | None = None               # how the art is animated; None = Motion's defaults
     frame: Frame | None = None                 # the frame's dressing; None = the defaults
     base: str | None = None                    # every card's restyle base unless its entry says: hash or label
+    design: str | None = None                  # every card's frame design unless its entry says; None = m15
     cards: dict = field(default_factory=dict)  # name -> CardEntry, in collector order
     # not part of the file
     path: Path | None = field(default=None, compare=False)
@@ -257,6 +264,29 @@ class SetFile:
 
     def position(self, name):
         return list(self.cards).index(name) if name in self.cards else 0
+
+    def lookup(self, name):
+        """What Cards.find needs for this name: the entry's printing, and the design the set or the entry
+        asked for by name (None when neither did, or when it is auto -- the printing decides then)."""
+        entry = self.card({"name": name})
+        design = entry.design or self.design
+        return entry.printing, (design if design and design != "auto" else None)
+
+    def design_of(self, record):
+        """The frame design this card renders in (a key of frame.DESIGNS): its entry's, else the set's,
+        else m15; "auto" at either level follows the printing (frame.printed_design)."""
+        from . import frame
+        d = self.card(record).design or self.design or "m15"
+        return frame.printed_design(record) if d == "auto" else d
+
+    def _generation_size(self, block, record):
+        """The (width, height) a restyle or a clip of this card is made at: the block's own when the
+        file spells them, else the size that fits the card's design at the block's default budget."""
+        from . import frame
+        design = self.design_of(record)
+        if design == "m15" or "width" in block.explicit or "height" in block.explicit:
+            return block.width, block.height  # the defaults are the M15 window's size
+        return frame.generation_size(design, block.width * block.height)
 
     def card_seed(self, name, illustration_id, style=None):
         """This card's seed: pinned in its entry, else derived from the style's seed by its rule."""
@@ -279,6 +309,7 @@ class SetFile:
             return None
         entry = self.card(record)
         r = {k: v for k, v in dataclasses.asdict(style).items() if k not in ("name", "seed_rule", "explicit")}
+        r["width"], r["height"] = self._generation_size(style, record)
         # no-op knobs stay out of the hash, so older variants keep their names
         if r["clip_skip"] == 1:
             del r["clip_skip"]
@@ -327,6 +358,7 @@ class SetFile:
         motion = motion or self.motion or Motion()
         entry = self.card(record)
         r = {k: v for k, v in dataclasses.asdict(motion).items() if k not in ("name", "seed_rule", "explicit")}
+        r["width"], r["height"] = self._generation_size(motion, record)
         # knobs that do nothing stay out of the hash, so a clip keeps its name when they change
         if r["loop"] != "crossfade":
             del r["crossfade"]
@@ -382,7 +414,7 @@ class SetFile:
     # --- (de)serialisation --------------------------------------------------
     def to_dict(self):
         d = {"code": self.code, "name": self.name}
-        for k in ("size", "note", "art_filter", "base"):
+        for k in ("size", "note", "art_filter", "base", "design"):
             if getattr(self, k) is not None:
                 d[k] = getattr(self, k)
         if self.style:
@@ -483,10 +515,18 @@ def from_dict(d, where="set"):
     if not isinstance(cards, dict):
         raise SetError(f"{where}: cards must be an object of name -> entry")
     st.cards = {n: _build(CardEntry, e or {}, f"{where}: cards[{n!r}]") for n, e in cards.items()}
+    _check_design(st.design, where)
     for n, e in st.cards.items():
         if e.pick is not None and not re.fullmatch(r"[0-9a-f]{8}", e.pick):
             raise SetError(f"{where}: cards[{n!r}]: pick should be a variant hash (8 hex characters), not {e.pick!r}")
+        _check_design(e.design, f"{where}: cards[{n!r}]")
     return st
+
+
+def _check_design(design, where):
+    from . import frame
+    if design is not None and design not in frame.DESIGN_CHOICES:
+        raise SetError(f"{where}: design must be one of {', '.join(frame.DESIGN_CHOICES)}, not {design!r}")
 
 
 def load(path):

@@ -31,7 +31,7 @@ Repository = "https://github.com/narfman0/tcg-mint"
 packages = ["mint"]
 
 [tool.setuptools.package-data]
-mint = ["*.html", "fonts/*", "web/static/*"]
+mint = ["*.html", "designs/*", "fonts/*", "web/static/*"]
 
 [tool.ruff]
 line-length = 130

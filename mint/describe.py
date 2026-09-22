@@ -224,7 +224,7 @@ def main(argv=None):
         cards, art = Cards(ws.cards_file), Art(ws.art)
         for name in names:
             entry = st.card({"name": name})
-            card = cards.find(name, entry.printing)
+            card = cards.find(name, *st.lookup(name))
             if entry.subject and not a.force:
                 print(f"kept      {card['name']}: {entry.subject}")
             else:

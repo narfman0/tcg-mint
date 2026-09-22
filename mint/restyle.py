@@ -242,7 +242,7 @@ def main(argv=None):
         server.require()
         cards, art = Cards(ws.cards_file), Art(ws.art)
         for name in names:
-            card = cards.find(name, st.card({"name": name}).printing)
+            card = cards.find(name, *st.lookup(name))
             v, made = restyle(server, art, card, st, force=a.force, upscale=not a.no_upscale)
             print(f"{'restyled' if made else 'cached  '} {card['name']} -> {os.path.relpath(v.path)}")
     except MintError as e:

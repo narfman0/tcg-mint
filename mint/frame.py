@@ -297,6 +297,56 @@ def stack(families):
     return ", ".join(f"'{f}'" for f in families) + ", serif"
 
 
+# --- designs ---------------------------------------------------------------
+# The frame designs: the M15 frame as it is, and the modern variants of it that move its pieces (todo/
+# frame-designs.md). Each is a class on .card and a css file, mint/designs/<name>.css, injected after the base
+# rules and before the set's css; the base template is never forked. The art rectangle is what a picture
+# must cover in card units (1/100 in), bleed included where the design reaches it: the generation size of
+# a restyle or a clip follows its aspect (generation_size), and `check` warns of a crop too far from it.
+#   name: (art width, art height, css file or None for the base frame alone)
+DESIGNS = {
+    "m15": (210.6, 154, None),               # the art window
+    "extended": (230, 154, "extended.css"),  # the window widened to the border, x 10-240
+    "borderless": (272, 200, "borderless.css"),  # off the card's edges between the title bar and the type bar
+    "fullart": (272, 372, "fullart.css"),    # the whole card
+}
+DESIGN_CHOICES = ("auto", *DESIGNS)  # what a set or card entry may say; auto follows the printing
+DESIGNS_DIR = PKG / "designs"
+
+
+def printed_design(card):
+    """The design the printed card has, by Scryfall's markers: full art, else borderless, else extended
+    art, else the M15 frame. What `auto` resolves to."""
+    if card.get("full_art"):
+        return "fullart"
+    if card.get("border_color") == "borderless":
+        return "borderless"
+    if "extendedart" in (card.get("frame_effects") or []):
+        return "extended"
+    return "m15"
+
+
+def design_css(design):
+    """The design's css, "" for the base frame."""
+    fn = DESIGNS[design][2]
+    return (DESIGNS_DIR / fn).read_text() if fn else ""
+
+
+def art_aspect(design):
+    w, h, _ = DESIGNS[design]
+    return w / h
+
+
+def generation_size(design, pixels):
+    """The (width, height), multiples of 32, nearest the design's art aspect at about `pixels` in all.
+    For a design other than M15: the M15 sizes are the blocks' own defaults (1248 x 912 for a restyle,
+    832 x 576 for a clip), so a set that never chose a design keeps every recipe hash it had."""
+    aspect = art_aspect(design)
+    w = max(32, round(math.sqrt(pixels * aspect) / 32) * 32)
+    h = max(32, round(w / aspect / 32) * 32)
+    return w, h
+
+
 # --- pieces ---------------------------------------------------------------
 def frame_kind(card):
     """Which frame a card gets: its colour, gold, artifact, land or C (colorless), the keys of FRAMES."""
@@ -729,13 +779,17 @@ def collector_number(card):
 
 
 def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_size=None, set_icon=None,
-               flavor=None, art_filter=None, set_css="", frame_vars=None, maker="", year="", other_face=None):
+               flavor=None, art_filter=None, set_css="", frame_vars=None, maker="", year="", other_face=None,
+               design="m15"):
     """The whole page for one card. `art_url` is the file:// URL of the image to show;
     `fonts_css` the @font-face rules for local faces (frame.local_fonts); `set_size` and `set_icon`
     the card's own set's printed size and expansion symbol SVG (frame.Sets), unknown when None;
     `frame_vars` the frame knobs as css (frame_css), the defaults when None; `other_face` the
-    record of a double-faced card's other side, named at the foot of the text box."""
+    record of a double-faced card's other side, named at the foot of the text box; `design` a key
+    of DESIGNS (resolved already: sets.SetFile.design_of)."""
     title, body = THEMES[theme]
+    if design not in DESIGNS:
+        raise ValueError(f"no frame design {design!r}; one of {', '.join(DESIGNS)}")
     kind = frame_kind(card)
     frame, frame_dark, bar, bar_edge, box, pinline = FRAMES[kind]
     tint = land_tint(card)
@@ -779,6 +833,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
         legendary=" legendary" if legendary and not turned else "",
         pair=(" pair hybrid" if kind_b != kind else " pair") if pair else "",
         frame_vars=frame_vars or frame_css(),
+        design=f" design-{design}", design_css=design_css(design),
         watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout,
         stamp='<div class="stamp"></div>' if stamped else "", stamped=" stamped" if stamped else "",
         body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else "",

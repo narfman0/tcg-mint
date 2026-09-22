@@ -1,0 +1,6 @@
+/* full art: the art under everything (the whole 272 x 372 page, bleed included); the title bar floating
+   at the top, the type bar and a translucent text plate at the foot, no plate on a card with no rules
+   text (a basic), the collector line on a black strip. The base template stacks the art at z 1 and the
+   bars, text box, P/T plate, stamp, badges, crown and footer at 2, so moving .art is enough to put it
+   under them. Phase 2 of todo/frame-designs.md fills this in, measured off scans of real full-art
+   printings. Until then a card in this design renders as M15. */

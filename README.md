@@ -106,6 +106,16 @@ A set is a JSON file (see `sets/bls1.json`):
 - A `.css` file with the same name (`sets/bls1.css`) is injected after the
   base frame rules, so each set can carry its own frame identity: colours,
   textures, bar shapes, anything.
+- `design` names the frame design the set's cards render in, and a card
+  entry's `design` overrides it: `m15` (the default), `extended` (the art
+  window widened to the border), `borderless` (the art off the card's
+  sides between the bars), `fullart` (the art under everything), or `auto`
+  to follow each card's printing. A design steers the default printing to
+  its own kind (a card set to `fullart` starts from its newest full-art
+  printing), sizes a restyle or a clip to its shape unless the block
+  spells `width` and `height`, and `mint check` warns when the picture is
+  the wrong shape for it. The designs beyond M15 are being drawn
+  (`todo/frame-designs.md`); until then they render as M15.
 
 Unknown keys are errors (`mint check` finds them), so a typo in a recipe never
 passes silently. Who you are on the cards, the ComfyUI address, the printer,

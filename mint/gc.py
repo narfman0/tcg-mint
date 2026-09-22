@@ -82,7 +82,7 @@ def render_state(ws, st, cards, art):
             stale.append((m, fn, "the card left the set"))
             continue
         try:
-            card = cards.find(name, st.card({"name": name}).printing)
+            card = cards.find(name, *st.lookup(name))
         except MintError:
             stale.append((m, fn, "the card is not in the card file"))
             continue
@@ -104,7 +104,7 @@ def _faces(cards, st):
     out = []
     for n in st.names():
         try:
-            out += cards.find(n, st.card({"name": n}).printing).get("card_faces") or []
+            out += cards.find(n, *st.lookup(n)).get("card_faces") or []
         except MintError:
             pass
     return out
@@ -125,7 +125,7 @@ def collect(ws, only=None, keep_days=3):
         if only and st.code.lower() != only.lower():
             for n in st.names():  # its cards still count as referenced
                 try:
-                    referenced.add(cards.find(n, st.card({"name": n}).printing)["illustration_id"])
+                    referenced.add(cards.find(n, *st.lookup(n))["illustration_id"])
                 except MintError:
                     pass
             continue
@@ -135,7 +135,7 @@ def collect(ws, only=None, keep_days=3):
         report["dropped"] += [(st.code, m, fn) for fn in dropped]
         for name in st.names():
             try:
-                card = cards.find(name, st.card({"name": name}).printing)
+                card = cards.find(name, *st.lookup(name))
             except MintError:
                 continue
             referenced.add(card["illustration_id"])

@@ -101,7 +101,7 @@ def main(argv=None):
         server.require()
         cards, art = Cards(ws.cards_file), Art(ws.art)
         for name in names:
-            card = cards.find(name, st.card({"name": name}).printing)
+            card = cards.find(name, *st.lookup(name))
             v, made = animate(server, art, card, st, force=a.force, remix=a.remix, base=a.base)
             clips = ", ".join(os.path.relpath(p) for p in v.videos) or os.path.relpath(v.path)
             print(f"{'animated' if made else 'cached  '} {card['name']} -> {clips}")

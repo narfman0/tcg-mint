@@ -127,6 +127,11 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   transform: translate(-0.24px, 0.88px); }
 .pip img { position: relative; height: 12px; width: 12px; display: block; }
 .setsym { height: 14px; width: 14px; }
+/* stacking, settled here so a design (frame.DESIGNS) puts the art under the frame by moving it and nothing
+   else: the band and the pinline plate at the bottom, the art over them, and everything that may float over
+   the art -- the bars, the text box, the P/T plate, the stamp, the badges, the crown, the footer -- above it */
+.art { z-index: 1; }
+.bar, .textbox, .pt, .stamp, .loyalty, .defense, .crown-o, .crown, .footer { z-index: 2; }
 /* the art window: the image spans 19.6-230.2 x 39.7-193.7, its one black line drawn just outside it */
 .art { position: absolute; left: 19.6px; top: 39.7px; width: 210.6px; height: 154px;
   background: #222 center / cover no-repeat; background-image: url("$art");
@@ -265,10 +270,14 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .footer .brush { width: 6.5px; height: 4px; margin: 0 1.3px 0 3.5px; vertical-align: baseline; }
 </style>
 <style>
+/* the frame design (frame.DESIGNS): mint/designs/<name>.css moves the pieces above; the M15 frame adds nothing */
+$design_css
+</style>
+<style>
 /* per-set frame identity: sets/<code>.css, injected last so it can override any rule above */
 $set_css
 </style>
-<div class="card $layout$legendary$stamped$pair">
+<div class="card $layout$legendary$stamped$pair$design">
   <div class="frame"></div>
   $body
   $stamp

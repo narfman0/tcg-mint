@@ -16,6 +16,7 @@ import sqlite3
 from pathlib import Path
 
 from .errors import CardNotFound, MintError
+from .frame import printed_design
 
 BUILD_WAIT = 600  # seconds a lookup waits on a rebuild in progress before "database is locked"
 
@@ -66,8 +67,10 @@ def TODAY():
     return dt.date.today().isoformat()
 
 
-def oddness(card):
-    """(penalty, reasons) for a printing as the default; 0 is a plain black-bordered card."""
+def oddness(card, design=None):
+    """(penalty, reasons) for a printing as the default; 0 is a plain black-bordered card. With a frame
+    design (frame.DESIGNS) the design's own marker is not odd, so a card set to full art defaults to
+    its newest full-art printing."""
     why = []
     if card.get("digital"):
         why.append(("digital", 100))
@@ -88,28 +91,38 @@ def oddness(card):
         why.append(("promo", 30))
     if card.get("set") == "plst" or card.get("set", "").startswith("mb"):
         why.append(("The List / Mystery Booster", 15))
-    if card.get("border_color") not in (None, "black"):
-        why.append((card["border_color"] + " border", 10))
+    border = card.get("border_color")
+    plain_border = border == "borderless" and design in ("borderless", "fullart")  # a full-art card is borderless too
+    if border not in (None, "black") and not plain_border:
+        why.append((border + " border", 10))
     odd = ODD_FRAME & set(card.get("frame_effects") or [])
+    if design == "extended":
+        odd.discard("extendedart")
+    if design == "fullart":
+        odd.discard("fullart")
     if odd:
         why.append((", ".join(sorted(odd)), 10))
-    if card.get("full_art") and "Land" not in card.get("type_line", ""):
+    if card.get("full_art") and "Land" not in card.get("type_line", "") and design != "fullart":
         why.append(("full art", 10))
+    if design and design != "m15" and printed_design(card) != design:  # the design's own printings come first
+        why.append((f"not {design}", 5))
     if card.get("textless"):
         why.append(("textless", 20))
     return sum(p for _, p in why), [w for w, _ in why]
 
 
-def default_printing(cands):
-    """The printing `find` uses without an explicit one: least odd, newest among those, and
-    the lowest collector number within a set (the plain printing sits before its variants)."""
+def default_printing(cands, design=None):
+    """The printing `find` uses without an explicit one: least odd (for the frame design, if any),
+    newest among those, and the lowest collector number within a set (the plain printing sits
+    before its variants)."""
     def key(c):
         m = re.match(r"\d+", c.get("collector_number", ""))
-        return (oddness(c)[0], c.get("released_at") or "", int(m.group()) if m else 10**6)  # released: newest first, below
+        # released: newest first, below
+        return (oddness(c, design)[0], c.get("released_at") or "", int(m.group()) if m else 10**6)
     if not cands:
         return None
-    best = min(oddness(c)[0] for c in cands)
-    tied = [c for c in cands if oddness(c)[0] == best]
+    best = min(oddness(c, design)[0] for c in cands)
+    tied = [c for c in cands if oddness(c, design)[0] == best]
     newest = max(c.get("released_at") or "" for c in tied)
     return min((c for c in tied if (c.get("released_at") or "") == newest), key=key)
 
@@ -216,10 +229,10 @@ class Cards:
             "AND (layout IS NULL OR layout != 'art_series') ORDER BY released DESC, set_code", (want, want)).fetchall()
         return [front_face(self._read(o, n)) for o, n in rows]
 
-    def find(self, name, printing=None):
+    def find(self, name, printing=None, design=None):
         """The card to render for this name. With several printings on file, the newest
-        that looks like a normal card wins (default_printing); `printing` ("rvr:40")
-        picks one explicitly."""
+        that looks like a normal card wins (default_printing) -- or like the frame `design`
+        asked for (sets.SetFile.lookup); `printing` ("rvr:40") picks one explicitly."""
         cands = self.printings(name)
         if not cands:
             raise CardNotFound(f"not in {self.path.name}: {name}")
@@ -229,7 +242,7 @@ class Cards:
                 if c["set"] == code.lower() and (not num or c["collector_number"] == num):
                     return c
             raise CardNotFound(f"{name}: no printing {printing!r} on file (have {', '.join(self.printing_ids(cands))})")
-        return default_printing(cands)
+        return default_printing(cands, design)
 
     @staticmethod
     def printing_ids(cards):

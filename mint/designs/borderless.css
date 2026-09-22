@@ -1,0 +1,4 @@
+/* borderless: no border and no band between the title bar and the type bar; the art runs off the card's
+   edges there (into the bleed: the .card is 250 wide at 11 in the 272 page), and the bars and text box
+   sit where they always do. Phase 2 of todo/frame-designs.md fills this in, measured off scans of real
+   borderless printings. Until then a card in this design renders as M15. */

@@ -304,3 +304,37 @@ def test_color_match_is_a_knob_only_when_on():
     assert "color_match" not in off
     on = sets.from_dict({**BASE, "style": {**BASE["style"], "color_match": 0.7}}).recipe(card)
     assert on["color_match"] == 0.7 and sets.recipe_hash(on) != sets.recipe_hash(off)
+
+
+def test_design_is_the_entrys_the_sets_or_the_printings():
+    alpha = {"name": "Alpha", "illustration_id": "aaaa", "full_art": True}
+    st = sets.from_dict(BASE)
+    assert st.design_of(alpha) == "m15" and st.lookup("Alpha") == (None, None)
+    st = sets.from_dict({**BASE, "design": "auto"})
+    assert st.design_of(alpha) == "fullart" and st.design_of({"name": "Beta"}) == "m15"
+    assert st.lookup("Alpha") == (None, None)  # auto: the printing decides, so find is not steered
+    st = sets.from_dict({**BASE, "design": "extended", "cards": {"Alpha": {"design": "borderless", "printing": "x:1"}}})
+    assert st.design_of(alpha) == "borderless" and st.design_of({"name": "Beta"}) == "extended"
+    assert st.lookup("Alpha") == ("x:1", "borderless") and st.lookup("Beta") == (None, "extended")
+    assert st.to_dict()["design"] == "extended" and st.to_dict()["cards"]["Alpha"]["design"] == "borderless"
+    with pytest.raises(SetError, match="design must be one of"):
+        sets.from_dict({**BASE, "design": "retro"})
+    with pytest.raises(SetError, match=r"cards\['Alpha'\]: design"):
+        sets.from_dict({**BASE, "cards": {"Alpha": {"design": "retro"}}})
+
+
+def test_generation_size_follows_the_design_unless_spelled():
+    alpha = {"name": "Alpha", "illustration_id": "aaaa"}
+    m15 = sets.from_dict(BASE)
+    h = sets.recipe_hash(m15.recipe(alpha))
+    r = m15.recipe(alpha)
+    assert (r["width"], r["height"]) == (1248, 912)
+    full = sets.from_dict({**BASE, "design": "fullart"})
+    r = full.recipe(alpha)
+    assert r["width"] < r["height"] and r["width"] % 32 == 0 and sets.recipe_hash(r) != h  # a portrait picture
+    spelled = sets.from_dict({**BASE, "design": "fullart", "style": {**BASE["style"], "width": 1024, "height": 1024}})
+    r = spelled.recipe(alpha)
+    assert (r["width"], r["height"]) == (1024, 1024)
+    mr = full.motion_recipe(alpha)
+    assert mr["width"] < mr["height"] and mr["width"] % 32 == 0 and mr["height"] % 32 == 0
+    assert (m15.motion_recipe(alpha)["width"], m15.motion_recipe(alpha)["height"]) == (832, 576)

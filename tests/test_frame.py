@@ -278,7 +278,7 @@ def test_two_colour_frames():
 def test_two_colour_frames_in_the_page(art):
     dual = synthetic_card(colors=[], type_line="Land", produced_mana=["G", "U"], power=None)
     html = frame.build_html(dual, symbols=NoSymbols(), art_url="file://" + art)
-    assert 'class="card normal stamped pair"' in html
+    assert 'class="card normal stamped pair design-m15"' in html
     assert f"--pinline: {frame.FRAMES['G'][5]}" in html and f"--pinline-b: {frame.FRAMES['U'][5]}" in html
     assert f"--box: {frame.DUAL_BOX['G']}" in html and f"--box-b: {frame.DUAL_BOX['U']}" in html
     assert f"--bar: {frame.PAIR_BAR}" in html
@@ -288,9 +288,33 @@ def test_two_colour_frames_in_the_page(art):
             return "data:,"
     hybrid = synthetic_card(colors=["G", "W"], mana_cost="{G/W}")
     html = frame.build_html(hybrid, symbols=DotSymbols(), art_url="file://" + art)
-    assert 'class="card normal stamped pair hybrid"' in html
+    assert 'class="card normal stamped pair hybrid design-m15"' in html
     assert f"--frame: {frame.FRAMES['G'][0]}" in html and f"--frame-b: {frame.FRAMES['W'][0]}" in html
     assert f"--box: {frame.FRAMES['G'][4]}" in html and f"--box-b: {frame.FRAMES['W'][4]}" in html
     assert html.count("data:image/svg+xml;base64,") >= 2  # the two textures
     plain = frame.build_html(synthetic_card(), symbols=NoSymbols(), art_url="file://" + art)
     assert " pair" not in plain and f"--frame-b: {frame.FRAMES['U'][0]}" in plain
+
+
+def test_designs_follow_the_printing_and_size_the_generation():
+    assert frame.printed_design(synthetic_card()) == "m15"
+    assert frame.printed_design(synthetic_card(frame_effects=["extendedart", "legendary"])) == "extended"
+    assert frame.printed_design(synthetic_card(border_color="borderless")) == "borderless"
+    # full art outranks borderless (a full-art card is usually borderless too), and both outrank extended art
+    everything = synthetic_card(full_art=True, border_color="borderless", frame_effects=["extendedart"])
+    assert frame.printed_design(everything) == "fullart"
+    for d in frame.DESIGNS:
+        w, h = frame.generation_size(d, 1248 * 912)
+        assert w % 32 == 0 and h % 32 == 0
+        assert abs(w / h / frame.art_aspect(d) - 1) < 0.08
+        assert abs(w * h / (1248 * 912) - 1) < 0.1
+    assert frame.generation_size("fullart", 1248 * 912)[0] < frame.generation_size("fullart", 1248 * 912)[1]  # portrait
+    assert frame.design_css("m15") == "" and "full art" in frame.design_css("fullart")
+
+
+def test_build_html_carries_the_design(card, art):
+    html = frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, design="fullart")
+    assert "design-fullart" in html and "full art" in html
+    import pytest
+    with pytest.raises(ValueError):
+        frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, design="retro")

@@ -70,7 +70,7 @@ def render_cards(ws, names, *, set_path=None, styled=False, themes=("wizards",),
     results = []
     with Browser(dpi) as browser:
         for i, name in enumerate(names, 1):
-            found = cards.find(name, st.card({"name": name}).printing)
+            found = cards.find(name, *st.lookup(name))
             fs = faces(found)
             for card in (fs if back_faces else fs[:1]):
                 other = fs[1 - card["face_index"]] if len(fs) == 2 else None  # a double-faced card's other side
@@ -104,7 +104,7 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
             card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
             set_size=expansions.size(card["set"]), set_icon=expansions.icon(card["set"]), flavor=entry.flavor,
             art_filter=art_filter, set_css=st.css, frame_vars=frame.frame_css(st.frame),
-            maker=ws.maker, year=year, other_face=other_face)
+            maker=ws.maker, year=year, other_face=other_face, design=st.design_of(card))
         sizes = browser.render(html, out)
         r = Rendered(card["name"], number, th, out, source, sizes, art_filter, card_warnings(card))
         manifest.add(r, set_code=set_code if set_path else None, styled=styled, fhash=fhash, dpi=dpi)

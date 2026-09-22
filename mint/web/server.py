@@ -240,7 +240,7 @@ def create_app(ws):
                 "describer": S.describer_info(),
                 "sets": out, "themes": list(frame.THEMES), "controls": list(sets.CONTROLS),
                 "loops": list(sets.LOOPS), "motion_remix": list(sets.MOTION_REMIX),
-                "style_fields": style_fields(), "frame_fields": frame_fields(),
+                "style_fields": style_fields(), "frame_fields": frame_fields(), "designs": list(frame.DESIGN_CHOICES),
                 "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
                 "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer,
                           "export_dir": str(ws.export_path)}}
@@ -455,7 +455,7 @@ def create_app(ws):
         """Make a variant's recipe the set's style, so it becomes the card's current one."""
         st = S.find_set(code)
         name, h = body["name"], body["hash"]
-        card = S.cards().find(name, st.card({"name": name}).printing)
+        card = S.cards().find(name, *st.lookup(name))
         v = S.art.variant(card, h)
         if not v or v.kind != "restyle":
             raise HTTPException(404, f"no restyle variant {h} for {name}")
@@ -479,11 +479,23 @@ def create_app(ws):
             sets.save(st.path, st)
         return set_detail(S, st)
 
+    @app.put("/api/sets/{code}/design")
+    def put_design(code: str, body: dict):
+        """The set-wide frame design: a key of frame.DESIGNS, "auto", or null for m15."""
+        st = S.find_set(code)
+        with S.lock:
+            design = body.get("design") or None
+            if design is not None and design not in frame.DESIGN_CHOICES:
+                raise HTTPException(400, f"design must be one of {', '.join(frame.DESIGN_CHOICES)}")
+            st.design = design
+            sets.save(st.path, st)
+        return set_detail(S, st)
+
     @app.delete("/api/sets/{code}/cards/{name:path}/variants/{h}")
     def delete_variant(code: str, name: str, h: str):
         """Remove one variant (image + sidecar). A card entry that named it as its base or pick goes back to the default."""
         st = S.find_set(code)
-        card = S.cards().find(name, st.card({"name": name}).printing)
+        card = S.cards().find(name, *st.lookup(name))
         v = S.art.variant(card, h)
         if not v:
             raise HTTPException(404, f"no variant {h} for {name}")
@@ -518,12 +530,13 @@ def create_app(ws):
         entry = st.card({"name": name})
         out = []
         cands = S.cards().printings(name)
-        default = default_printing(cands)
+        _, design = st.lookup(name)  # a design asked for by name makes its own printings the plain ones
+        default = default_printing(cands, design)
         for c in cands:
-            penalty, why = oddness(c)
+            penalty, why = oddness(c, design)
             crop = S.art.crop(c, fetch=False) if c.get("illustration_id") else None
             out.append({**card_summary(c), "ub": bool(warnings(c)), "crop": str(crop) if crop else None,
-                        "crop_cached": bool(crop and crop.exists()),
+                        "crop_cached": bool(crop and crop.exists()), "design": frame.printed_design(c),
                         "set_name": c.get("set_name"), "odd": why, "penalty": penalty, "default": c is default,
                         "selected": entry.printing == f"{c['set']}:{c['collector_number']}"})
         return out
@@ -543,7 +556,7 @@ def create_app(ws):
     def scan(code: str, name: str):
         """Fetch Scryfall's full-card scan (for the calibration overlay)."""
         st = S.find_set(code)
-        card = S.cards().find(name, st.card({"name": name}).printing)
+        card = S.cards().find(name, *st.lookup(name))
         return {"path": str(S.art.scan(card))}
 
     # the card itself, after its sub-routes: {name:path} is greedy (a double-faced name holds a slash)
@@ -720,6 +733,7 @@ def card_detail(S, st, name, cards=None):
     art = S.art
     info["card"] = card_summary(card)
     info["warnings"] = warnings(card)
+    info["design"] = st.design_of(card)  # what it renders in, after auto is resolved
     crop = art.crop(card, fetch=False)
     info["crop"] = str(crop) if crop.exists() else None
     info["variants"] = [variant_dict(v) for v in art.variants(card)]
@@ -956,8 +970,7 @@ def submit_enhance(S, st, names, body):
         job.step(0, len(names))
         made = []
         for i, name in enumerate(names):
-            entry = st.card({"name": name}) if st else sets.CardEntry()
-            card = cards.find(name, entry.printing)
+            card = cards.find(name, *(st.lookup(name) if st else (None, None)))
             v, did = upscale.enhance(server, S.art, card, model, base, force)
             job.say(f"{'enhanced' if did else 'cached'} {name} -> {v.label}-{v.hash}")
             made.append(v.hash)
@@ -982,6 +995,8 @@ def submit_animate(S, st, names, body):
     base_knobs.pop("explicit", None)
     base_knobs.update(overrides)
     motion = sets.from_dict({"code": "x", "motion": base_knobs}).motion
+    # only what the file or this run spelled out counts as spelled: the size still follows the card's design
+    motion.explicit = set(st.motion.explicit if st.motion else ()) | set(overrides)
     base = body.get("base") or None
     takes = max(1, min(int(body.get("takes") or 1), 8))
     force = bool(body.get("force"))
@@ -998,7 +1013,7 @@ def submit_animate(S, st, names, body):
         job.step(0, len(names) * takes)
         made = []
         for i, name in enumerate(names):
-            card = cards.find(name, st.card({"name": name}).printing)
+            card = cards.find(name, *st.lookup(name))
             for t, sd in enumerate(seeds):
                 v, did = animate.animate(server, S.art, card, st, motion=motion, force=force, seed=sd, base=base)
                 take = f"  (take {t + 1}, seed {sd})" if takes > 1 else ""
@@ -1045,7 +1060,7 @@ def submit_describe(S, st, names, body):
         written, made = [], []
         for i, name in enumerate(names):
             entry = st.card({"name": name})
-            card = cards.find(name, entry.printing)
+            card = cards.find(name, *st.lookup(name))
             if entry.subject and not force:
                 job.say(f"kept {name}: {entry.subject}")
             else:
@@ -1111,7 +1126,7 @@ def submit_restyle(S, st, names, body):
         job.step(0, len(names) * takes)
         made = []
         for i, name in enumerate(names):
-            card = cards.find(name, st.card({"name": name}).printing)
+            card = cards.find(name, *st.lookup(name))
             for t, sd in enumerate(seeds):
                 v, did = restyle.restyle(server, S.art, card, st, style=sty, force=force, upscale=up, seed=sd)
                 take = f"  (take {t + 1}, seed {sd})" if takes > 1 else ""

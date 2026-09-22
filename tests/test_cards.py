@@ -102,3 +102,18 @@ def test_default_printing_is_the_newest_plain_one():
     assert default_printing(cands) is regular
     assert default_printing([lair, promo]) is lair  # only odd ones on file: the least odd still wins
     assert default_printing([]) is None
+
+
+def test_a_design_makes_its_own_printings_the_plain_ones():
+    from mint.cards import default_printing, oddness
+    plain = lambda **o: {"name": "X", "illustration_id": "i", "set_type": "expansion", "border_color": "black",
+                         "lang": "en", "released_at": "2020-01-01", "collector_number": "10", "type_line": "Creature", **o}
+    regular = plain(set="cmm", collector_number="150", released_at="2023-01-01")
+    extended = plain(set="cmm", collector_number="509", frame_effects=["extendedart"], released_at="2023-01-01")
+    full = plain(set="cmm", collector_number="600", full_art=True, border_color="borderless", released_at="2023-01-01")
+    assert default_printing([full, extended, regular]) is regular
+    assert default_printing([full, extended, regular], "extended") is extended and oddness(extended, "extended") == (0, [])
+    assert default_printing([full, extended, regular], "fullart") is full and oddness(full, "fullart") == (0, [])
+    assert default_printing([full, extended, regular], "borderless") is regular  # full art is still odd for it
+    assert oddness(full, "borderless")[1] == ["full art", "not borderless"]
+    assert oddness(regular, "extended") == (5, ["not extended"]) and oddness(regular, "m15") == (0, [])
