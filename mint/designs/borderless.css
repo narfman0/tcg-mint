@@ -1,4 +1,74 @@
-/* borderless: no border and no band between the title bar and the type bar; the art runs off the card's
-   edges there (into the bleed: the .card is 250 wide at 11 in the 272 page), and the bars and text box
-   sit where they always do. Phase 2 of todo/frame-designs.md fills this in, measured off scans of real
-   borderless printings. Until then a card in this design renders as M15. */
+/* borderless (Scryfall border_color "borderless", full_art false): the picture under everything, out to the cut
+   edge on all four sides -- no black border, no textured band -- with the M15 bars and text box floating on it.
+   Measured off Scryfall's 745x1040 scans of nine plain (light-bar) borderless printings, seven of them
+   planeswalkers, which is what the kind mostly is: Jace 2xm:334, Wrenn and Six 2x2:334, Ugin m21:279, Grist
+   mh2:306, Liliana dmu:373, Liliana of the Dark Realms blc:78, Chandra fra:309, Elminster clb:362, Zombify sld:2389.
+   (The collector-booster borderless cards Scryfall also flags `inverted` -- Lightning Bolt 2x2:361, Counterspell
+   mh2:308, Scavenging Ooze m21:318 -- keep the M15 positions exactly, bar 17-37.2, type 197-217, but paint the
+   bars and text box in the frame's dark colour with white text: a palette, not a geometry, so a design of its own.)
+   - The title bar rides 5.5 higher than M15's: its outline 11.1-30.9 (Jace), 10.7-30.9 (Wrenn), 11.7-31.9 (Ugin),
+     11.7-31.2 (Grist), 12.1-32.3 (Liliana blc), 12.1-31.9 (Chandra); Elminster's 8.4-28.2 is the one outlier.
+     Median 11.7-31.2, so the bar sits at 11.5 and its pinline ring 2 outside it, 9.5-33.4 (measured 8.7-33.4 Jace,
+     9.4-33.6 Ugin, 10.1-34.6 Liliana blc, 10.1-33.9 Chandra). Its face is the M15 width (218.5 Jace, 221.5 Wrenn,
+     219.1 Grist against 219.2), so only `top` moves.
+   - The type bar and text box stay put: type outline 196.0-216.5 (Wrenn), 196.0-216.1 (Ugin), 195.9-216.1 (Liliana
+     blc) against M15's 197-217; text box top 219.5 / 219.5 / 219.4 against 218.4; its right edge 231.1 (Wrenn),
+     230.6 (Jace), 232.3 (Chandra) against 231.4. Jace 2xm:334, the first box topper, is the odd one at 193.3-212.8
+     with the box straight under the bar. The text box bottom reads 317.4-320.1 across the nine (M15: 322).
+   - Around the type bar and text box the band is gone: in its place a flat plate of the pinline colour, carried
+     down from the type bar's ring, 4 beyond the box's face (right edge: 234.6 Jace, 235.4 Wrenn, 236.3 Chandra,
+     corrected for each scan's centre) and 2.5 below its bottom (321.1 Jace, 322 Wrenn, 322 Ugin, 321 Grist, 321.1
+     Elminster), the bottom corners arcs of about 20 (the plate leaves the sides near 300 and runs flat under the
+     box from x 36 -- Jace, Wrenn) with the text box's own bottom corners rounded about 9 inside them. Beyond the
+     plate, art. The two-colour plate blends the way the pinline does.
+   - The bars and the text box are somewhat translucent on the earlier printings (the bar's face tracks the art
+     beside it at a slope of .44 on Jace, .26 on Ugin, r .85; the art ghosts through Jace's and Wrenn's text
+     box) and opaque on the recent (Chandra, Grist: slope 0). The text box keeps a tenth of see-through; the
+     bars stay solid, for the text.
+   - The collector line prints in white straight on the art, which fades toward black at the bottom edge (Ugin,
+     Chandra, Liliana blc: 20-60 lum under the plate against 100-150 higher up): a black gradient from the
+     plate's foot to the cut.
+   The layouts that move the art (saga, class) or lie sideways (split, battle) are out: they render M15.
+   Art: the picture must cover 272 x 206 (the page's width, the top edge to the type bar's ring at 195); the
+   rest of the page -- the strips beside and under the text box, where the real card shows more of the same
+   painting -- is the picture again, blown up to cover the page and blurred into a wash of its own colours. */
+.design-borderless:not(.saga, .class, .split, .battle) {
+  overflow: visible; border-radius: 0; isolation: isolate;  /* the art reaches into the bleed */
+  /* the art at z -1 goes under the plate and the pinlines (z auto) and is still over the card's own black,
+     since the card isolates; the frame's pieces stay at 2 */
+  & .art { left: -11px; top: -11px; width: 272px; height: 372px; z-index: -1; background-size: 0 0; }
+  /* the picture is painted twice off the same background (inherit; the element itself paints none of it): the
+     wash first, 6 over the page so the blur's fringe is cut off, then the picture proper. That one is scaled
+     by height, 216 for the 206 the design asks for (its width follows, as cover would give it for any picture
+     of 1.32:1 or wider -- a narrower one, which `check` flags, shows the wash at its sides), the extra 10 under
+     the plate and fading out: where the strips beside the plate show the picture giving way to the wash it is
+     then a dissolve and not a seam (the type bar's ring is a pill; a hard edge at 195 showed past its rounded
+     ends). The 5% of zoom costs a 1.37:1 picture 12 a side, 11 of them bleed. */
+  & .art::before { content: ""; position: absolute; inset: -6px; background: inherit; background-size: cover;
+    filter: blur(3px) brightness(.8); }
+  & .art::after { inset: 0 0 auto 0; height: 216px; opacity: 1; box-shadow: none;
+    background: inherit; background-size: auto 216px; background-position: center top;
+    mask-image: linear-gradient(180deg, #000 206px, transparent 216px); }
+  & .pl-art { display: none; }  /* no line around the art: it has no edge */
+  /* the band is the plate: the pinline colour, flat, from the type bar's ring to 2.5 under the text box, 4 out
+     from its sides; 13 rather than the ring's 12.8 so the ring's ends do not bulge past it once Chromium snaps */
+  & .frame { left: 13px; right: 13px; top: 195px; bottom: 24.5px; border-radius: 5px 5px 20px 20px;
+    background: var(--pinline); box-shadow: -1.5px 0.6px 0.4px rgba(0,0,0,.85); }
+  & .frame::before, & .frame::after { display: none; }  /* the texture, and a hybrid's second texture */
+  /* (the pinline's own two-colour blend, over 102-148, since the plate is pinline now and not band) */
+  &.pair .frame { background: linear-gradient(90deg, var(--pinline) calc(50% - 23px), var(--pinline-b) calc(50% + 23px)); }
+  /* the text box a tenth see-through, its bottom corners rounded inside the plate's arcs (the box's fill is the
+     base's, and the pair's blend the base's, each with the alpha) */
+  & .textbox { border-radius: 0 0 9px 9px; background: color-mix(in srgb, var(--box) 90%, transparent); }
+  &.pair .textbox { background: linear-gradient(90deg, color-mix(in srgb, var(--box) 90%, transparent) calc(50% - 18px),
+    color-mix(in srgb, var(--box-b) 90%, transparent) calc(50% + 18px)); }
+  & .pl-text { border-radius: 0 0 11px 11px; }
+  /* the title bar 5.5 up, its ring and the crown with it */
+  & .titlebar { top: 11.5px; }
+  & .pl-title { top: 9.5px; }
+  & .crown-o, & .crown { top: -5.5px; }
+  /* the foot: the wash darkens to the cut under the plate, and the collector line sits on that */
+  &::after { content: ""; position: absolute; left: -11px; right: -11px; top: 325.5px; bottom: -11px; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,.85)); }
+  & .footer { text-shadow: 0 0 1.2px rgba(0,0,0,.8); }
+}
