@@ -1,6 +1,6 @@
 """Start a set file from a plain decklist.
 
-    mint newset --code SAT --name "Satoru, ..." [--style neon] [--private] [--out sets/satoru.json] decklist.txt
+    mint newset --code SAT --name "Satoru, ..." [--style neon] [--out sets/satoru.json] decklist.txt
 
 The decklist is `<count> <Card Name>` per line, mainboard first, then a blank
 line and the commander(s); anything from the first `#` header on is ignored
@@ -12,7 +12,6 @@ file is updated in place: new cards are appended, numbers and per-card edits
 --style seeds the set's `style` block from a template in styles/ (see
 style.py) or one of the built-in recipes (`neon`, `ink`, `glass`); edit it
 afterwards, it is just JSON. A template's .css becomes the set's .css.
---private puts the set in sets/private/, which git ignores.
 """
 import argparse
 import re
@@ -87,11 +86,11 @@ def dedupe(names):
     return [n for n in names if not (n in seen or seen.add(n))]
 
 
-def create(ws, code, name, names, style_name=None, private=False, out=None):
+def create(ws, code, name, names, style_name=None, out=None):
     """Make or update a set file: new cards are appended after the existing ones with the
     next numbers; per-card edits and an existing style block are kept. A style template
     seeds the style block (and its .css) only when the set has none. Returns (path, set, added)."""
-    out = Path(out or (ws.sets / ws.PRIVATE if private else ws.sets) / (code.lower() + ".json"))
+    out = Path(out or ws.sets / (code.lower() + ".json"))
     st = sets.load(out) if out.exists() else sets.SetFile(code=code, name=name)
     st.code, st.name = code, name
     css = None
@@ -126,12 +125,11 @@ def main(argv=None):
     ap.add_argument("--code", required=True, help="set code, e.g. SAT (the company code is added by the renderer)")
     ap.add_argument("--name", required=True)
     ap.add_argument("--style", help="seed the style block from a template in styles/ or a built-in recipe")
-    ap.add_argument("--private", action="store_true", help="put the set in sets/private/, which git ignores")
     ap.add_argument("--out", help="set file (default sets/<code lowercased>.json)")
     a = ap.parse_args(argv)
     try:
         out, st, added = create(workspace.default(), a.code, a.name, read_decklist(a.decklist),
-                                style_name=a.style, private=a.private, out=a.out)
+                                style_name=a.style, out=a.out)
     except MintError as e:
         raise SystemExit(str(e)) from None
     print(f"{out}: {len(st.cards)} cards ({added} new)" + (f", style {st.style.name}" if st.style else ""))

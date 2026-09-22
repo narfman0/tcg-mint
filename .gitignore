@@ -24,9 +24,9 @@ build/
 dist/
 .venv/
 
-# private sets and style templates: local only, never committed (`--private`)
-sets/private/
-styles/private/
+# your sets and style templates: the workspace's, never the repo's (docs/examples/ shows the shapes)
+sets/
+styles/
 
 # subagent worktrees
 .claude/worktrees/

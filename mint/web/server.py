@@ -222,7 +222,7 @@ def create_app(ws):
             try:
                 st = sets.load(p)
                 out.append({"code": st.code, "name": st.name, "path": str(p), "size": st.size, "cards": len(st.cards),
-                            "style": st.style.name if st.style else None, "private": ws.is_private(p)})
+                            "style": st.style.name if st.style else None})
             except MintError as e:
                 out.append({"code": p.stem, "name": "", "path": str(p), "error": str(e)})
         try:
@@ -262,8 +262,7 @@ def create_app(ws):
             raise HTTPException(400, f"there is already a set {code}")
         names = card_names(body)
         with S.lock:
-            path, st, _ = newset.create(ws, code, body.get("name") or code, names, style_name=body.get("style") or None,
-                                        private=bool(body.get("private")))
+            path, st, _ = newset.create(ws, code, body.get("name") or code, names, style_name=body.get("style") or None)
         submit_crops(S, st, st.names(), {}, origin="new set")  # the board fills in as each crop lands
         return set_detail(S, st)
 
@@ -382,36 +381,34 @@ def create_app(ws):
     # --- style templates ---------------------------------------------------------------------
     @app.get("/api/styles")
     def styles_list():
-        return [template_dict(S, name, p, private) for name, p, private in style.templates(ws)]
+        return [template_dict(S, name, p) for name, p in style.templates(ws)]
 
     @app.get("/api/styles/{name}")
     def get_style(name: str):
-        for n, p, private in style.templates(ws):
+        for n, p in style.templates(ws):
             if n == name:
-                return template_dict(S, n, p, private)
+                return template_dict(S, n, p)
         raise HTTPException(404, f"no style template {name}")
 
     @app.put("/api/styles/{name}")
     def put_style_template(name: str, body: dict):
         """Create or replace a template: `style` is the block as the file would hold it (every key
-        given is spelled out), `css` its frame rules, `private` the tier. A built-in's name makes
-        a file that shadows it."""
+        given is spelled out), `css` its frame rules. A built-in's name makes a file that shadows it."""
         block = dict(body.get("style") or {})
         block["name"] = name
         fr = body.get("frame")
         parsed = sets.from_dict({"code": "x", "style": block, **({"frame": fr} if fr else {})}, f"styles/{name}.json")
         with S.lock:
-            p = style.write(ws, name, parsed.style, body.get("css") or "", private=bool(body.get("private")), frame=parsed.frame)
-        return template_dict(S, name, p, ws.is_private(p))
+            p = style.write(ws, name, parsed.style, body.get("css") or "", frame=parsed.frame)
+        return template_dict(S, name, p)
 
     @app.post("/api/styles")
     def post_style_from_set(body: dict):
-        """Save a set's style block as a template, as `mint style save` does (name, private, force)."""
+        """Save a set's style block as a template, as `mint style save` does (name, force)."""
         st = S.find_set(body.get("set") or "")
         with S.lock:
-            p = style.save(ws, st, body.get("name") or None, private=bool(body.get("private")),
-                           force=bool(body.get("force")))
-        return template_dict(S, p.stem, p, ws.is_private(p))
+            p = style.save(ws, st, body.get("name") or None, force=bool(body.get("force")))
+        return template_dict(S, p.stem, p)
 
     @app.delete("/api/styles/{name}")
     def delete_style_template(name: str):
@@ -669,7 +666,7 @@ def card_names(body):
     return names
 
 
-def template_dict(S, name, path, private):
+def template_dict(S, name, path):
     """A style template for the page: the block as its file spells it, its css, and which sets
     carry a style of that name."""
     t = style.read(S.ws, name)
@@ -683,9 +680,8 @@ def template_dict(S, name, path, private):
             continue
         if s.style and s.style.name == name:
             used.append(s.code)
-    shadowed = path is not None and style.find(S.ws, name) != path
-    return {"name": name, "path": str(path) if path else None, "private": private, "builtin": path is None,
-            "shadowed": shadowed, "style": block, "css": css, "sets": used,
+    return {"name": name, "path": str(path) if path else None, "builtin": path is None,
+            "style": block, "css": css, "sets": used,
             "frame": dataclasses.asdict(t["frame"]) if t["frame"] is not None else None}
 
 

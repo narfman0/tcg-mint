@@ -1,7 +1,7 @@
 """Style templates: a set's art style, saved on its own so other sets can start from it.
 
     mint style list
-    mint style save NIV [--as glass] [--private]
+    mint style save NIV [--as glass]
     mint style show glass
 
 A template is a bare style block (the `style` object of a set file, see
@@ -9,8 +9,7 @@ sets.py) in styles/<name>.json, plus an optional styles/<name>.css holding the
 frame rules that go with it, and an optional `frame` key inside the JSON: the
 frame's dressing knobs (sets.Frame), so a template brings its whole look. `mint newset --style <name>` seeds a new set from
 it; the three built-in recipes (neon, ink, glass) are the fallback when no
-template has that name. Templates in styles/private/ are found the same way
-but git never sees them (`--private` writes there; workspace.py explains).
+template has that name.
 
 `save` takes a set code or a set file; the template is named after the set's
 style unless --as says otherwise, and an existing template is only replaced
@@ -33,13 +32,11 @@ def builtin(name):
 
 
 def find(ws, name):
-    """The template file for a name, private/ first; None when there is none."""
+    """The template file for a name; None when there is none."""
     if name.endswith(".json") and Path(name).exists():
         return Path(name)
-    for p in (ws.styles / ws.PRIVATE / f"{name}.json", ws.styles / f"{name}.json"):
-        if p.exists():
-            return p
-    return None
+    p = ws.styles / f"{name}.json"
+    return p if p.exists() else None
 
 
 def read(ws, name):
@@ -69,16 +66,16 @@ def load(ws, name):
 
 
 def templates(ws):
-    """[(name, path, private)] for every template on disk, then the built-ins not shadowed by one."""
-    out = [(p.stem, p, ws.is_private(p)) for p in ws.style_files()]
-    seen = {n for n, _, _ in out}
+    """[(name, path)] for every template on disk, then the built-ins (path None) not shadowed by one."""
+    out = [(p.stem, p) for p in ws.style_files()]
+    seen = {n for n, _ in out}
     from .newset import STYLES
-    out += [(n, None, False) for n in STYLES if n not in seen]
+    out += [(n, None) for n in STYLES if n not in seen]
     return out
 
 
 def find_set(ws, ref):
-    """A set by path or by code, private sets included."""
+    """A set by path or by code."""
     if Path(ref).exists():
         return sets.load(ref)
     for p in ws.set_files():
@@ -91,18 +88,15 @@ def find_set(ws, ref):
     raise SetError(f"no set file or set code {ref!r}")
 
 
-def save(ws, st, name=None, private=False, force=False):
+def save(ws, st, name=None, force=False):
     """Write a set's style (and css) as a template; returns the template path."""
     if st.style is None:
         raise SetError(f"{st.path}: this set has no style block to save")
     name = name or st.style.name
-    if not private and ws.is_private(st.path) and not force:
-        raise SetError(f"{st.path} is a private set; saving its style to a shared template needs --force "
-                       "(or --private to keep it out of git)")
-    p = (ws.styles / ws.PRIVATE if private else ws.styles) / f"{name}.json"
+    p = ws.styles / f"{name}.json"
     if p.exists() and not force:
         raise SetError(f"{p} exists; --force replaces it")
-    return write(ws, name, st.style, st.css, private=private, frame=st.frame)
+    return write(ws, name, st.style, st.css, frame=st.frame)
 
 
 def check_name(name):
@@ -110,14 +104,12 @@ def check_name(name):
         raise SetError(f"a template name is letters, digits, - and _, not {name!r}")
 
 
-def write(ws, name, style, css="", private=False, frame=None):
+def write(ws, name, style, css="", frame=None):
     """Write a Style (its css, and its frame knobs when any is off its default) as the template
-    `name` in the shared or the private tier, removing a copy in the other tier so the name lives
-    in one place. Returns the path."""
+    `name`. Returns the path."""
     check_name(name)
-    d = ws.styles / ws.PRIVATE if private else ws.styles
-    p = d / f"{name}.json"
-    d.mkdir(parents=True, exist_ok=True)
+    p = ws.styles / f"{name}.json"
+    ws.styles.mkdir(parents=True, exist_ok=True)
     body = sets._slim(dataclasses.asdict(style), sets.Style, style.explicit)
     body["name"] = name
     if frame is not None and sets._slim(dataclasses.asdict(frame), sets.Frame):
@@ -128,9 +120,6 @@ def write(ws, name, style, css="", private=False, frame=None):
         css_fn.write_text(css)
     elif css_fn.exists():
         css_fn.unlink()
-    other = (ws.styles if private else ws.styles / ws.PRIVATE) / f"{name}.json"
-    if other.exists():
-        delete(ws, name, other)
     return p
 
 
@@ -153,7 +142,6 @@ def main(argv=None):
     s = sub.add_parser("save", help="save a set's style block as a template")
     s.add_argument("set", help="a set code (NIV) or a set file")
     s.add_argument("--as", dest="name", help="template name (default: the style's own name)")
-    s.add_argument("--private", action="store_true", help="write to styles/private/, which git ignores")
     s.add_argument("--force", action="store_true", help="replace an existing template")
     sh = sub.add_parser("show", help="print a template or built-in as JSON")
     sh.add_argument("name")
@@ -161,16 +149,11 @@ def main(argv=None):
     ws = workspace.default()
     try:
         if a.cmd == "list":
-            seen = set()
-            for name, p, private in templates(ws):
-                where = "built-in" if p is None else str(p) + (" (private)" if private else "")
-                if name in seen:
-                    where += "  -- shadowed by the one above"
-                seen.add(name)
-                print(f"  {name:12} {where}")
+            for name, p in templates(ws):
+                print(f"  {name:12} {'built-in' if p is None else p}")
         elif a.cmd == "save":
             st = find_set(ws, a.set)
-            p = save(ws, st, a.name, private=a.private, force=a.force)
+            p = save(ws, st, a.name, force=a.force)
             print(f"{p}: style {st.style.name} of {st.code}" + (" (+ css)" if st.css else ""))
         elif a.cmd == "show":
             t = read(ws, a.name)

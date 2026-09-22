@@ -63,7 +63,8 @@ instant, and the index rebuilds itself whenever the card file changes.
 
 ## Sets
 
-A set is a JSON file (see `sets/bls1.json`):
+A set is a JSON file in `sets/` (`docs/examples/set.json` shows one of every
+kind of entry; `sets/` and `styles/` are yours and git ignores both):
 
 ```json
 {
@@ -103,7 +104,7 @@ A set is a JSON file (see `sets/bls1.json`):
   (the bars tinted silver, gold or orange by rarity). The defaults are the
   texture, the bevel, the grain and the stamp on; each reaches the frame as a CSS custom property of
   the same name (`--art-bevel`), so the set's css can still override any.
-- A `.css` file with the same name (`sets/bls1.css`) is injected after the
+- A `.css` file with the same name (`sets/bls1.css`; `docs/examples/set.css`) is injected after the
   base frame rules, so each set can carry its own frame identity: colours,
   textures, bar shapes, anything.
 - `design` names the frame design the set's cards render in, and a card
@@ -137,7 +138,7 @@ ollama_url = "http://127.0.0.1:11434"
 
 | command | what |
 |---|---|
-| `mint newset` | start a set file from a decklist (commander first); `--style` seeds a style block from a template or a built-in; `--private` keeps the set out of git |
+| `mint newset` | start a set file from a decklist (commander first); `--style` seeds a style block from a template or a built-in |
 | `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet; `--faces` the backs of double-faced cards too |
 | `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
 | `mint describe` | a vision model reads each card's picture and text and writes its `subject` line; `--generate` then makes each card's `new` scene from it |
@@ -185,7 +186,7 @@ screen entry is a bookmark that opens in the browser. For a real install from
 a phone, front it with https (`tailscale serve 8300` does it in one line).
 
 - **Sets** — *new set* makes a set file from a pasted decklist (code, name,
-  a style template, private or not). Every card is a tile (styled render,
+  a style template). Every card is a tile (styled render,
   plain render, or just the art), with badges from the render manifest: no restyle for the current
   recipe, not rendered, stale render (the frame or the art changed since), rules text shrunk,
   Universes Beyond art, own art. *only what's missing* counts a stale render as missing.
@@ -229,8 +230,8 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   table, with move, rename, remove, add-from-decklist and renumber. Delete
   the set from here too; renders and the art cache stay.
 - **Styles** (*styles* in the nav) — the templates in `styles/`: make one,
-  edit every knob, its css and its frame knobs, move it between the shared
-  and private tiers, apply it to a set (its frame knobs come along), delete it. Which sets carry each is shown; a
+  edit every knob, its css and its frame knobs, apply it to a set (its frame
+  knobs come along), delete it. Which sets carry each is shown; a
   set's block is a copy, so editing a template changes no set until it is
   applied again.
 - **The look** — one picker on the board, in the viewer and beside the
@@ -429,7 +430,7 @@ Three recipes ship in `mint newset`: `neon` (canny control), `ink`
 (lineart control, monochrome), `glass` (canny). They are starting points;
 the block in the set file is the source of truth once created.
 
-### Style templates and private sets
+### Style templates
 
 A style you want to reuse lives in `styles/<name>.json` — a bare style block,
 plus an optional `styles/<name>.css` with the frame rules that go with it, and
@@ -443,18 +444,11 @@ mint style list                     # templates on disk, then the built-ins they
 mint newset --code ABC --name "..." --style cathedral decks/abc.txt
 ```
 
-`styles/` is version-controlled, so a template is how a look gets shared.
-What should *not* be shared goes in a `private/` tier that git ignores:
-`sets/private/` and `styles/private/`. A set or template there works exactly
-like one beside it — `mint check`, the workbench and `mint style list` find it,
-`--set sets/private/x.json` renders it — but `git status` never shows it, and
-its art variants and renders were already ignored (`art/`, `out/`).
-
-```sh
-mint newset --code XXX --name "..." --style glass --private decks/xxx.txt   # sets/private/xxx.json
-mint style save XXX --private                    # styles/private/<style>.json
-mint style save XXX                              # refused: a private set's style needs --force to be shared
-```
+Sets, templates, art variants and renders are all the workspace's, not the
+repo's: git ignores `sets/`, `styles/`, `art/` and `out/`. The recipes this
+project was built with are kept as reading matter in `docs/examples/styles/`
+(stained glass, ink, linocut, woodblock, vanitas ...); copy one into
+`styles/` to use it.
 
 ### Models
 

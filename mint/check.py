@@ -2,7 +2,7 @@
 
     mint check [sets/x.json ...]
 
-Validates every set file (sets/ and sets/private/ by default) against the
+Validates every set file (sets/ by default) against the
 schema, looks
 each card up, and says which image a plain and a styled render would use:
 whether the current recipe has a restyle variant, whether the crop has been

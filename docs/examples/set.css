@@ -1,4 +1,4 @@
-/* BLS1 frame identity. Injected after the base M15 rules, so anything here wins.
+/* An example set css (sets/<code>.css). Injected after the base M15 rules, so anything here wins.
    Empty on purpose beyond the starter below: this is where the set's look goes.
    Examples of the knobs:
      :root { --title-dy: -0.5px; }                       nudge title/type text up

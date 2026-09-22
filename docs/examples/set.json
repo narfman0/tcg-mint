@@ -1,0 +1,62 @@
+{
+  "code": "EXA",
+  "name": "Example",
+  "size": 6,
+  "note": "one of every kind of card entry; sets.py documents the keys, README.md the workflow",
+  "design": "m15",
+  "frame": {
+    "watermark": 0.7,
+    "rarity_tint": 0.7
+  },
+  "base": "glass",
+  "style": {
+    "name": "glass",
+    "prompt": "stained glass window illustration, art nouveau, thick black leading between panes of jewel-toned glass, backlit, ornamental borders and flowing curves, gold and ruby and sapphire, art-nouveau decorative composition, cathedral window",
+    "negative": "blurry, low quality, text, watermark, signature, frame, photographic, realistic, 3d render, nude, nsfw, portrait of a woman",
+    "control": "canny",
+    "control_strength": 0.7,
+    "denoise": 0.88,
+    "steps": 28,
+    "cfg": 6,
+    "seed": 23,
+    "seed_rule": "position"
+  },
+  "motion": {
+    "prompt": "leaves stir, light shifts through the panes; the camera is still",
+    "length": 49,
+    "loop": "pingpong"
+  },
+  "cards": {
+    "Llanowar Elves": {
+      "number": 1,
+      "subject": "an elf druid among old trees, a verdant forest background",
+      "printing": "plst:GNT-46"
+    },
+    "Grizzly Bears": {
+      "number": 2,
+      "flavor": "Two bears in a clearing. That is the whole card.",
+      "seed": 1317919832
+    },
+    "Rhystic Study": {
+      "number": 3,
+      "subject": "a scholar at a lectern, blue robes, a tower window",
+      "remix": "inspire",
+      "pose": "353b429c"
+    },
+    "Forest": {
+      "number": 4,
+      "design": "fullart",
+      "art": "art/my-forest.png"
+    },
+    "Ancient Tomb": {
+      "number": 5,
+      "pick": "6828e835",
+      "art_filter": "sepia(0.6)"
+    },
+    "Faerie Mastermind": {
+      "number": 6,
+      "base": "6828e835",
+      "motion": "wings flutter, the faerie hovers in place"
+    }
+  }
+}

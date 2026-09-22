@@ -141,7 +141,7 @@ window.addEventListener('hashchange', go);
 function renderNav() {
   const r = route();
   $('#setnav').innerHTML = (state.ws?.sets || []).map(s =>
-    `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}"${s.private ? ' title="private: sets/private/, not in git"' : ''}>${esc(s.code)}${s.private ? ' <span class="lock">⌂</span>' : ''}</a>`).join('') +
+    `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}">${esc(s.code)}</a>`).join('') +
     (STATIC ? '' : `<a href="#/all" class="all ${r.code === ALL ? 'on' : ''}" title="every set on one board">all</a><a href="#/styles" class="all ${r.view === 'styles' ? 'on' : ''}" title="style templates">styles</a>`);
   $('#comfy').className = 'dot' + (state.ws?.comfy?.alive ? ' on' : '');
   $('#comfy').title = `ComfyUI ${state.ws?.comfy?.url}: ${state.ws?.comfy?.alive ? 'running' : 'not running'}`;
@@ -184,7 +184,7 @@ function home() {
   const hit = s => !q || [s.code, s.name, s.style].some(v => (v || '').toLowerCase().includes(q));
   const setsHtml = () => ws.sets.filter(hit).map(s => `
       <a class="setcard" href="#/set/${esc(s.code)}">
-        <h3>${esc(s.code)} <span class="muted">${esc(s.name)}</span>${s.private ? ' <span class="badge" title="sets/private/ is git-ignored">private</span>' : ''}</h3>
+        <h3>${esc(s.code)} <span class="muted">${esc(s.name)}</span></h3>
         <div class="meta">${s.cards} cards${s.style ? ` · style <b>${esc(s.style)}</b>` : ' · no style'}${s.error ? `<div class="bad">${esc(s.error)}</div>` : ''}</div>
       </a>`).join('') || `<div class="empty">${ws.sets.length ? 'nothing matches' : 'no set files in sets/ — <code>mint newset</code> makes one'}</div>`;
   $('#main').innerHTML = `
@@ -1268,15 +1268,14 @@ async function newSetForm() {
     <div class="form">
       <label>code</label><input type="text" id="ns-code" placeholder="SAT" style="width:8em" title="letters and digits; the file is sets/<code>.json and renders go to out/<code>/">
       <label>name</label><input type="text" id="ns-name" placeholder="Satoru, forgot his ninjas at home">
-      <label>style</label><select id="ns-style"><option value="">none — add one later</option>${templates.map(t => `<option value="${esc(t.name)}">${esc(t.name)}${t.builtin ? ' (built-in)' : ''}${t.private ? ' (private)' : ''}</option>`).join('')}</select>
-      <label>private</label><span><input type="checkbox" id="ns-private"> <span class="muted">sets/private/, which git ignores</span></span>
+      <label>style</label><select id="ns-style"><option value="">none — add one later</option>${templates.map(t => `<option value="${esc(t.name)}">${esc(t.name)}${t.builtin ? ' (built-in)' : ''}</option>`).join('')}</select>
       <label>cards</label><textarea id="ns-deck" rows="8" placeholder="a decklist: '1 Card Name' per line, commander(s) after a blank line — or just names, one per line"></textarea>
       <label></label><div class="row"><button class="primary" id="ns-go">create</button><button id="ns-cancel">cancel</button></div>
     </div>`;
   $('#ns-cancel').onclick = () => { box.hidden = true; };
   $('#ns-go').onclick = () => {
     const body = {code: $('#ns-code').value.trim(), name: $('#ns-name').value.trim(), style: $('#ns-style').value || null,
-                  private: $('#ns-private').checked, decklist: $('#ns-deck').value};
+                  decklist: $('#ns-deck').value};
     if (!body.code) { toast('a set needs a code', true); return; }
     api('/api/sets', {method: 'POST', body}).then(d => { toast(`${d.code}: ${d.cards_detail.length} cards`); state.ws = null; location.hash = `#/set/${d.code}/edit`; })
       .catch(e => toast(e.message, true));
@@ -1319,7 +1318,7 @@ function edit() {
             <button id="savetpl" title="write this style block (and the set's css) to styles/ for other sets">save as template…</button>
             <button id="dropstyle" title="remove the style block; the variants it made stay in the art cache">remove style</button><span class="sep"></span>` : ''}
           <span class="muted">${st.style ? 'replace with' : 'start from'} template</span>
-          <select id="tpl">${st.style ? '' : '<option value="">choose a template…</option>'}${(E.styles || []).map(t => `<option value="${esc(t.name)}" ${t.name === st.style?.name ? 'selected' : ''}>${esc(t.name)}${t.builtin ? ' (built-in)' : ''}${t.private ? ' (private)' : ''}${t.sets.length ? ' · ' + t.sets.join(' ') : ''}</option>`).join('')}</select>
+          <select id="tpl">${st.style ? '' : '<option value="">choose a template…</option>'}${(E.styles || []).map(t => `<option value="${esc(t.name)}" ${t.name === st.style?.name ? 'selected' : ''}>${esc(t.name)}${t.builtin ? ' (built-in)' : ''}${t.sets.length ? ' · ' + t.sets.join(' ') : ''}</option>`).join('')}</select>
           <label title="the template's .css becomes the set's, replacing ${esc(code.toLowerCase())}.css"><input type="checkbox" id="tplcss" ${st.css ? '' : 'checked'}> its css too</label>
           <button id="applytpl" ${E.styles?.length && st.style ? '' : 'disabled'}>apply</button>
         </div>
@@ -1376,8 +1375,8 @@ function edit() {
     if (!confirm(`Remove the style block from ${code}? Its restyle variants stay in the art cache; a template can bring it back.`)) return;
     api(`/api/sets/${code}/style`, {method: 'PUT', body: {}}).then(() => { toast('style removed'); refresh(); }).catch(e => toast(e.message, true));
   };
-  // with no style block the picker starts on a placeholder, so apply waits for a real choice and always asks:
-  // the list puts private templates first, and one click used to install the first of them unasked
+  // with no style block the picker starts on a placeholder, so apply waits for a real choice and always asks
+  // (one click used to install the first template in the list unasked)
   if (!st.style) $('#tpl').onchange = () => { $('#applytpl').disabled = !$('#tpl').value; };
   $('#applytpl').onclick = () => {
     const t = $('#tpl').value;
@@ -1438,10 +1437,9 @@ function edit() {
 function saveTemplateFromSet(st) {
   const name = prompt(`Save ${st.code}'s style as which template? (styles/<name>.json; letters, digits, - and _)`, st.style.name);
   if (!name) return;
-  const priv = confirm('Private (styles/private/, which git ignores)?\n\nOK = private, Cancel = shared in styles/');
-  const save = force => api('/api/styles', {method: 'POST', body: {set: st.code, name, private: priv, force}})
+  const save = force => api('/api/styles', {method: 'POST', body: {set: st.code, name, force}})
     .then(t => { toast(`saved ${t.path}`); if (state.styles) state.styles.list = null; if (state.edit) state.edit.styles = null; })
-    .catch(e => { if (!force && / exists|needs --force/.test(e.message) && confirm(`${e.message}\n\nReplace / share it anyway?`)) save(true); else toast(e.message, true); });
+    .catch(e => { if (!force && / exists/.test(e.message) && confirm(`${e.message}\n\nReplace it?`)) save(true); else toast(e.message, true); });
   save(false);
 }
 
@@ -1449,12 +1447,12 @@ function saveTemplateFromSet(st) {
 async function styles(r) {
   const fields = state.ws.style_fields;
   let T = state.styles;
-  if (!T) T = state.styles = {list: null, name: null, values: null, css: '', private: false, keep: [], draft: false, frame: null};
+  if (!T) T = state.styles = {list: null, name: null, values: null, css: '', keep: [], draft: false, frame: null};
   if (!T.list) T.list = await api('/api/styles');
   const cur = r.name ? T.list.find(t => t.name === r.name) : null;
   if (r.name && !cur) { $('#main').innerHTML = `<div class="empty bad">no template ${esc(r.name)}</div>`; return; }
   if (cur && T.name !== cur.name) {
-    T.name = cur.name; T.draft = false; T.values = {...cur.style}; T.css = cur.css || ''; T.private = cur.private; T.keep = Object.keys(cur.style);
+    T.name = cur.name; T.draft = false; T.values = {...cur.style}; T.css = cur.css || ''; T.keep = Object.keys(cur.style);
     T.frame = cur.frame ? {...cur.frame} : null;
   }
   const knobs = state.ws.frame_fields || [];
@@ -1463,7 +1461,7 @@ async function styles(r) {
   const editing = cur || T.draft;
   const lit = f => JSON.stringify(T.values?.[f.name] ?? f.default) !== JSON.stringify(f.default);
   const asFile = cur ? Object.fromEntries(Object.entries(cur.style).filter(([k]) => k !== 'name')) : null;
-  const dirty = cur && (JSON.stringify(slimStyle(fields, T.values, T.keep)) !== JSON.stringify(asFile) || T.css !== (cur.css || '') || T.private !== cur.private
+  const dirty = cur && (JSON.stringify(slimStyle(fields, T.values, T.keep)) !== JSON.stringify(asFile) || T.css !== (cur.css || '')
     || JSON.stringify(frameSlim(T.frame)) !== JSON.stringify(frameSlim(cur.frame)));
   const sets = (state.ws.sets || []).filter(s => !s.error);
   $('#main').innerHTML = `
@@ -1472,7 +1470,7 @@ async function styles(r) {
     <div class="styles">
       <div class="tlist panel">
         ${T.list.map(t => `<div class="t ${t.name === T.name && !T.draft ? 'on' : ''}" data-tpl="${esc(t.name)}"><b>${esc(t.name)}</b>
-          ${t.builtin ? '<span class="badge">built-in</span>' : ''}${t.private ? '<span class="badge" title="styles/private/, not in git">private</span>' : ''}${t.shadowed ? '<span class="badge warn" title="a private template of the same name is the one that is found">shadowed</span>' : ''}
+          ${t.builtin ? '<span class="badge">built-in</span>' : ''}
           <small>${esc((t.style.prompt || '').slice(0, 80))}${(t.style.prompt || '').length > 80 ? '…' : ''}</small>
           ${t.sets.length ? `<small>used by ${t.sets.map(c => `<a href="#/set/${esc(c)}">${esc(c)}</a>`).join(' ')}</small>` : ''}</div>`).join('') || '<div class="empty">no templates yet</div>'}
       </div>
@@ -1484,7 +1482,6 @@ async function styles(r) {
           ${dirty ? '<span class="badge warn">unsaved</span>' : ''}</div>
         <div class="form">
           ${T.draft ? '<label>name</label><input type="text" id="tname" value="' + esc(T.name || '') + '" placeholder="letters, digits, - and _">' : ''}
-          <label title="styles/private/ is git-ignored; a private template shadows a shared one of the same name">private</label><span><input type="checkbox" id="tprivate" ${T.private ? 'checked' : ''}></span>
           ${styleForm(fields, T.values, lit)}
           <label title="frame rules that go with the style; a set that starts from the template gets them as its css">css</label><textarea class="css" id="tcss" style="min-height:90px">${esc(T.css)}</textarea>
           <label title="the frame's dressing that goes with the style: a set that takes the template takes these knobs too. All at their defaults = none saved">frame</label>${knobsHtml(knobs, T.frame)}
@@ -1504,20 +1501,19 @@ async function styles(r) {
   document.querySelectorAll('[data-tpl]').forEach(el => el.onclick = e => { if (e.target.tagName !== 'A') location.hash = `#/styles/${encodeURIComponent(el.dataset.tpl)}`; });
   if ($('#newtpl')) $('#newtpl').onclick = () => {
     T.draft = true; T.name = ''; T.values = {}; fields.forEach(f => { if (f.name !== 'name' && f.default !== null) T.values[f.name] = f.default; });
-    T.values.prompt = ''; T.css = ''; T.private = false; T.keep = []; T.frame = null;
+    T.values.prompt = ''; T.css = ''; T.keep = []; T.frame = null;
     if (location.hash !== '#/styles') location.hash = '#/styles'; else styles({view: 'styles'});
   };
   if (!editing) return;
   bindStyleForm(fields, T.values, () => styles(r));
   bindKnobs((k, v) => { T.frame = {...(T.frame || {}), [k]: v}; styles(r); });
-  $('#tprivate').onchange = e => { T.private = e.target.checked; styles(r); };
   $('#tcss').onchange = e => { T.css = e.target.value; };
   if ($('#tname')) $('#tname').onchange = e => { T.name = e.target.value.trim(); };
   const save = (name, then) => {
     if (!name) { toast('a template needs a name', true); return; }
     T.css = $('#tcss').value;
     const fr = frameSlim(T.frame);
-    api(`/api/styles/${encodeURIComponent(name)}`, {method: 'PUT', body: {style: slimStyle(fields, T.values, T.keep), css: T.css, private: T.private, frame: Object.keys(fr).length ? fr : null}})
+    api(`/api/styles/${encodeURIComponent(name)}`, {method: 'PUT', body: {style: slimStyle(fields, T.values, T.keep), css: T.css, frame: Object.keys(fr).length ? fr : null}})
       .then(t => { toast(`saved ${t.path}`); T.list = null; T.name = null; T.draft = false; if (state.edit) state.edit.styles = null; (then || (() => { location.hash = `#/styles/${encodeURIComponent(name)}`; if (r.name === name) styles({view: 'styles', name}); }))(); })
       .catch(e => toast(e.message, true));
   };

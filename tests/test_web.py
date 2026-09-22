@@ -172,10 +172,10 @@ def test_style_templates(client):
     assert client.put("/api/styles/mine", json={"style": {"prompt": "p", "denoise": 7}}).status_code == 400
     assert client.put("/api/styles/bad name", json={"style": {"prompt": "p"}}).status_code == 400
 
-    # move to the private tier: one file, in one place
-    r = client.put("/api/styles/mine", json={"style": {"prompt": "p2"}, "private": True})
-    assert r.json()["private"] and (client.ws.styles / "private" / "mine.json").exists()
-    assert not (client.ws.styles / "mine.json").exists() and not (client.ws.styles / "mine.css").exists()
+    # replace: the css goes when none is sent
+    r = client.put("/api/styles/mine", json={"style": {"prompt": "p2"}})
+    assert r.status_code == 200 and json.loads((client.ws.styles / "mine.json").read_text()) == {"name": "mine", "prompt": "p2"}
+    assert not (client.ws.styles / "mine.css").exists()
 
     # a set takes a template, a template is saved from a set, and the usage is reported
     client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"]})

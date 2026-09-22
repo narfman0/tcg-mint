@@ -54,7 +54,6 @@ h2 { font-size: 1.05rem; margin: 1.4rem 0 .5rem; color: var(--ink-2); text-trans
 
 /* sets home */
 .setlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-#setnav .lock { font-size: .8em; opacity: .6; }
 #setnav a.all { opacity: .7; font-style: italic; }
 .toolbar input[type=text] { width: 14em; }
 .setcard { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
