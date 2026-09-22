@@ -18,7 +18,7 @@ from tests.test_golden import CARDS, DPI, GOLDEN, MEAN_TOL, OUTLIER_FRAC, OUTLIE
 
 pytest.importorskip("playwright")
 
-# a legendary mythic gold creature (the gold plate with black lettering, a P/T, no crown, no stamp), a land with
+# a legendary mythic gold creature (the gold plate, its white lettering, a P/T, no crown, no stamp), a land with
 # long rules text (the bevelled land box, the fit at work) and an artifact (the brown plate, pips in the title)
 RETRO = {"legend": CARDS["legend"], "land": CARDS["land"], "artifact": CARDS["artifact"]}
 
@@ -71,6 +71,10 @@ def test_the_css_moves_and_repaints_m15_pieces_inside_its_class():
     assert ".design-retro .stamp { display: none; }" in css
     assert ".design-retro .pt .plate { display: none; }" in css
     assert ".design-retro .pw-line { display: none; }" in css
+    # the lettering on the plate is white with a drop on every kind, the light plates (gold, white) included
+    assert "--ink-plate: #000" not in css and "--drop: none" not in css
+    # a hybrid keeps one whole plate: the base masks its texture off the right half, the design unmasks it
+    assert ".design-retro.hybrid .frame::before { mask-image: none; }" in css
     for kind in frame.FRAMES:
         assert re.search(rf"\.design-retro\.kind-{kind}\b[^{{]*{{ --frame: #[0-9a-f]{{6}}; --box: #[0-9a-f]{{6}};", css), kind
     # the M15 frame is untouched: its page carries none of this

@@ -37,7 +37,8 @@
    - The art window is recessed: an outer dark line, a bevel, a black line, the picture. The outer line's outside
      edge lies at x 24.9 (24.5-25.8) and 225.1 (224.2-225.8), y 31.2 (29.9-32.2: the DMR rebuild at 32.0, the
      originals and the timeshifted sheet at 29.9-31.5) and 192.6 (192.3-193.0); the picture at x 28.8 (28.2-29.5)
-     to 221.2 (220.8-221.8) and y 34.9 (33.9-35.9) to 188.9 (188.5-189.6): a rectangle 3.85 wide all round, line
+     to 221.2 (220.8-221.8) and y 35.05 (Serra 35.9, Counterspell 35.5, Shivan 35.2, Lightning Helix 34.9,
+     Wasteland 34.6, Eternal Witness 33.9) to 188.9 (188.5-189.6): a rectangle 3.85 wide all round, line
      0.6, bevel 2.5, black line 0.75 (Serra 24.5 / 25.2 / 27.9 / 28.5 on the left, 221.1 / 221.7 / 224.2 / 224.8 on
      the right). The bevel's faces are lit from the upper right: the left and the bottom faces catch it (1.23 and
      1.24 of the plate on Serra, 1.52 / 1.53 Counterspell, 1.62 / 1.53 Sol Ring, 1.57 / 1.59 Shivan, 1.44 / 1.63
@@ -65,11 +66,22 @@
      0.4). Three rings under the box.
    - The power and toughness: white numerals with a black drop to the lower right, no box, the digits 315-325.5
      tall (Shivan 315.1-325.5, Serra 314.8-325.8, Yawgmoth 314.8-325.2: 10 units, the drop included) and ending
-     at 228.5 (227.5-229.5). The name, the type line and the numerals are white with the same drop on every colour
-     but gold, whose plate is light and whose text is black (Lightning Helix, Recoil, Terminate, Armadillo Cloak).
-   - The collector lines print on the plate's foot under the box, 311-335, white; ours keep M15's two rows at the
-     left and the credit at the right, moved up into the foot (M15's sit in its 26-unit black foot; this frame's
-     is 15), with the numerals' drop for legibility on a light plate.
+     at 227.7 (the white ink's right edge on Shivan DMR 329 227.5, Birds of Paradise DMR 336 227.2, Mulldrifter
+     TSR 311 227.9, Yawgmoth 228.2, and Serra 228.9 where the parchment plate blurs the threshold).
+     The name, the type line and the numerals are white with that drop on every colour, the light plates included:
+     on the gold cards the name band's brightest hundredth runs 242-255 against the plate's own 174-215 (Recoil
+     242/208, Lightning Helix 255/215, Terminate 244/184, Armadillo Cloak 244/174, Vindicate BRC 131 254/197) --
+     white glyphs over a dark drop, not black ink; the same on the white cards (Serra 249 against 218, Wrath of
+     God DMR 279 253 against 225).
+   - The collector lines print on the plate's foot under the box, 311-335: the artist's credit in the title face,
+     white with the name's drop, and the legal line under it white too -- except on the white cards, whose legal
+     line is black on the parchment (the foot's darkest fiftieth against the plate's own: Wrath of God DMR 279
+     90 against 124, Serra 91 against 176, where every other kind's foot is the reverse, its brightest fiftieth
+     the ink -- Shivan 233 against a plate of 122, Birds 226 against 112, Vindicate 225 against 197, Ornithopter
+     237 against 119; a basic's foot stays white on the land plate, Plains INR 288). Ours keep M15's two rows at
+     the left and the credit at the right, moved up into the foot (M15's sit in its 26-unit black foot; this
+     frame's is 15), with the numerals' drop; on a white card both rows go black, since the two printed lines
+     take opposite ink and ours run them in one small sans -- the legal line's black is the legible one.
    - The palette, medians of the plate (its rails and foot, the title band agreeing) and of the box's face:
      white parchment #cfc2b0 / #fbfafd (Serra); blue #4f869c / #d7e2f7 (Counterspell; Cyclonic Rift's plate
      #3196a5), black #2a231c / #dbb78c (Duress #302720 / #d5b894, Yawgmoth #201f17 / #ddb38a, Dauthi #18180f /
@@ -80,9 +92,15 @@
      whose bright patches read 0xd5cab0 and whose cracks 0x524026, so its median sits low), artifact #65503f /
      #e4e1df (Ornithopter #725846 / #ded9e2, Sol Talisman #634c35 / #eae5e1, Sol Ring #55412d / #eaeae8, Mox
      Diamond #53443b / #d9d4c7: the old artifact plate is brown stone, not M15's blue-grey steel), land #6b4f3e /
-     #be8a54 (Gemstone Mine #6f4a37 / #c28e4b, Wasteland #655c51 / #bb8759; a basic's box takes its colour --
-     Forest INR 297 #b1b36f, Swamp DMR 407 #787473 -- drawn here as a pale straw under the colour's pinline,
-     which the base passes for a land that makes one colour). Colorless takes the artifact plate. The textures are
+     #be8a54 (Gemstone Mine #6f4a37 / #c28e4b, Wasteland #655c51 / #bb8759; a basic's box takes its
+     colour, its bevel band as well as its face -- the ten INR and DMR basics, band then face at y 250-270:
+     white #d6cac4 / #dfc78a and #cdbdc6 / #e2c194, blue #006b83 / #93aaa7 and #245074 / #979ca2, black
+     #4b4747 / #7f867a and #3d383b / #767371, red #d37157 / #d9ab87 and #bc6050 / #cc9983, green #4f9253 /
+     #adb171 and #527949 / #a6a465 -- both drawn here off the colour's pinline, which the base passes for a
+     land that makes one colour: the face a pale straw under it, the band the pinline pulled a third towards a
+     warm grey (ours #d4d0c9, #2a7b9f, #4d4a44, #b95642, #357758 against those prints' means #d2c4c5, #125e7c,
+     #444141, #c86954, #518650 -- white the loosest, the pinline being nearly white where the print's band is a
+     warm grey). Colorless takes the artifact plate. The textures are
      frame.texture_uri's tiles with retro parameters (in the comment ahead of them): the highlight and the shadow
      are the medians of the lightest and darkest tenth of each plate.
    - Fonts: the title, type and P/T face was Goudy Medieval, which is not free and not in fonts/. Almendra Bold,
@@ -106,17 +124,21 @@
 .design-retro.kind-B { --frame: #2a231c; --box: #dbb78c; --bar: #cfae86; --bar-edge: #3a3637; }
 .design-retro.kind-R { --frame: #a54e35; --box: #b8837a; --bar: #ae7a71; --bar-edge: #7b3d2c; }
 .design-retro.kind-G { --frame: #4e5836; --box: #d8b086; --bar: #cca882; --bar-edge: #2f5a3b; }
-.design-retro.kind-gold { --frame: #857346; --box: #bcaab3; --bar: #b3a2aa; --bar-edge: #7d6530;
-  --ink-plate: #000; --drop: none; }
+.design-retro.kind-gold { --frame: #857346; --box: #bcaab3; --bar: #b3a2aa; --bar-edge: #7d6530; }
 .design-retro.kind-artifact, .design-retro.kind-C { --frame: #65503f; --box: #e4e1df; --bar: #d8d5d3; --bar-edge: #5d6a70; }
 .design-retro.kind-land { --frame: #6b4f3e; --box: #be8a54; --bar: #b58551; --bar-edge: #6b5a42; }
-/* a basic's box in its colour: a pale straw under the colour's pinline (the base passes it for a land that makes
-   one colour; a plain land's pinline is the land's own straw, which leaves the box straw) -- a Forest's comes out
-   0x94aa7f against the print's 0xb1b36f, a Swamp's 0x9e9b7f against 0x787473 -- and its symbol the glyph
-   alone -- no disc, no shadow -- in a deeper shade of the same (Forest INR 297: the tree 0x4c8c52 on the box's
-   0xb1b36f, 52 tall), masked out of the symbol the way the full-art medallion does (--glyph, frame.glyph_uri) */
-.design-retro.kind-land .textbox:has(.big-sym) { background: color-mix(in srgb, var(--pinline) 35%, #d8cc9c); }
-.design-retro .textbox .big-sym .pip, .design-retro .textbox .big-sym .pip img { width: 52px; height: 52px; }
+/* a basic's box in its colour, face and bevel band both (the band is the colour on every scan, never the land's
+   tan): a pale straw under the colour's pinline for the face, the pinline itself a third of the way to a warm
+   grey for the band -- a Forest's face comes out 0x94aa7f against the print's 0xb1b36f -- and its symbol the
+   glyph alone -- no disc, no shadow -- in a deeper shade of the face (Forest INR 297: the tree 0x4c8c52 on the
+   box's 0xb1b36f), masked out of the symbol the way the full-art medallion does (--glyph, frame.glyph_uri).
+   The glyph keeps the disc's viewBox, so it fills only half to five-sixths of the box it is masked into (ours
+   at a 52 box: Island 25.3 x 37.7, Forest 43.7 x 43.7, Swamp 41.7 x 42.0) where the print draws it 38.3 x 55.8
+   (Island INR 291), 69.2 x 68.9 (Forest INR 297) and 64.4 x 65.1 (Swamp DMR 407) -- 1.48 to 1.58 times ours, so
+   the box is 80 */
+.design-retro.kind-land .textbox:has(.big-sym) { background: color-mix(in srgb, var(--pinline) 35%, #d8cc9c);
+  --retro-band: color-mix(in srgb, var(--pinline) 70%, #8c8378); }
+.design-retro .textbox .big-sym .pip, .design-retro .textbox .big-sym .pip img { width: 80px; height: 80px; }
 .design-retro .textbox .big-sym .pip img { visibility: hidden; }
 .design-retro .textbox .big-sym .pip::before { display: none; }
 .design-retro .textbox .big-sym .pip::after { content: ""; position: absolute; inset: 0;
@@ -130,7 +152,8 @@
   border: 0.9px solid; border-color: rgba(255,255,255,.3) rgba(255,255,255,.35) rgba(0,0,0,.3) rgba(0,0,0,.32);
   box-shadow: inset 0 0 0 .6px rgba(0,0,0,.42); }
 .design-retro .frame::before { background-image: var(--retro-texture); }
-.design-retro .frame::after { display: none; }  /* a hybrid's second texture: one plate, one texture */
+.design-retro .frame::after { display: none; }  /* a hybrid's second texture: one plate, one texture ... */
+.design-retro.hybrid .frame::before { mask-image: none; }  /* ... and the first one whole: the base cuts it at the midline */
 /* no pinline plate, no crown */
 .design-retro .pinlines, .design-retro .crown-o, .design-retro .crown { display: none; }
 
@@ -162,14 +185,16 @@
     inset 0 2.7px 1px rgba(0,0,0,.11), inset -2.7px 0 1px rgba(0,0,0,.11), inset 1px 0 0 rgba(255,255,255,.22); }
 .design-retro .stamp { display: none; }
 /* a land's box is bevelled like the window: an inner line, a light band (the box's own colour, a shade lighter:
-   Wasteland's reads 160 against the box's 150-170 and the plate's 100), an outer line, as three rings */
+   Wasteland's reads 160 against the box's 150-170 and the plate's 100), an outer line, as three rings; the band
+   is a variable so that a basic can repaint it in its colour without restating the rings */
 .design-retro.kind-land .textbox { left: 28.2px; top: 211.6px; width: 193.9px; height: 94.9px;
-  box-shadow: 0 0 0 .5px #000, 0 0 0 3px color-mix(in srgb, var(--box) 80%, #fff), 0 0 0 3.5px #000,
+  --retro-band: color-mix(in srgb, var(--box) 80%, #fff);
+  box-shadow: 0 0 0 .5px #000, 0 0 0 3px var(--retro-band), 0 0 0 3.5px #000,
     inset 0 2.4px 1px rgba(0,0,0,.1), inset -2.4px 0 1px rgba(0,0,0,.1); }
 
 /* --- the power and toughness: the numerals alone, white with the drop, no plate, no lift; the box keeps the plate's
    inline width (frame.pt_plate) and the numerals sit at its right end, so a 10/10 ends where a 5/5 does --- */
-.design-retro .pt { right: 21.5px; top: 314.8px; height: 13px; justify-content: flex-end; filter: none;
+.design-retro .pt { right: 21.8px; top: 314.8px; height: 13px; justify-content: flex-end; filter: none;
   font-size: 13.8px; color: var(--ink-plate); text-shadow: var(--drop); }
 .design-retro .pt .plate { display: none; }
 .design-retro .pt span { top: 0; }
@@ -188,8 +213,11 @@
 .design-retro .loyalty { left: 192.5px; top: 309.5px; }
 .design-retro.planeswalker .footer .credit { margin-right: 38px; }
 
-/* --- the collector lines, up into the plate's foot (the black foot is 15, M15's 26) --- */
+/* --- the collector lines, up into the plate's foot (the black foot is 15, M15's 26); black on a white card,
+   whose printed legal line is black on the parchment (.collector carries its own colour, so it is named too) --- */
 .design-retro .footer { bottom: 15.5px; left: 25.5px; right: 25.5px; text-shadow: 0.4px 0.45px 0 rgba(0,0,0,.9); }
+.design-retro.kind-W .footer, .design-retro.kind-W .footer .collector,
+.design-retro.kind-W .footer .collector b { color: #1a1613; text-shadow: none; }
 
 /* --- the textures: frame.texture_uri's tile (fractal noise shaped into a highlight layer and a shadow layer,
    256 SVG px drawn at 128) with these parameters in frame.TEXTURES' terms -- base frequency, octaves, seed,
