@@ -428,8 +428,9 @@ CROWN = [
 
 
 # ... and its left side, (y, x) down from where the top edge meets it: the tip bulges out to 8 beside the bar's
-# top, notches in to 10 at the bar's middle, flares to 7 below the bar and tucks back in under the art. The
-# right side mirrors it about the card's centre (125).
+# top, notches in to 10 at the bar's middle, flares to 7 below the bar and tucks back in under the bar's foot,
+# where the tail's outer edge ends (the two traced points after 41 had followed the tongue's shadow, not the
+# tail). The right side mirrors it about the card's centre (125).
 CROWN_SIDE = [
     (10.5, 14.1), (11.0, 13.8), (11.5, 13.1), (12.0, 12.8), (12.5, 12.4), (13.0, 12.1), (13.5, 11.4), (14.0, 11.4),
     (14.5, 10.7), (15.0, 10.7), (15.5, 10.4), (16.0, 10.1), (16.5, 9.7), (17.0, 9.4), (17.5, 9.1), (18.0, 9.1),
@@ -438,28 +439,38 @@ CROWN_SIDE = [
     (27.0, 9.7), (27.5, 10.1), (28.0, 10.1), (28.5, 9.7), (29.0, 9.7), (29.5, 9.4), (30.0, 8.1), (30.5, 7.7), (31.0,
     7.4), (31.5, 7.0), (32.0, 7.4), (32.5, 7.4), (33.0, 7.7), (33.5, 7.7), (34.0, 8.1), (34.5, 8.1), (35.0, 8.1),
     (35.5, 8.4), (36.0, 8.7), (36.5, 8.7), (37.0, 9.1), (37.5, 9.1), (38.0, 9.4), (38.5, 9.4), (39.0, 9.7), (39.5,
-    10.1), (40.0, 10.4), (40.5, 10.4), (41.0, 11.1), (41.5, 11.1), (42.0, 11.7)
+    10.1), (40.0, 10.4), (40.5, 10.4), (41.0, 11.1),
 ]
 
 
-def crown_paths():
-    """(fill, outline) CSS path() strings for the crown badge, in card units from the card's top-left: up the
-    left side, along the traced top edge, down the mirrored right side, closed under the art; the outline is
-    the same shape pushed out 1.3."""
-    # below the bar the badge narrows into a flat tongue beside the art, x 13.5-16.6, down to 58 (the traced side
-    # profile's last points had followed the tongue's shadow, not the tongue); the outline layer is that shadow, out
-    # to 10.8, and the shape closes under the bar at the art's line
-    foot = [(41.5, 11.5), (43.0, 13.0), (45.0, 13.5), (58.0, 13.5)]
-    side = [(y, x) for y, x in CROWN_SIDE if y <= 40.5]
+# The crown's foot, (x, y) from the tail's tip in to the card's middle, traced off Scryfall's own renders of
+# Talrand (OTC), Rishkar (J25) and Gonti (OTC), which sit exactly on the template's geometry, and checked
+# against scans of Jaxis (SNC) and Thalia (VOW), which lie a unit higher and blur; the two sides mirror
+# within 0.3. Below the bar the badge is not the tongue beside the art: that is the pinline plate's
+# (template.html .pl-crown), and the badge ends 1.6 under the bar with its bottom edge at 38.8, the outline
+# under it a 0.5 line to 39.3 (thinner than the 1.3 round the top -- the tongue's dark upper edge starts right
+# under it). At each side the tail comes to a point at 41.8, its inside running back up to the bottom edge.
+CROWN_FOOT = [(11.4, 41.8), (12.0, 41.0), (12.5, 40.0), (13.2, 39.4), (14.3, 38.9), (16.6, 38.8)]
+# ... and the outline's, from the tail's tip: the line rounds the tail's inside (1.3 thick, the renders cut it
+# 2.2-3.5 wide on the slant) to reach the tongue's edge at (12.2, 44), then runs down that edge to 54 as a
+# wedge over the band out to the border, black beside the tail and fading down (.crown-o's gradient): the
+# renders show the band shaded there on both sides, to ~15% of its brightness at 44, ~45% at 48, clear by 54.
+CROWN_FOOT_O = [(10.0, 42.0), (9.5, 43.0), (9.5, 54.0), (12.2, 54.0), (12.2, 44.0), (12.6, 43.0), (13.2, 42.0),
+                (13.9, 41.0), (14.9, 40.0), (16.3, 39.5), (17.5, 39.3)]
 
-    def path(o, foot_o):
+
+def crown_paths():
+    """(fill, outline) CSS path() strings for the crown badge, in card units from the card's top-left: from
+    the bottom edge out along the left foot, up the left side, along the traced top edge, down the mirrored
+    right side and foot, closed along the bottom edge; the outline is the same shape pushed out 1.3 around
+    the top and sides, with its own traced foot (CROWN_FOOT_O)."""
+    def path(o, foot):
         top = [(CROWN_X0 + i, y - o) for i, y in enumerate(CROWN) if 14 <= CROWN_X0 + i <= 236]
-        left = [(x - foot_o, y) for y, x in reversed(foot)] + [(x - o, y) for y, x in reversed(side)]
-        right = [(250 - x + o, y) for y, x in side] + [(250 - x + foot_o, y) for y, x in foot]
-        pts = left + top + right
-        body = " ".join(f"L{x:.1f} {y:.1f}" for x, y in pts)
-        return f"M{pts[0][0]:.1f} {pts[0][1]:.1f} {body} L233.4 58 L233.4 38.7 L16.6 38.7 L16.6 58 Z"
-    return path(0, 0), path(1.3, 2.7)
+        side = [(x - o, y) for y, x in CROWN_SIDE]
+        left = list(reversed(foot)) + list(reversed(side))
+        right = [(250 - x, y) for x, y in side] + [(250 - x, y) for x, y in foot]
+        return "M" + " L".join(f"{x:.1f} {y:.1f}" for x, y in left + top + right) + " Z"
+    return path(0, CROWN_FOOT), path(1.3, CROWN_FOOT_O)
 
 
 def pt_plate(text):
@@ -717,9 +728,10 @@ def mana(symbols, cost):
 DFC_ICON = {("transform", 0): "☀", ("transform", 1): "☾", ("modal_dfc", 0): "▲", ("modal_dfc", 1): "▼"}
 
 
-# the pinline plate: the normal frame's four elements' pinlines, painted before them (template.html .pinlines)
+# the pinline plate: the normal frame's four elements' pinlines, painted before them (template.html .pinlines),
+# and first of all the legendary crown's tongues (shown only under a crown), so their halo lies under the rest
 PINLINES = "".join(f'<div class="pinlines {layer}">'
-                   + "".join(f'<div class="pinline pl-{e}"></div>' for e in ("title", "art", "type", "text"))
+                   + "".join(f'<div class="pinline pl-{e}"></div>' for e in ("crown", "title", "art", "type", "text"))
                    + "</div>" for layer in ("shade", "light"))
 
 

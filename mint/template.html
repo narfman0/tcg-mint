@@ -97,12 +97,35 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
 .frame::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: url("$texture"); background-size: 128px 128px; opacity: var(--frame-texture); }
 /* the legendary crown: its shape is the traced profile frame.CROWN, set on each element as an inline clip path
-   in card units (the elements span the card), the black outline a copy pushed out 1.3 */
+   in card units (the elements span the card), the black outline a copy pushed out 1.3 around the top and sides;
+   the badge ends 1.6 under the bar (38.8, its outline to 39.3), its tails coming to a point at each side (frame.CROWN_FOOT) */
 .crown-o, .crown { position: absolute; left: 0; top: 0; width: 250px; height: 60px; }
-/* the badge is the pinline colour, whitened toward the centre, brighter than everything around it; the outline
-   layer is its shadow, black around the top and fading out down the tongue's side */
-.crown-o { background: linear-gradient(180deg, #000 0, #000 48px, rgba(0,0,0,0) 60px); }
+/* the badge is the pinline colour, whitened toward the centre, brighter than everything around it; the outline layer
+   is black, and below the bar its tails run on down the tongues' edges as a wedge of shadow over the band out to
+   the border (frame.CROWN_FOOT_O), fading with depth: on Scryfall's renders the band beside a tail reads ~15% of its
+   brightness at 44, ~45% at 48 and clear by 54, on the right side as on the left */
+.crown-o { background: linear-gradient(180deg, #000 0, #000 42px, rgba(0,0,0,.75) 44px, rgba(0,0,0,.55) 48px,
+  rgba(0,0,0,.2) 52px, rgba(0,0,0,0) 54px); }
 .crown { background: linear-gradient(90deg, var(--pinline) 25%, color-mix(in srgb, var(--pinline) 60%, #fff) 50%, var(--pinline) 75%); }
+/* the tongues under the crown's feet are the pinline plate's, not the badge's: one piece up beside the art from
+   its rail to the badge's foot, the plate's shadow falling off it to the left like everywhere else. Traced off
+   Scryfall's renders of Talrand (OTC), Rishkar (J25) and Gonti (OTC), the two sides within 0.3 of each other: the
+   tongue's edge is at 12.2 straight down to 53, then curves in to the rail, 13.0 at 54, 14.5 at 56, 15.3 at 58,
+   15.9 at 60, 16.6 by 64; a dark bevel 2.2 wide runs inside its top and outer edges (the pinline at 60% at the edge,
+   80% half a unit in, 92% at 1.5, clear at 2.2 -- the rail below has none: an inset shadow, blurred, since a
+   gradient tile the width of the bevel came out snapped a unit off its edge); and the band beyond its outer edge is
+   shaded on the lit side too, 50% at the edge and clear 2 units out, where the rail below carries the pale ridge
+   instead: a soft halo of the tongue's own. The bottom of the piece tucks inside the art's pinline, so its only
+   free edges are the tongues'. The shape is on ::before so the halo is not clipped away with it, and the halo
+   rides the light copy only, over that copy's ridge, so it is not laid down twice */
+.pl-crown { display: none; left: 12.2px; top: 38.9px; width: 225.6px; height: 28.6px; }
+.legendary .pl-crown { display: block; }
+.pinlines .pinline.pl-crown { background: none; }
+.pinlines.light .pl-crown { filter: drop-shadow(0 0 2.4px rgba(0,0,0,.9)); }
+.pl-crown::before { content: ""; position: absolute; inset: 0; background: var(--pinline);
+  box-shadow: inset 0 0 2.4px rgba(0,0,0,.85);
+  clip-path: path('M0 0 L0 14.1 C1.6 15.6 4.4 19.6 4.4 25.1 L5.3 27.1 L7.3 28.6 L218.3 28.6 L220.3 27.1 L221.2 25.1 \
+C221.2 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
 /* two-colour cards (frame.frame_pair): the pinline and text box run the left colour into the right across the
    middle, the bars staying a flat grey; a hybrid spell's band blends too, its two textures cross-fading, where a
    dual land keeps the land band. Every element is centred on the card, so each blends about its own middle.
@@ -117,6 +140,7 @@ html, body { width: 272px; height: 372px; background: #000; overflow: hidden; }
   mask-image: linear-gradient(90deg, transparent calc(50% - 30px), #000 calc(50% + 30px)); }
 .pair .crown { background: linear-gradient(90deg, var(--pinline) 25%,
   color-mix(in srgb, color-mix(in srgb, var(--pinline) 50%, var(--pinline-b)) 60%, #fff) 50%, var(--pinline-b) 75%); }
+.pair .pl-crown::before { background: linear-gradient(90deg, var(--pinline) calc(50% - 23px), var(--pinline-b) calc(50% + 23px)); }
 /* the bars span 14.8-235 outline included, 4.8 past the art on each side, 20 tall, their ends the pointed ovals of
    --bar-shape; the fill is flat (the bottom shade is the bevel's), the bevel lit from the upper right. The outline
    is a unit of black just inside the clip (a 0.5 border always rendered as 1): two cap images draw the ends' curve
