@@ -148,7 +148,7 @@ ollama_url = "http://127.0.0.1:11434"
 | command | what |
 |---|---|
 | `mint newset` | start a set file from a decklist (commander first); `--style` seeds a style block from a template or a built-in |
-| `mint render` | render cards by name or from a set file; `--compare` audition every font theme on one sheet; `--faces` the backs of double-faced cards too |
+| `mint render` | render cards by name or from a set file; `--design NAME` renders in one frame design whatever the set says; `--compare` audition every font theme on one sheet; `--faces` the backs of double-faced cards too |
 | `mint restyle` | regenerate every card's art in the set's style through ComfyUI (img2img + ControlNet) |
 | `mint describe` | a vision model reads each card's picture and text and writes its `subject` line; `--generate` then makes each card's `new` scene from it |
 | `mint animate` | a short seamless clip of a card's art through ComfyUI (Wan 2.2), beside its stills; the workbench's card page is where it is meant to be pressed |
@@ -501,6 +501,16 @@ A design steers the default printing to its own kind — a printing of that
 kind is no longer odd for the markers, the border or the promo that make
 it one — and sizes restyles and clips to its art rectangle. Sagas,
 classes, splits and battles keep the M15 frame whatever the design.
+
+`mint render --design NAME` overrides both the set's and the cards' own, for
+rendering the same cards in one frame after another without editing the set
+file; the renders land beside each other, each named for what came out, and
+the card page labels them by design:
+
+```sh
+mint render --set sets/bls1.json --design m15    --out out/bls1
+mint render --set sets/bls1.json --design retro  --out out/bls1
+```
 
 ### Style templates
 

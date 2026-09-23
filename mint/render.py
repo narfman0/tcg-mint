@@ -163,6 +163,8 @@ def main(argv=None):
     ap.add_argument("--dpi", type=int, default=1200)
     ap.add_argument("--out", default=".", help="directory for the PNGs (default: current directory)")
     ap.add_argument("--faces", action="store_true", help="also render the back face of double-faced cards")
+    ap.add_argument("--design", choices=list(frame.DESIGN_CHOICES),
+                    help="render every card in this frame design, whatever the set says")
     a = ap.parse_args(argv)
     themes = list(frame.THEMES) if a.compare else [a.theme]
 
@@ -174,7 +176,8 @@ def main(argv=None):
 
     try:
         results = render_cards(workspace.default(), a.names, set_path=a.set, styled=a.styled, themes=themes,
-                               dpi=a.dpi, out_dir=a.out, compare=a.compare, on_rendered=report, back_faces=a.faces)
+                               dpi=a.dpi, out_dir=a.out, compare=a.compare, on_rendered=report, back_faces=a.faces,
+                               design=a.design)
     except MintError as e:
         sys.exit(str(e))
     if a.compare:
