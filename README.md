@@ -512,35 +512,55 @@ classes, splits and battles keep the M15 frame whatever the design.
 
 #### Where a design's picture comes from
 
-Scryfall's `art_crop` is the M15 window whatever the printing is: 626 × 457
-of landscape. That is the whole picture for most designs, but not for
-`textless`, whose window is 210.6 × 303.6 — taller than it is wide. Handed
-the crop, `cover` keeps the aspect and throws away well over half of it.
+Scryfall's `art_crop` is usually the M15 window whatever the printing is: 626
+× 457 of landscape. For two designs that is not the picture the card shows.
 
-So for a card in a design that carries more art than the window, *and* whose
-chosen printing is of that design, the picture is cut out of the full-card
-scan instead — `art/cut_<design>_<id>.png`, at the rectangle that design's
-printings leave unpainted (`frame.SCAN_CUT`; for textless, from under the art
-line beneath the glass title bar down to the flat foot). The print's P/T
-plate, holofoil stamp and foot sweep are inside that rectangle and stay
-there: they sit at M15's coordinates on the card, which is exactly where our
-own opaque pieces land back on top of them.
+- **`textless`** — the window is 210.6 × 303.6, taller than it is wide, and
+  the crop is 1.37:1. `cover` keeps the aspect and throws away well over half
+  of it: the figure ends up cropped at the chest.
+- **`extended`** — the shape is close (1.52 against 1.37), but the printed
+  card's art *reaches both cut edges*: 250 card units across against the
+  window's 210.6. The crop has never carried the extension, so what you get
+  is the M15 window blown up 19% and the sides invented.
 
-Nothing about this is a knob. A plain printing rendered `textless` keeps the
-crop — its scan has no more picture in it than the crop does — and `mint
-check` still says the shape is wrong. What the cut needs is a card file with
-the promo printings in it (`mint cards --kind default_cards`); the oracle
-file has one printing per card and often not the textless one.
+For a card in one of those designs whose chosen printing is of that design,
+the picture is cut out of the full-card scan instead —
+`art/cut_<design>_<id>.png`, at the rectangle that design's printings leave
+unpainted (`frame.SCAN_CUT`, taken from each design's own css header).
+Textless keeps the print's P/T plate, holofoil stamp and foot sweep inside
+the rectangle: they sit at M15's coordinates, which is exactly where our own
+opaque pieces land back on top of them.
 
-The cut is about 627 × 836, so `mint check` will ask for `mint upscale` —
-which enhances the cut, not the crop, for a card whose design has one. The
-base is named `cut` (spelled out as `cut:textless` in a recipe), so a restyle
-or a clip that starts from it says so:
+The other designs keep the crop, and `frame.SCAN_CUT` records why each one
+does. The interesting no is **`fullart`**: for a full-art basic Scryfall
+crops tall by itself (626 × 747, 0.838:1 — measured on six, always that),
+which is closer to the 0.731 window than any rectangle of clean picture on
+the card; the MagicFest promos' art window is the M15 one opened a little,
+which *is* the crop; and on the edge-to-edge kind every pixel past the crop
+is under printed text. `borderless` is the same story, and `modern` and
+`retro` print their art in a window the crop already matches.
+
+Nothing here is a knob. A plain printing rendered `textless` keeps the crop —
+its scan has no more picture in it than the crop does — and `mint check`
+still says the shape is wrong. What the cut needs is a card file with the
+promo and booster printings in it (`mint cards --kind default_cards`); the
+oracle file has one printing per card and often not the one the design wants.
+
+A cut is about 627 × 836 (textless) or 745 × 466 (extended), so `mint check`
+will still ask for `mint upscale` — which enhances the cut, not the crop, for
+a card whose design has one. The base is named `cut` (spelled `cut:textless`
+in a recipe), so a restyle or a clip that starts from it says so:
 
 ```sh
 mint upscale --set sets/x.json                 # the cut where there is one, the crop elsewhere
 mint upscale --set sets/x.json --base cut      # the cut, and an error for a card that has none
 ```
+
+For a card with no printing of its design — most cards, in `fullart` — there
+is no better picture to be had from Scryfall, and the lever is generation
+rather than sourcing: a restyle or a clip is already made at the design's own
+aspect (`frame.generation_size`), so a `fullart` set's `new` or `inspire`
+scenes come out full-card shaped.
 
 `mint render --design NAME` overrides both the set's and the cards' own, for
 rendering the same cards in one frame after another without editing the set
@@ -728,6 +748,7 @@ and:
 |---|---|---|
 | Scryfall's `art_crop` | 626 × 457 | **2.7× short** — about 300 DPI on the card |
 | a scan cut (textless) | 627 × 836 | **2.9× short** of that design's own 1685 × 2429 window |
+| a scan cut (extended) | 745 × 466 | **2.9× short** of extended's 2176 × 1435 — 19% more picture than the crop |
 | after `mint upscale` (4× ESRGAN) | 2504 × 1828 | 0.67× — half again what it needs |
 | a restyle at the block's default | 1248 × 912 | **1.35× short** — about 590 DPI |
 | that restyle enhanced | 4992 × 3648 | 0.34× |

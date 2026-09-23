@@ -44,15 +44,25 @@ def test_every_design_says_where_its_art_sits():
 
 
 def test_only_a_design_the_crop_cannot_serve_has_a_cut():
-    assert frame.scan_cut("m15") is None  # Scryfall's crop *is* the M15 window
-    for d in frame.DESIGNS:
-        if d not in frame.SCAN_CUT:
-            assert frame.scan_cut(d) is None, f"{d} has a cut nobody measured"
-    x, y, w, h = frame.scan_cut("textless")
-    assert (x, y, w, h) == (19.6, 39.6, 210.6, 281.0)  # textless.css's own measurements
-    # the point of it: what the cut gives fits the design, and what the crop gives does not
-    assert frame.fits("textless", w / h)
+    # the two designs whose printings carry picture the crop has never had, and nothing else. fullart is
+    # the one that looks like it belongs here: Scryfall crops its basics tall by itself, and on its other
+    # kinds everything past the crop is under printed text (SCAN_CUT's comment holds the numbers)
+    assert set(frame.SCAN_CUT) == {"textless", "extended"}
+    for d in ("m15", "borderless", "fullart", "modern", "retro"):
+        assert frame.scan_cut(d) is None, f"{d} has a cut nobody measured"
+    assert frame.scan_cut(None) is None
+    assert frame.scan_cut("textless") == (19.6, 39.6, 210.6, 281.0)  # each design's own css header
+    assert frame.scan_cut("extended") == (0, 39.7, 250, 156.6)
+    off = lambda d, aspect: abs(aspect / frame.art_aspect(d) - 1)  # noqa: E731 - how hard `cover` cuts
+    for d, (x, y, w, h) in frame.SCAN_CUT.items():
+        assert 0 <= x and x + w <= 250 and 0 <= y and y + h <= 350, f"{d}'s cut leaves the card face"
+        # both beat the crop: a shape closer to the design, more picture, or both
+        assert off(d, w / h) < off(d, frame.art_aspect("m15")) or w > frame.DESIGNS["m15"][0], d
+    # textless is the loud case -- the crop is half that picture -- and extended the quiet one: near
+    # enough in shape, but 250 units of picture across against the window's 210.6
     assert not frame.fits("textless", frame.art_aspect("m15"))
+    assert frame.fits("extended", frame.art_aspect("m15"))
+    assert frame.scan_cut("extended")[2] > frame.DESIGNS["m15"][0]
 
 
 def test_a_cut_is_only_for_a_printing_of_that_design(tmp_path):
@@ -62,6 +72,21 @@ def test_a_cut_is_only_for_a_printing_of_that_design(tmp_path):
     assert art.cut_for(textless(), "m15") is None             # the crop already is that window
     assert art.cut_for(textless(), None) is None
     assert art.cut(synthetic_card(), "m15") is None
+    ext = synthetic_card(frame_effects=["extendedart"])
+    assert art.cut_for(ext, "extended") == "extended"
+    assert art.cut_for(ext, "textless") is None               # the printing is not one
+
+
+def test_a_full_art_printing_keeps_its_crop(tmp_path):
+    """The design that looks like it wants a cut and does not: Scryfall crops a full-art basic tall on
+    its own (0.838:1 against the window's 0.731, six measured), which beats any rectangle of clean
+    picture the card has, and its other kinds hide the rest of their art under printed text."""
+    art = Art(tmp_path)
+    basic = synthetic_card(full_art=True, type_line="Basic Land — Forest", name="Forest")
+    other = synthetic_card(full_art=True, type_line="Creature — Elf Druid")
+    assert frame.printed_design(basic) == "fullart" and frame.printed_design(other) == "fullart"
+    assert art.cut_for(basic, "fullart") is None and art.cut_for(other, "fullart") is None
+    assert art.cut(basic, "fullart", fetch=False) is None
 
 
 def test_the_cut_comes_off_the_scan_at_the_measured_rectangle(tmp_path):

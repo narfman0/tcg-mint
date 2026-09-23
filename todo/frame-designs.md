@@ -150,22 +150,59 @@ plate, the stamp's bite and the foot's sweep; those sit at M15's coordinates
 in the print and at M15's coordinates in our render, so our own opaque pieces
 land back on top of them.
 
-- `frame.ART_RECT` (where each design's art sits -- the origin `DESIGNS`'
+- `frame.ART_ORIGIN` (where each design's art sits -- the origin `DESIGNS`'
   size never had) and `frame.SCAN_CUT` (the pure-picture rectangle of a
-  printing of that design). Only textless has a cut: the other designs are
-  unmeasured, and a design with no entry behaves exactly as it does today.
+  printing of that design, with a comment on every design that has none
+  saying why). A design with no entry behaves exactly as it did.
 - `Art.cut(card, design)` cuts and caches `art/cut_<design>_<id>.png`.
 - `Art.resolve(..., design=...)` prefers it -- and an enhance made from it --
-  when the design has a cut, the *printing* is of that design
-  (`frame.printed_design`), and the plain crop does not fit the design's
-  rectangle. Every caller of resolve passes the design, so the render, the
-  stale check, `check`, `gc` and the workbench all agree on what a card
-  renders with.
+  when the design has a cut rectangle and the *printing* is of that design
+  (`frame.cut_design`). Every caller of resolve passes the design, so the
+  render, the stale check, `check`, `gc` and the workbench all agree on what
+  a card renders with.
 - The base name is `cut` (`cut:<design>` spelled out), so a restyle can start
   from it and say so in its recipe rather than "crop" quietly meaning
   something else.
 
-Left for whoever measures them: a cut for `fullart`, `borderless`,
-`extended`, `modern` and `retro`. Each wants the same treatment as textless
--- real scans, the half-way-point rule, the rectangle the print leaves
-unpainted -- and none of them is guessed at here.
+### The other six designs, measured 2026-09-23
+
+Done, and the answer is two cuts, not six. Every design's crop was measured
+against its own window over the crops in the art cache (797 of them) and a
+sample fetched per design:
+
+| design | the crop it gets | verdict |
+|---|---|---|
+| `textless` | the plain window, 1.37:1, against a 0.69 window | **cut** (19.6, 39.6, 210.6, 281) |
+| `extended` | 1.24-1.62, mostly the plain window | **cut** (0, 39.7, 250, 156.6) -- not for the shape (1.52 against 1.37 is inside the fit rule) but for the picture: the print's art reaches both cut edges, 250 units against 210.6 |
+| `fullart` | 0.838:1 on every basic; the plain window on the rest | crop |
+| `borderless` | 0.97-1.91, mostly near 1.37 against a 1.32 window | crop |
+| `modern` | the plain window, against a 1.36 window | crop |
+| `retro` | the plain window, against a 1.25 window | crop |
+
+`fullart` is the one that looks like it should have a cut. It does not, and
+this is the reasoning, because it will otherwise be re-proposed:
+
+- **a full-art basic**: Scryfall crops it tall by itself -- 626 x 747,
+  0.838:1, on all six sampled -- and that is *closer* to the 0.731 window
+  than the 230 x 255 (0.902:1) of clean picture between the title bar and the
+  type bar. A cut would be a downgrade. Rendered both ways to be sure.
+- **the MagicFest promos**: fullart.css measured their window as the M15 one
+  opened to the P/T, 211 x 160. That is the crop.
+- **the edge-to-edge kind** (SLD, MH3, LTR -- the ones whose crop *is* the
+  plain window): their art does cover the card, but everything past the crop
+  is under the printed title bar, type bar and text plate.
+- and registration rules out taking the card face whole: `fullart`'s and
+  `borderless`'s rectangles reach into the bleed, so `cover` scales a face
+  cut over the whole 272 x 372 page and the print's own title bar lands
+  11-14 units off ours instead of under it. Only a design whose rectangle
+  stays on the card -- textless -- can carry the print's pieces inside its
+  cut.
+
+So the remaining lever for those designs is generation, not sourcing: a
+restyle or a clip is already made at the design's aspect
+(`frame.generation_size`).
+
+Left undone: nothing on this task. If the card file grows printings
+(`mint cards --kind default_cards`), the numbers above are worth re-running
+-- the measuring scripts were one-offs, and `mint calibrate --design` is the
+thing to grow if it needs doing often.

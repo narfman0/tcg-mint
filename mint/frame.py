@@ -342,15 +342,37 @@ ART_ORIGIN = {
 }
 # The rectangle of a *printing* of a design that is picture and nothing else: what art.cut takes out of
 # Scryfall's full-card scan when the printing's own frame is the design we are rendering. Scryfall's art_crop
-# is the M15 window whatever the card is -- 626 x 457 of landscape -- so for a design whose picture runs past
-# that window the crop is a fraction of the art the card actually shows, and `cover` throws the rest away.
-# Only a design whose printings have been measured belongs here; one with no cut keeps the crop.
+# is usually the M15 window whatever the card is -- 626 x 457 of landscape -- so for a design whose picture
+# runs past that window the crop is a fraction of the art the card shows, and `cover` throws the rest away.
+# Each rectangle is that design's own css header, measured off its printings; a design with no entry keeps
+# the crop, and the comment on each says why the ones that are missing are missing.
 SCAN_CUT = {
-    # the M15 window's width, from under the art's line beneath the glass title bar (the picture from 39.6)
-    # to the flat foot at 320.6, the sides 19.6-230.2: textless.css's measurements off twelve promos. The P/T
-    # plate, the stamp's bite and the foot's sweep fall inside it and stay -- the print puts all three at
-    # M15's coordinates, which is where our own opaque pieces land back on top of them.
+    # textless.css, twelve promos: the M15 window's width, from under the art's line beneath the glass title
+    # bar (the picture from 39.6) to the flat foot at 320.6, the sides 19.6-230.2. The P/T plate, the stamp's
+    # bite and the foot's sweep fall inside it and stay -- the print puts all three at M15's coordinates,
+    # which is where our own opaque pieces land back on top of them.
     "textless": (19.6, 39.6, 210.6, 281.0),
+    # extended.css, sixteen scans: "the art reaches x 0 and x 250, the cut edges, on every scan", from under
+    # the title bar (image from 39.7) to the type bar's own outline at 196.3. 250 units of picture against
+    # the crop's 210.6 -- the extension itself, which the crop has never carried.
+    "extended": (0, 39.7, 250, 156.6),
+    # No cut, and each for a reason that was measured before it was written down:
+    #   m15             Scryfall's art_crop *is* this window.
+    #   modern, retro   their printings' art is a window too, and near the crop's shape (1.36 and 1.25
+    #                   against 1.37): the crop is the whole of what those cards show.
+    #   borderless      the crop fits it well (1.37 against the design's 1.32), and the only picture the scan
+    #                   carries beyond the crop is under the printed bars and text box.
+    #   fullart         the one that looks like it should have a cut and does not. Its printings come in
+    #                   three kinds and the crop wins or ties on all three: for a full-art basic Scryfall
+    #                   crops tall by itself -- 626 x 747, 0.838:1, measured on six, always that -- which is
+    #                   closer to the 0.731 window than the 230 x 255 of clean picture between the title bar
+    #                   and the type bar (0.902:1); the MagicFest promos' window is the M15 one opened to the
+    #                   P/T, 211 x 160, which is the crop; and on the edge-to-edge kind (SLD, MH3, LTR, whose
+    #                   crop *is* the plain window) everything past the crop is under printed text.
+    #   Registration is the other half of it: borderless's and fullart's rectangles reach into the bleed, so
+    #   a cut of the card face is scaled by `cover` over the whole page and the print's own title bar lands
+    #   11-14 units off ours instead of under it. A design can only carry the print's pieces inside its cut
+    #   where its rectangle stays on the card, as textless's does.
 }
 ART_FIT = 0.15  # an aspect further than this from the design's is cut hard by `cover` (check.art_fit)
 # the layouts whose art is not the window the designs move (a saga's and a class's beside the text, a split's and
@@ -404,11 +426,8 @@ def fits(design, aspect):
 
 def scan_cut(design):
     """The picture rectangle of a printing of this design -- (x, y, w, h) in card units, for art.cut --
-    or None when the crop serves it or nobody has measured one. Scryfall's art_crop *is* the M15 window,
-    so a design whose rectangle is near that window's aspect needs no cut however its other pieces move."""
-    if not design or fits(design, art_aspect("m15")):
-        return None
-    return SCAN_CUT.get(design)
+    or None when the crop already serves it (SCAN_CUT says which, and why, design by design)."""
+    return SCAN_CUT.get(design) if design else None
 
 
 def cut_design(card, design):
@@ -416,9 +435,9 @@ def cut_design(card, design):
     have to hold: the design carries more art than Scryfall's crop and its rectangle has been measured
     (scan_cut), and this *printing* is of that design -- a plain printing's scan has no more picture in
     it than the crop does, so there would be nothing to cut."""
-    if not scan_cut(design):
+    if not scan_cut(design) or printed_design(card) != design:
         return None
-    return design if printed_design(card) == design else None
+    return design
 
 
 def generation_size(design, pixels):
