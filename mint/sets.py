@@ -6,7 +6,9 @@
       "style": {...},                      the restyle recipe (Style below; restyle.py explains the knobs)
       "motion": {...},                     the animate recipe (Motion below; animate.py explains the knobs)
       "base": "spore",                     what every restyle starts from: a restyle label (that card's newest
-                                           variant with it) or a variant hash; default the crop
+                                           variant with it), a variant hash, or "cut" (art.py: the design's
+                                           picture off the printing's scan); default the card's base picture,
+                                           which is that cut where the design has one and the crop elsewhere
       "design": "m15",                     the frame design (frame.DESIGNS: m15, extended, borderless, fullart)
                                            or "auto" to follow each card's printing; default m15
       "cards": {
@@ -280,6 +282,23 @@ class SetFile:
         d = self.card(record).design or self.design or "m15"
         return frame.printed_design(record) if d == "auto" else d
 
+    def base_picture(self, record, base):
+        """`base` with "crop" read as the card's base picture: for a card whose design cuts its art out
+        of the printing's own scan (frame.cut_design) that cut, and Scryfall's crop for everyone else --
+        so a restyle or a clip starts from the picture the card renders with. A bare "cut" is spelled
+        out into the card's design; anything else is left alone."""
+        from . import art as artlib
+        from . import frame
+        if base != "crop" and not artlib.is_cut(base):
+            return base
+        design = artlib.CUT_BASE.match(base).group(1) if artlib.is_cut(base) else None
+        design = design or self.design_of(record)
+        cut = frame.cut_design(record, design)
+        if cut:
+            return artlib.cut_base(cut)
+        # a cut asked for by name that this printing cannot give: spelled out, so base_path says why
+        return artlib.cut_base(design) if artlib.is_cut(base) else "crop"
+
     def _generation_size(self, block, record):
         """The (width, height) a restyle or a clip of this card is made at: the block's own when the
         file spells them, else the size that fits the card's design at the block's default budget."""
@@ -343,6 +362,7 @@ class SetFile:
         if remix == "repose":  # the one image read is the pose source, and only its skeleton
             base = entry.pose or base
             r["control"] = "openpose"
+        base = self.base_picture(record, base)
         if art is not None and is_label(base):
             v = art.latest(record, base)
             base = v.hash if v else base
@@ -384,9 +404,13 @@ class SetFile:
             base = "none"
         elif base is None:
             if art is not None:
-                base = art.resolve(record, style_hash=self.styled_hash(record, art=art)).hash or "crop"
+                # the variant its styled art is, else the card's base picture by name (the scan cut for a
+                # design that has one): a cut is not a variant, so it is named, never hashed, in a recipe
+                src = art.resolve(record, style_hash=self.styled_hash(record, art=art),
+                                  design=self.design_of(record), fetch=False)
+                base = src.variant.hash if src.variant else self.base_picture(record, "crop")
             else:
-                base = entry.pick or "crop"
+                base = entry.pick or self.base_picture(record, "crop")
         r["base"] = base
         return r
 
@@ -432,8 +456,10 @@ HASH_RE = re.compile(r"^[0-9a-f]{8}$")
 
 
 def is_label(base):
-    """A base that names a restyle label rather than the crop or a variant hash."""
-    return bool(base) and base != "crop" and not re.fullmatch(r"[0-9a-f]{8}", base)
+    """A base that names a restyle label rather than the crop, a scan cut or a variant hash."""
+    from . import art
+    return (bool(base) and base != "crop" and not art.is_cut(base)
+            and not re.fullmatch(r"[0-9a-f]{8}", base))
 
 
 def recipe_hash(recipe):

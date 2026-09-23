@@ -129,6 +129,43 @@ it one -- its markers, its border, and the promo or box set that is the
 only place some of them are printed -- so `design: "textless"` now picks a
 textless promo instead of the plain printing. A planeswalker renders in
 every design (the modern and textless agents mended theirs; retro's is an
-anachronism that renders). Left undone: `mint calibrate --design`, and an
-art source that cuts a textless printing's picture out of the scan when
-Scryfall's crop is the plain window (art.py; the agent's follow-up).
+anachronism that renders). `mint calibrate --design` landed with phase 3.
+
+## Phase 5 -- the art a design's own printing carries (2026-09-23)
+
+The one thing phase 4 left: **Scryfall's `art_crop` is the M15 window
+whatever the printing is**, so a textless promo -- a card whose picture runs
+the height of the face -- hands us 626 x 457 of landscape for a window that
+wants 210.6 x 303.6. `cover` then keeps the aspect and throws away well over
+half of it, and `mint check` has had nothing better to say than that it is
+about to happen.
+
+The fix is a second art source beside the crop: cut the picture out of
+`art/scan_<id>.png`, the full-card scan the art cache already fetches for
+`mint calibrate`, at the rectangle that design's *printings* leave
+uncovered. For textless that is the M15 window's width from under the art's
+line beneath the glass bar to the flat foot -- 19.6-230.2 x 39.6-320.6, the
+numbers textless.css measured off twelve promos. Its foot carries the P/T
+plate, the stamp's bite and the foot's sweep; those sit at M15's coordinates
+in the print and at M15's coordinates in our render, so our own opaque pieces
+land back on top of them.
+
+- `frame.ART_RECT` (where each design's art sits -- the origin `DESIGNS`'
+  size never had) and `frame.SCAN_CUT` (the pure-picture rectangle of a
+  printing of that design). Only textless has a cut: the other designs are
+  unmeasured, and a design with no entry behaves exactly as it does today.
+- `Art.cut(card, design)` cuts and caches `art/cut_<design>_<id>.png`.
+- `Art.resolve(..., design=...)` prefers it -- and an enhance made from it --
+  when the design has a cut, the *printing* is of that design
+  (`frame.printed_design`), and the plain crop does not fit the design's
+  rectangle. Every caller of resolve passes the design, so the render, the
+  stale check, `check`, `gc` and the workbench all agree on what a card
+  renders with.
+- The base name is `cut` (`cut:<design>` spelled out), so a restyle can start
+  from it and say so in its recipe rather than "crop" quietly meaning
+  something else.
+
+Left for whoever measures them: a cut for `fullart`, `borderless`,
+`extended`, `modern` and `retro`. Each wants the same treatment as textless
+-- real scans, the half-way-point rule, the rectangle the print leaves
+unpainted -- and none of them is guessed at here.

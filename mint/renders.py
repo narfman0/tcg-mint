@@ -56,10 +56,14 @@ def backs_of(directory, number, styled=False):
 
 
 def want_hashes(st, card, art, entry=None):
-    """The art hash each of plain / styled should render with now, for the stale check."""
+    """The art hash each of plain / styled should render with now, for the stale check. Nothing is
+    fetched: which picture a card renders with is decided from the card and its design, not from what
+    happens to be on disk, so the answer is the render's whether or not the file is there yet."""
     entry = entry if entry is not None else st.card(card)
-    return {"plain": art.resolve(card, override=entry.art).hash,
-            "styled": art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art)).hash}
+    design = st.design_of(card)
+    return {"plain": art.resolve(card, override=entry.art, design=design, fetch=False).hash,
+            "styled": art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art),
+                                  design=design, fetch=False).hash}
 
 
 def stale(entry, fhash, want=None):

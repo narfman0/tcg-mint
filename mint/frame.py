@@ -327,6 +327,32 @@ DESIGNS = {
     "retro": (192.5, 153.7, "retro.css"),          # the 1997 frame's window, inside its black line (Mirage to Scourge)
 }
 DESIGN_CHOICES = ("auto", *DESIGNS)  # what a set or card entry may say; auto follows the printing
+# Where each design's art rectangle sits: the (x, y) DESIGNS' size hangs from, in card units from the card's
+# top-left corner with the bleed outside it -- so a design whose picture runs off the card's sides starts at
+# -11, the bleed's width. DESIGNS says how big a picture has to be; this says where it lands, which is what
+# cutting one out of a printing's own scan needs (art.cut). Each pair is that design's own .art rule.
+ART_ORIGIN = {
+    "m15": (19.6, 39.7),
+    "extended": (-11, 37),
+    "borderless": (-11, -11),
+    "fullart": (-11, -11),
+    "textless": (19.6, 17),
+    "modern": (21, 41),
+    "retro": (28.75, 35.05),
+}
+# The rectangle of a *printing* of a design that is picture and nothing else: what art.cut takes out of
+# Scryfall's full-card scan when the printing's own frame is the design we are rendering. Scryfall's art_crop
+# is the M15 window whatever the card is -- 626 x 457 of landscape -- so for a design whose picture runs past
+# that window the crop is a fraction of the art the card actually shows, and `cover` throws the rest away.
+# Only a design whose printings have been measured belongs here; one with no cut keeps the crop.
+SCAN_CUT = {
+    # the M15 window's width, from under the art's line beneath the glass title bar (the picture from 39.6)
+    # to the flat foot at 320.6, the sides 19.6-230.2: textless.css's measurements off twelve promos. The P/T
+    # plate, the stamp's bite and the foot's sweep fall inside it and stay -- the print puts all three at
+    # M15's coordinates, which is where our own opaque pieces land back on top of them.
+    "textless": (19.6, 39.6, 210.6, 281.0),
+}
+ART_FIT = 0.15  # an aspect further than this from the design's is cut hard by `cover` (check.art_fit)
 # the layouts whose art is not the window the designs move (a saga's and a class's beside the text, a split's and
 # a battle's sideways): they render M15 whatever the design, and `check` says so
 M15_LAYOUTS = ("saga", "class", "split", "battle")
@@ -362,6 +388,37 @@ def design_css(design):
 def art_aspect(design):
     w, h, _ = DESIGNS[design]
     return w / h
+
+
+def art_rect(design):
+    """(x, y, width, height) of the design's art rectangle, in card units from the card's top-left."""
+    w, h, _ = DESIGNS[design]
+    x, y = ART_ORIGIN[design]
+    return x, y, w, h
+
+
+def fits(design, aspect):
+    """Whether a picture of this aspect fills the design's rectangle without `cover` cutting it hard."""
+    return abs(aspect / art_aspect(design) - 1) <= ART_FIT
+
+
+def scan_cut(design):
+    """The picture rectangle of a printing of this design -- (x, y, w, h) in card units, for art.cut --
+    or None when the crop serves it or nobody has measured one. Scryfall's art_crop *is* the M15 window,
+    so a design whose rectangle is near that window's aspect needs no cut however its other pieces move."""
+    if not design or fits(design, art_aspect("m15")):
+        return None
+    return SCAN_CUT.get(design)
+
+
+def cut_design(card, design):
+    """The design this card's picture should be cut out of its scan for (art.cut), or None. Two things
+    have to hold: the design carries more art than Scryfall's crop and its rectangle has been measured
+    (scan_cut), and this *printing* is of that design -- a plain printing's scan has no more picture in
+    it than the crop does, so there would be nothing to cut."""
+    if not scan_cut(design):
+        return None
+    return design if printed_design(card) == design else None
 
 
 def generation_size(design, pixels):

@@ -177,17 +177,19 @@ def mime(path):
     return {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}.get(ext, "image/png")
 
 
-def base_of(st, entry):
-    """What the describer looks at: the image the card's restyles start from, by the same rule
-    (its own base, else the set's, else the crop)."""
-    return entry.base or st.base or "crop"
+def base_of(st, entry, card=None):
+    """What the describer looks at: the image the card's restyles start from, by the same rule (its
+    own base, else the set's, else the crop -- which, given the card, is the cut out of the printing's
+    scan when its design has one, exactly as it is for a restyle)."""
+    base = entry.base or st.base or "crop"
+    return st.base_picture(card, base) if card is not None else base
 
 
 def describe_card(describer, art, card, st, entry=None):
     """Describe one card's base image and return its record, which is also written beside the
     image (art.describe). The set file is not touched here: the caller writes the subject."""
     entry = entry or st.card(card)
-    base = base_of(st, entry)
+    base = base_of(st, entry, card)
     if art is not None and sets.is_label(base):
         v = art.latest(card, base)
         base = v.hash if v else base

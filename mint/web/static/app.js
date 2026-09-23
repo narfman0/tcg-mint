@@ -374,8 +374,9 @@ function board() {
   const hasNew = c => (c.variants || []).some(v => v.kind === 'restyle' && v.recipe?.remix === 'new' &&
                                                  (lookLabel ? v.label === lookLabel : true));
   const lacks = {
-    'crops': c => !c.crop && !c.entry.art && !c.error,
-    'enhance': c => !c.plain || c.plain.kind === 'crop',
+    // a card whose design cuts its picture out of the scan needs that too, crop or no crop
+    'crops': c => (!c.crop || (c.cut_wanted && !c.cut)) && !c.entry.art && !c.error,
+    'enhance': c => !c.plain || c.plain.kind === 'crop' || c.plain.kind === 'cut',
     'restyle': c => lookIsRecipe ? !hasStyled(c) : !variantFor(c, state.style),
     'newcards': c => !c.entry.subject || !hasNew(c),
     'render-plain': c => !c.renders?.plain || !!c.renders.plain.stale,
@@ -703,6 +704,14 @@ function columns(c) {
   if (c.crop) src.push({key: 'crop', title: 'crop', sub: `${c.card.set.toUpperCase()} ${c.card.collector_number} · ${c.card.artist}`,
                         path: c.crop, kind: 'crop', enhanced: enhOf('crop')});
   after('crop', src);
+  // the picture cut out of this printing's own scan: Scryfall's crop is the M15 window whatever the
+  // card is, so a design that carries more art than that window (textless) renders from this instead
+  if (c.cut) {
+    const cb = 'cut:' + c.design;
+    src.push({key: cb, title: 'cut', sub: `${c.design} · out of the printing's scan`,
+              path: c.cut, kind: 'crop', enhanced: enhOf(cb)});
+    after(cb, src);
+  }
   groups.push({title: 'source', cols: src});
   const labels = [...new Set(vs.filter(v => v.kind === 'restyle').map(v => v.label))].sort();
   for (const l of labels) {
@@ -716,7 +725,9 @@ function columns(c) {
   }
   const words = clipsOf('none');  // clips from the words alone start from no image
   if (words.length) groups.push({title: 'motion · from words', cols: words.map(m => clipCol(m, 'nothing'))});
-  const gone = v => v.base !== 'crop' && v.base !== 'none' && !vs.some(x => x.hash === v.base);
+  // a variant whose source is missing; the crop, no image at all and a scan cut are all sources that
+  // are not variants, so none of them counts as gone
+  const gone = v => v.base !== 'crop' && v.base !== 'none' && !v.base.startsWith('cut:') && !vs.some(x => x.hash === v.base);
   const orphans = vs.filter(v => v.kind === 'enhance' && gone(v));
   if (orphans.length) groups.push({title: 'enhance · source deleted', cols: orphans.map(e => col(e, {title: 'enhance', sub: `${e.hash} · of ${e.base}`}))});
   const lost = vs.filter(v => v.kind === 'motion' && gone(v));
@@ -756,9 +767,9 @@ function columnHtml(x, c) {
               ['promote', x.key, 'make the set style from this']])}
       ${trashBtn('delete', x.key, 'delete this image')}`;
   else if (x.kind === 'crop') acts = `
-      ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="crop">enhance</button>`}
-      ${animateBtn('crop')}
-      ${menu([['base', 'crop', 'restyle / inspire from this'], ['pose', 'crop', 'repose from this']])}`;
+      ${x.enhanced?.length ? '' : `<button class="small" data-act="enhance" data-arg="${esc(x.key)}">enhance</button>`}
+      ${animateBtn(x.key)}
+      ${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this']])}`;
   else if (x.kind === 'enhance') acts = `${animateBtn(x.key)}${menu([['base', x.key, 'restyle / inspire from this'], ['pose', x.key, 'repose from this']])}${trashBtn('delete', x.key, 'delete this image')}`;
   else if (x.kind === 'motion') acts = `${x.videos.map(p => `<a class="pill" href="${file(p)}" target="_blank" title="the clip file in a new tab">${esc(p.split('.').pop())}</a>`).join('')}${trashBtn('delete', x.key, 'delete this clip')}`;
   else acts = `
@@ -784,7 +795,9 @@ function generatePanel(c, cols) {
   const mode = e.remix || style?.remix || 'restyle';
   const setBase = st.base || 'crop', from = e.base || setBase;
   const labels = styleLabels([c]).map(([l]) => l);
-  const imgOpts = (val, first) => [first, ['crop', 'crop'], ...labels.map(l => [l, `${l} · newest`]),
+  const imgOpts = (val, first) => [first, ['crop', 'crop'],
+    ...(c.cut ? [['cut:' + c.design, `cut · the ${c.design} picture off the scan`]] : []),
+    ...labels.map(l => [l, `${l} · newest`]),
     ...cols.filter(x => x.v).map(x => [x.key, `${x.title}-${x.key}`])]
     .map(([v, t]) => `<option value="${esc(v)}" ${val === v ? 'selected' : ''}>${esc(t)}</option>`).join('');
   const tpl = lookTemplate(style), lookName = tpl || style?.name || '';

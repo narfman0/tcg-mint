@@ -115,7 +115,8 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
     entry = st.card(card)
     number = entry.number or i
     style_hash = st.styled_hash(card, art=art) if styled else None
-    source = art.resolve(card, override=entry.art if not back else None, style_hash=style_hash)
+    design = st.design_of(card)  # the frame it renders in, and so which picture its art comes from
+    source = art.resolve(card, override=entry.art if not back else None, style_hash=style_hash, design=design)
     # a restyled image wins; the CSS filter is the fallback for --styled
     art_filter = None
     if styled and source.kind != "styled":
@@ -125,7 +126,6 @@ def render_one(ws, browser, st, card, i, styled, themes, out_dir, compare, year,
         prefix = f"{set_code}-" if set_path else ""
         num = f"{number:03d}" + ("b" if back else "")
         base = f"{prefix}{num}_{slug(card['name'])}{'.styled' if styled else ''}{tag}"
-        design = st.design_of(card)
         html = frame.build_html(
             card, symbols=symbols, art_url=source.url, theme=th, fonts_css=fonts_css,
             set_size=expansions.size(card["set"]), set_icon=expansions.icon(card["set"]), flavor=entry.flavor,

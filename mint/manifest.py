@@ -53,7 +53,7 @@ class Manifest:
             "card": rendered.name, "number": rendered.number, "theme": rendered.theme,
             "set": set_code, "styled": styled, "design": rendered.design, "back": rendered.back,
             "source": {"kind": src.kind, "path": str(src.path), "hash": src.hash,
-                       "label": src.variant.label if src.variant else None},
+                       "label": (src.variant.label if src.variant else src.label) or None},
             "art_filter": rendered.art_filter, "sizes": rendered.sizes, "warnings": rendered.warnings,
             "shrunk": rendered.shrunk, "frame": fhash, "dpi": dpi,
             "rendered_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),

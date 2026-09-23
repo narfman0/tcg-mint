@@ -39,13 +39,17 @@ kept image stays; a variant's videos go with it), the workbench
 row, the clip columns and the viewer playing them). tcg-motion keeps the
 region/composite work and can retire otherwise.
 
-## Later
+## Closed
 
-- The "living card": the rendered frame with the art window moving. Needs a
-  render with a transparent art window (`page.screenshot(omit_background=True)`
-  with `$art` unset) and the `.art` rect from `getBoundingClientRect()` in
-  the manifest; then frame-over-clip at a display DPI. Explicitly out of
-  scope for now: the user wants clips of the art, not of the card.
+- **The "living card" is not wanted** (decided 2026-09-23, with the user):
+  motion belongs to the picture, never to the card. The rendered frame with
+  a moving art window is off the list for good, not parked -- so the
+  transparent-art-window render (`page.screenshot(omit_background=True)` with
+  `$art` unset), the `.art` rect in the manifest and frame-over-clip
+  compositing are all unneeded, and nothing in the codebase is waiting on
+  them. Do not re-propose it.
+
+## Later
 - Wan 2.2 14B I2V as a second engine (two-stage high/low-noise KSamplers,
   fp8 or GGUF) when the 5B look isn't enough.
 - `WanFirstLastFrameToVideo` with the same image at both ends as a fourth

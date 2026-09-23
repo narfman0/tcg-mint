@@ -91,8 +91,10 @@ def render_state(ws, st, cards, art):
         if entry.render == fn:  # the render the card is pinned to prints as it is; it is never stale
             sources.setdefault(card["illustration_id"], set()).add((e.get("source") or {}).get("hash"))
             continue
-        want = (art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art)) if e.get("styled")
-                else art.resolve(card, override=entry.art)).hash
+        design = st.design_of(card)
+        want = (art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art), design=design,
+                            fetch=False) if e.get("styled")
+                else art.resolve(card, override=entry.art, design=design, fetch=False)).hash
         if e.get("frame") != fh:
             stale.append((m, fn, "the frame changed"))
         elif (e.get("source") or {}).get("hash") != want:

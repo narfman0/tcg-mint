@@ -30,7 +30,7 @@ from .. import (
     upscale,
     wan,
 )
-from ..art import Art
+from ..art import Art, cut_base
 from ..cards import Cards, default_printing, oddness, warnings
 from ..errors import MintError
 from ..manifest import Manifest, frame_hash
@@ -163,7 +163,7 @@ def variant_dict(v):
 
 def source_dict(src):
     return {"kind": src.kind, "path": str(src.path), "hash": src.hash,
-            "label": src.variant.label if src.variant else None} if src else None
+            "label": (src.variant.label if src.variant else src.label) or None} if src else None
 
 
 def card_summary(card):
@@ -809,9 +809,15 @@ def card_detail(S, st, name, cards=None, shared=None):
         pv = art.variant(card, entry.pick)
         info["picked"] = variant_dict(pv) if pv else None
     want = {}
-    if crop.exists() or entry.art:
-        plain = art.resolve(card, override=entry.art)
-        styled = art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art))
+    design = info["design"]
+    # the picture cut out of this printing's own scan, when the design carries more art than the crop
+    cut = art.cut(card, design, fetch=False) if art.cut_for(card, design) else None
+    info["cut_wanted"] = bool(cut)  # the design wants one; `cut` is it once the scan has been cut
+    info["cut"] = str(cut) if cut and cut.exists() else None
+    if crop.exists() or entry.art or info["cut"]:
+        plain = art.resolve(card, override=entry.art, design=design, fetch=False)
+        styled = art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art), design=design,
+                             fetch=False)
         info["plain"], info["styled"] = source_dict(plain), source_dict(styled)
         want = {"plain": plain.hash, "styled": styled.hash}
     info["renders"] = renders_for(S, st, name, want, shared=shared)
@@ -1004,10 +1010,11 @@ def submit_themes(S, st, names, body):
 
 
 def submit_crops(S, st, names, body, origin=None):
-    """A crops job: each card's Scryfall art crop into the art cache, skipping the ones on disk.
-    A new set or added cards queue one by themselves, so the board fills in without a render;
-    the board's button and the card page's fetch the ones still missing. Returns the job, or None
-    when every card named has its crop already."""
+    """A crops job: each card's Scryfall art crop into the art cache, skipping the ones on disk --
+    and, for a card whose frame design carries more art than the crop, the cut out of its full-card
+    scan too (art.cut). A new set or added cards queue one by themselves, so the board fills in
+    without a render; the board's button and the card page's fetch the ones still missing. Returns
+    the job, or None when every card named has its pictures already."""
     cards = S.cards()
     todo = []
     for name in names:
@@ -1015,7 +1022,10 @@ def submit_crops(S, st, names, body, origin=None):
             card = cards.find(name, st.card({"name": name}).printing)
         except MintError:
             continue  # not on file: the card page says so
-        if card.get("illustration_id") and not S.art.crop(card, fetch=False).exists():
+        if not card.get("illustration_id"):
+            continue
+        cut = S.art.cut_for(card, st.design_of(card))
+        if not S.art.crop(card, fetch=False).exists() or (cut and not S.art.cut(card, cut, fetch=False).exists()):
             todo.append(name)
     if not todo:
         return None
@@ -1028,12 +1038,17 @@ def submit_crops(S, st, names, body, origin=None):
             card = cards.find(name, st.card({"name": name}).printing)
             try:
                 crop = S.art.crop(card)
+                cut = S.art.cut_for(card, st.design_of(card))
+                cut_path = S.art.cut(card, cut) if cut else None  # the scan comes with it
             except OSError as e:
                 failed.append(name)
                 job.say(f"could not fetch {name}: {e}")
             else:
-                job.say(f"fetched {name} <- {card['set'].upper()} {card['collector_number']}")
+                job.say(f"fetched {name} <- {card['set'].upper()} {card['collector_number']}"
+                        + (f", and cut its {cut} picture out of the scan" if cut_path else ""))
                 job.made(set=st.code, name=name, kind="crop", key="crop", path=str(crop))
+                if cut_path:
+                    job.made(set=st.code, name=name, kind="cut", key=cut_base(cut), path=str(cut_path))
             job.step(i + 1)
         if failed:
             raise MintError(f"{len(failed)} of {len(todo)} crop(s) could not be fetched from Scryfall: {', '.join(failed[:5])}"
@@ -1058,7 +1073,8 @@ def submit_enhance(S, st, names, body):
         made = []
         for i, name in enumerate(names):
             card = cards.find(name, *(st.lookup(name) if st else (None, None)))
-            v, did = upscale.enhance(server, S.art, card, model, base, force)
+            v, did = upscale.enhance(server, S.art, card, model, base, force,
+                                     design=st.design_of(card) if st else None)
             job.say(f"{'enhanced' if did else 'cached'} {name} -> {v.label}-{v.hash}")
             made.append(v.hash)
             if st:

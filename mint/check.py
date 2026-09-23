@@ -14,6 +14,7 @@ at the 800 DPI `mint export` writes for MPC Autofill.
 """
 import argparse
 import sys
+from pathlib import Path
 
 from PIL import Image
 
@@ -25,15 +26,15 @@ from .export import MAX_DPI as ORDER_DPI  # what `mint export` writes for MPC Au
 
 
 def art_fit(path, design):
-    """Why the picture at `path` does not fit the design's art rectangle: an aspect more than 15% off
-    it is cut hard by `cover` (the M15 window into a full-art card loses its sides), else None."""
+    """Why the picture at `path` does not fit the design's art rectangle: an aspect further off it than
+    frame.ART_FIT is cut hard by `cover` (the M15 window into a full-art card loses its sides), else None."""
     try:
         with Image.open(path) as im:
             aspect = im.width / im.height
     except (OSError, ValueError):
         return None
     want = frame.art_aspect(design)
-    if abs(aspect / want - 1) <= 0.15:
+    if frame.fits(design, aspect):
         return None
     shape = "wider" if aspect > want else "taller"
     return f"the picture is {aspect:.2f}:1, {shape} than the {design} design's {want:.2f}:1 -- cover crops it"
@@ -72,12 +73,14 @@ def check_set(ws, cards, art, st):
         design = st.design_of(card)
         if design != "m15":
             notes.append(f"design: {design}")
-        plain = art.resolve(card, override=entry.art, enhance=True) if art.crop(card, fetch=False).exists() or entry.art \
-            else None
-        notes.append(f"plain: {plain.describe() if plain else 'crop not fetched'}")
-        if plain and (fit := art_fit(plain.path, design)):
+        # nothing is fetched here: resolve says which picture the render would use, and the file may
+        # not be in the cache yet (a scan cut is made on the first render that wants it)
+        plain = art.resolve(card, override=entry.art, enhance=True, design=design, fetch=False)
+        have = Path(plain.path).exists()
+        notes.append(f"plain: {plain.describe()}" + ("" if have else " (not fetched)"))
+        if have and (fit := art_fit(plain.path, design)):
             notes.append(f"warn: {fit}")
-        if plain and (thin := art_thin(plain.path, design)):
+        if have and (thin := art_thin(plain.path, design)):
             notes.append(f"warn: {thin}")
         h = st.styled_hash(card, art=art)
         if h:
