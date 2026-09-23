@@ -194,7 +194,10 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
 .pip::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #000;
   transform: translate(-0.24px, 0.88px); }
 .pip img { position: relative; height: 12px; width: 12px; display: block; }
-.setsym { height: 14px; width: 14px; }
+/* the expansion symbol keeps its size whatever the type line does: a flex item shrinks by default, and a
+   long type line (Purphoros' "Legendary Enchantment Creature — God") ate it down to a speck before the
+   fit below learned to shrink the type instead. The gap is the pips', so text never butts against it */
+.setsym { height: 14px; width: 14px; flex: none; margin-left: 4px; }
 /* stacking, settled here so a design (frame.DESIGNS) puts the art under the frame by moving it and nothing
    else: the band and the pinline plate at the bottom, the art over them, and everything that may float over
    the art -- the bars, the text box, the P/T plate, the stamp, the badges, the crown, the footer -- above it */
@@ -530,6 +533,16 @@ window.fit = () => {
     while (bar.scrollWidth > bar.clientWidth && n > 8) { n -= 0.2; name.style.fontSize = n + 'px'; }
     ns = Math.min(ns, n);
   }
-  return [fs, ns];
+  // long type lines shrink the same way, until type + expansion symbol fit the type bar. Without this the
+  // symbol was the one that gave way -- it is the flexible half of the bar -- and a long line left a speck
+  let ts = Infinity;
+  for (const bar of document.querySelectorAll('.typebar')) {
+    const type = bar.querySelector('.type');
+    type.style.fontSize = '';
+    let t = parseFloat(getComputedStyle(type).fontSize);
+    while (bar.scrollWidth > bar.clientWidth && t > 7) { t -= 0.2; type.style.fontSize = t + 'px'; }
+    ts = Math.min(ts, t);
+  }
+  return [fs, ns, ts];
 };
 </script>

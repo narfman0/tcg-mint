@@ -32,7 +32,7 @@ class Browser:
         self._pw.stop()
 
     def render(self, html, out, fit=True):
-        """Screenshot html to out. Returns the shrink-to-fit result {"text": px, "name": px}, or None."""
+        """Screenshot html to out. Returns the shrink-to-fit result {"text": px, "name": px, "type": px}, or None."""
         # Chromium needs a file:// page for the file:// art and font references to resolve
         with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
             f.write(html)
@@ -43,8 +43,8 @@ class Browser:
             self.page.evaluate("document.fonts.ready")
             sizes = None
             if fit:
-                fs, ns = self.page.evaluate("fit()")
-                sizes = {"text": round(fs, 2), "name": round(ns, 2)}
+                fs, ns, ts = self.page.evaluate("fit()")
+                sizes = {"text": round(fs, 2), "name": round(ns, 2), "type": round(ts, 2)}
             self.page.screenshot(path=str(out), clip={"x": 0, "y": 0, **PAGE})
             return sizes
         finally:
