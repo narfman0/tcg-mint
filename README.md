@@ -39,6 +39,8 @@ playwright install chromium
 
 For development, `pip install -e .[dev]` adds ruff and pytest; `pytest` runs the
 unit tests and `pytest -m render` the one that drives Chromium.
+Setting this up on a second machine — the fonts, ComfyUI and 43 GB of
+weights included — is [docs/reproduce.md](docs/reproduce.md).
 
 If `playwright install` times out on your network, fetch the same build with
 curl and unzip it where Playwright expects it — the path is printed by
@@ -141,6 +143,8 @@ export_dir = "~/Desktop"
 describer = "claude"          # or "ollama"; claude reads ANTHROPIC_API_KEY from the environment
 describe_model = ""           # empty = the describer's default (claude-sonnet-5 / qwen2.5vl)
 ollama_url = "http://127.0.0.1:11434"
+comfy_root = ""               # the ComfyUI checkout, when it is on this machine; only `mint doctor`
+                              # wants it, to check the weights a node pack downloads for itself
 ```
 
 ## Commands
@@ -307,9 +311,13 @@ static read-only page with thumbnails, for sharing a set's look.
 
 ## Fonts
 
-The frame wants Beleren (titles) and MPlantin (rules text). They are not
-ours to redistribute; `fonts/README.md` says where each is published and how
-to repair the community copies that Chromium's font sanitizer rejects.
+The frame wants Beleren (titles) and MPlantin (rules text), and MPlantin in
+*both* its roman and its italic — flavor text, reminder text and ability
+words are set in italic, and a family present only as its roman gets a fake
+oblique sheared out of the roman rather than a fallback. `mint fonts`
+reports face by face for that reason. They are not ours to redistribute;
+`fonts/README.md` says where each is published, the `sha256` to expect, and
+how to repair the community copies that Chromium's font sanitizer rejects.
 Without them the closest open faces are substituted automatically.
 
 ## Art: upscaling and ComfyUI
@@ -538,15 +546,25 @@ Nothing is bundled. SDXL is the practical choice on a 16 GB card (mature
 ControlNets, ~5–8 s a card); Flux is prettier for painterly work but heavier.
 Into ComfyUI's `models/`:
 
-- `checkpoints/` — an SDXL checkpoint tuned for illustration (Juggernaut XL,
-  DreamShaper XL, or base SDXL 1.0)
+- `checkpoints/` — an SDXL checkpoint tuned for illustration. Juggernaut XL
+  is the default and what most styles here name; Animagine XL 3.1 (the
+  `woodblock` template) and Pony Diffusion V6 XL (`nsfw`, and the `MRN` set)
+  are the other two in use, and Pony wants `clip_skip: 2`
 - `controlnet/` — xinsir's **ControlNet Union SDXL (promax)**: one file that
   covers canny, lineart, depth and more
+- `ipadapter/` + `clip_vision/` — IP-Adapter Plus and its CLIP-ViT-H encoder,
+  which the `inspire` remix uses to anchor a set on one reference image
 - `loras/` — style LoRAs as wanted (Civitai is the usual source)
-- later: IP-Adapter Plus, to anchor a whole set on one reference image
 
-Preprocessors beyond canny (lineart, depth) come from the
-`comfyui_controlnet_aux` custom node pack.
+Preprocessors beyond canny (lineart, depth, DWPose) come from the
+`comfyui_controlnet_aux` custom node pack, which downloads their weights
+itself the first time each runs — about 1.7 GB, and the one thing `mint
+doctor` cannot confirm over HTTP unless `comfy_root` says where to look.
+
+**[docs/reproduce.md](docs/reproduce.md) is the whole setup end to end**:
+every model file with its size and where it is published, the node packs,
+and what a fresh clone cannot give you (your `sets/` and `styles/` are not
+in git).
 
 ### On naming artists
 
@@ -715,6 +733,11 @@ which `--back` takes as `auto` (`mint back`), `none`, or an image of your own.
   would want its own
 - ordering history: `mint export` writes a folder, but nothing records which
   export went to MakePlayingCards, when, or what came back
+- the Wan 14B pair for motion: prettier, but it needs a two-stage sampler and
+  quantised weights — a second engine behind the same `motion` block
+- job persistence: a restyle or a clip in flight is lost if the workbench
+  stops, and the queue does not survive a restart
+- the workbench is HTTP on localhost with nobody to log in as
 
 Two things this list used to claim that are in fact here: the layouts beyond
 `normal` (split, adventure, planeswalker, saga, class, battle, and both faces

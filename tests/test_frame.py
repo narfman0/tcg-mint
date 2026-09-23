@@ -63,6 +63,20 @@ def test_font_files_parse_names(tmp_path):
                    ("Liberation Serif", 400, "normal"), ("Liberation Serif", 400, "italic"), ("Tinos", 400, "italic")}
 
 
+def test_font_files_keeps_multi_word_families_apart(tmp_path):
+    """A face whose family is several words is its own family: filing "Beleren Small Caps" under
+    Beleren would let a small-caps face stand in for the title face at weight 400."""
+    for fn in ["Beleren-Bold.ttf", "Beleren Small Caps.ttf", "JaceBeleren-Bold.ttf",
+               "MPlantin.ttf", "MPlantin-Bold.ttf", "MPlantin-Italic.ttf", "Montserrat-SemiBold.otf"]:
+        (tmp_path / fn).write_bytes(b"")
+    got = {(f, w, s) for f, w, s, _ in frame.font_files(tmp_path)}
+    assert got == {("Beleren", 700, "normal"), ("Beleren Small Caps", 700, "normal"),
+                   ("JaceBeleren", 700, "normal"), ("MPlantin", 400, "normal"),
+                   ("MPlantin", 700, "normal"), ("MPlantin", 400, "italic"),
+                   ("Montserrat", 700, "normal")}
+    assert {"Beleren Small Caps", "JaceBeleren"} <= frame.LOCAL_FAMILIES  # never asked of Google
+
+
 def test_packaged_fonts_are_present_with_licenses():
     faces = {(f, w, s): fn for f, w, s, fn in frame.font_files(frame.FONTS)}
     assert set(faces) == {("Almendra", 700, "normal"), ("Liberation Serif", 400, "normal"),

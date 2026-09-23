@@ -40,7 +40,8 @@ THEMES = {
 FONTS = PKG / "fonts"
 # the collector line's face: the real cards use a proprietary geometric sans (Relay); Montserrat is the open stand-in
 PACKAGED_FAMILIES = {"Almendra": "title fallback", "Liberation Serif": "rules text fallback", "Montserrat": "collector line"}
-LOCAL_FAMILIES = {"Beleren", "Matrix Bold", "MPlantin", *PACKAGED_FAMILIES}  # never ask Google for these
+LOCAL_FAMILIES = {"Beleren", "Beleren Small Caps", "JaceBeleren", "Matrix Bold", "MPlantin",
+                  *PACKAGED_FAMILIES}  # never ask Google for these
 
 # M15 frame palette: (frame, frame-dark, bar, bar-edge, text box, pinline). Red and land sit a little off
 # their scans' medians so that under their textures the band's median lands on the scan's. The frame, bar, text box and
@@ -251,11 +252,21 @@ class Sets:
 
 
 # --- fonts ----------------------------------------------------------------
+FAMILIES = {"beleren": "Beleren", "belerensmallcaps": "Beleren Small Caps", "jacebeleren": "JaceBeleren",
+            "matrix": "Matrix Bold", "mplantin": "MPlantin",
+            "almendra": "Almendra", "liberationserif": "Liberation Serif", "tinos": "Tinos", "montserrat": "Montserrat"}
+# trailing filename words that name a weight or a slope, not the family: Mplantin-Italic is the
+# MPlantin family, and "Beleren Small Caps" is a family of its own -- splitting on the first word
+# would file it as plain Beleren and let a small-caps face stand in for the title face.
+FACE_WORDS = {"regular", "book", "roman", "normal", "italic", "oblique", "bold", "bolditalic",
+              "semibold", "semibolditalic", "demibold", "medium", "light", "black"}
+# families published as a single bold cut, whose filename need not say so
+BOLD_FAMILIES = {"Matrix Bold", "Beleren Small Caps"}
+
+
 def font_files(fonts_dir):
     """(family, weight, style, path) for every font file in fonts/, keyed off
     the filename: Beleren-Bold.ttf -> Beleren 700; Mplantin-Italic.ttf -> MPlantin italic."""
-    known = {"beleren": "Beleren", "matrix": "Matrix Bold", "mplantin": "MPlantin",
-             "almendra": "Almendra", "liberationserif": "Liberation Serif", "tinos": "Tinos", "montserrat": "Montserrat"}
     out = []
     fonts_dir = Path(fonts_dir)
     if not fonts_dir.is_dir():
@@ -264,9 +275,11 @@ def font_files(fonts_dir):
         if fn.suffix.lower() not in (".ttf", ".otf", ".woff", ".woff2"):
             continue
         stem = fn.stem
-        base = re.split(r"[-_ ]", stem)[0].lower()
-        family = known.get(base, stem.split("-")[0])
-        weight = 700 if re.search(r"bold", stem, re.I) or family == "Matrix Bold" else 400
+        parts = [p for p in re.split(r"[-_ ]+", stem) if p]
+        while len(parts) > 1 and parts[-1].lower() in FACE_WORDS:  # keep at least the first word
+            parts.pop()
+        family = FAMILIES.get("".join(parts).lower(), stem.split("-")[0])
+        weight = 700 if re.search(r"bold", stem, re.I) or family in BOLD_FAMILIES else 400
         style = "italic" if re.search(r"italic", stem, re.I) else "normal"
         out.append((family, weight, style, fn))
     return out

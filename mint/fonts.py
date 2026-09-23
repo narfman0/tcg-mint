@@ -20,19 +20,39 @@ import sys
 
 from . import frame, workspace
 
+# the faces each family has to supply, not just the family: a family present only as its roman is
+# not "ok". The frame sets flavor text, reminder text and ability words in italic
+# (template.html), and with no italic face the browser shears the roman into a fake one -- it
+# never falls back to Liberation Serif for a family it has already matched.
 WANT = {
-    "Beleren":  "M15 title, type line and P/T face",
-    "MPlantin": "rules and flavor text",
-    "Matrix Bold": "2003-2014 title face (fallback for Beleren)",
+    "Beleren":     ("M15 title, type line and P/T face", [(700, "normal")]),
+    "MPlantin":    ("rules and flavor text", [(400, "normal"), (400, "italic")]),
+    "Matrix Bold": ("2003-2014 title face (fallback for Beleren)", [(700, "normal")]),
 }
+FACE = {(400, "normal"): "roman", (400, "italic"): "italic",
+        (700, "normal"): "bold", (700, "italic"): "bold italic"}
+
+
+def face(weight, style):
+    return FACE.get((weight, style), f"{weight} {style}")
+
+
+def shown(faces):
+    """'Mplantin.ttf (roman), Mplantin-Italic.ttf (italic)' for a {(weight, style): path} map,
+    in reading order: roman, italic, bold, bold italic."""
+    order = lambda item: (item[0][0], item[0][1] == "italic")  # noqa: E731
+    return ", ".join(f"{p.name} ({face(w, s)})" for (w, s), p in sorted(faces.items(), key=order))
 
 
 def report(fonts_dir):
-    """{family: [description, ...]} of what is present, and the list of missing families."""
+    """({family: {(weight, style): path}}, [(family, weight, style) ...]) -- what is present, and
+    the faces WANT asks for that are not."""
     have = {}
     for family, weight, style, fn in frame.font_files(fonts_dir):
-        have.setdefault(family, []).append(f"{fn.name} ({weight} {style})")
-    return have, [f for f in WANT if f not in have]
+        have.setdefault(family, {})[(weight, style)] = fn
+    missing = [(family, w, s) for family, (_, faces) in WANT.items() for (w, s) in faces
+               if (w, s) not in have.get(family, {})]
+    return have, missing
 
 
 # codepoints that are blank by design and stay mapped even to an empty glyph
@@ -92,19 +112,24 @@ def main(argv=None):
         repair_all(ws.fonts)
     have, missing = report(ws.fonts)
     print(f"fonts dir: {ws.fonts}")
-    for family, role in WANT.items():
-        if family in have:
-            print(f"  ok       {family:16} {', '.join(have[family])}")
+    for family, (role, faces) in WANT.items():
+        mine = have.get(family, {})
+        gone = [f for f in faces if f not in mine]
+        if not gone:
+            print(f"  ok       {family:18} {shown(mine)}")
+        elif mine:  # the family is there but a face of it is not, and gets synthesized
+            print(f"  partial  {family:18} {shown(mine)}: no {', '.join(face(*f) for f in gone)}, "
+                  f"which the browser fakes from the roman")
         else:
-            print(f"  missing  {family:16} {role}")
-    for family in have:
+            print(f"  missing  {family:18} {role}")
+    for family, faces in have.items():
         if family not in WANT and family not in frame.PACKAGED_FAMILIES:
-            print(f"  extra    {family:16} {', '.join(have[family])}")
+            print(f"  extra    {family:18} {shown(faces)}")
     packaged, _ = report(frame.FONTS)
     for family, role in frame.PACKAGED_FAMILIES.items():
-        src = have.get(family) or packaged.get(family) or []
+        src = have.get(family) or packaged.get(family) or {}
         where = "yours" if family in have else "packaged"
-        print(f"  fallback {family:16} {role}: {', '.join(src)} ({where})")
+        print(f"  fallback {family:18} {role}: {shown(src)} ({where})")
     if missing:
         print("\nmissing faces use the packaged open fallbacks; see fonts/README.md for the real ones")
     return 1 if missing else 0

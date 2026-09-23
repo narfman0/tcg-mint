@@ -31,6 +31,18 @@ NODES = {
 MODELS = [("checkpoint", "CheckpointLoaderSimple", "ckpt_name"), ("controlnet", "ControlNetLoader", "control_net_name"),
           ("upscaler", "UpscaleModelLoader", "model_name")]
 
+# The weights comfyui_controlnet_aux fetches for itself on first use, by the control each serves
+# (restyle.preprocessor names them). These cannot be checked the way a checkpoint is: the node
+# offers every name it knows how to download, present or not, so its options list is always full.
+# They are only visible on disk, under the pack's own ckpts/ -- hence workspace.comfy_root.
+AUX_CKPTS = {
+    "depth":   [("depth-anything/Depth-Anything-V2-Large/depth_anything_v2_vitl.pth", "1.3 GB")],
+    "lineart": [("lllyasviel/Annotators/sk_model.pth", "17 MB"), ("lllyasviel/Annotators/sk_model2.pth", "17 MB")],
+    "openpose": [("yzd-v/DWPose/yolox_l.onnx", "207 MB"),
+                 ("hr16/DWPose-TorchScript-BatchSize5/dw-ll_ucoco_384_bs5.torchscript.pt", "129 MB")],
+}
+AUX_DIR = "custom_nodes/comfyui_controlnet_aux/ckpts"
+
 
 class Report:
     def __init__(self):
@@ -59,10 +71,17 @@ def check_workspace(ws, r):
 
 
 def check_fonts(ws, r):
-    have, missing = fonts.report(ws.fonts)
-    for family in fonts.WANT:
-        if family in have:
-            r.ok("font " + family, ", ".join(have[family]))
+    """Per face, not per family: a family present only as its roman still fakes its italic, and
+    reporting that as ok is how a missing MPlantin italic hid behind a green check."""
+    have, _ = fonts.report(ws.fonts)
+    for family, (_, faces) in fonts.WANT.items():
+        mine = have.get(family, {})
+        gone = [f for f in faces if f not in mine]
+        if not gone:
+            r.ok("font " + family, fonts.shown(mine))
+        elif mine:
+            r.warn("font " + family, f"{fonts.shown(mine)}: no {', '.join(fonts.face(*f) for f in gone)}, "
+                                     "which the browser fakes from the roman; fonts/README.md says where it is published")
         else:
             r.warn("font " + family, "substituted by the packaged fallback; fonts/README.md says where it is published")
 
@@ -88,7 +107,7 @@ def styles_in_use(ws):
             continue
         if st.style:
             out.append((f"set {st.code}", st.style))
-    for name, p, _ in style.templates(ws):
+    for name, p in style.templates(ws):  # (name, path); a built-in template has no path
         if p is not None:
             try:
                 out.append((f"template {name}", style.load(ws, name)[0]))
@@ -128,6 +147,35 @@ def check_comfy(ws, r, styles):
         for lora in (st.loras if st else []):
             have = lora["name"] in loras
             (r.ok if have else r.fail)(f"lora {lora['name']}", "" if have else f"not in ComfyUI; wanted by {where}")
+
+
+def check_aux(ws, r, styles):
+    """The preprocessor weights the node pack fetches for itself. A missing one is a warning, not
+    a failure -- the pack downloads it at the moment it is first asked for, which only hurts a
+    machine that is offline or in a hurry. Nothing here is checkable over HTTP (see AUX_CKPTS),
+    so with no comfy_root set this says what will be fetched rather than whether it is there."""
+    controls = set()
+    for _, st in styles:
+        if st is not None:
+            controls.add(st.control)
+            if st.remix == "repose":  # repose controls on DWPose whatever the style's own control
+                controls.add("openpose")
+    wanted = [(c, rel, size) for c in sorted(controls) for rel, size in AUX_CKPTS.get(c, [])]
+    if not wanted:
+        return
+    root = ws.comfy_path
+    if root is None:
+        names = ", ".join(rel.rsplit("/", 1)[-1] for _, rel, _ in wanted)
+        r.warn("aux preprocessors", f"fetched on first use, into {AUX_DIR}/: {names}. "
+                                    "Set comfy_root in mint.toml to check them here")
+        return
+    for control, rel, size in wanted:
+        p = root / AUX_DIR / rel
+        if p.exists():
+            r.ok(f"aux {control}", f"{rel.rsplit('/', 1)[-1]} ({size})")
+        else:
+            r.warn(f"aux {control}", f"{rel.rsplit('/', 1)[-1]} not in {AUX_DIR}/; "
+                                     f"the pack fetches it ({size}) the first time {control} runs")
 
 
 def motions_in_use(ws):
@@ -206,6 +254,7 @@ def main(argv=None):
     check_sets(r, styles)
     check_chromium(r)
     check_comfy(ws, r, styles)
+    check_aux(ws, r, styles)
     check_motion(ws, r, motions_in_use(ws))
     check_describer(ws, r)
     print(f"\n{r.failed} thing(s) a job would miss" if r.failed else "\neverything a job needs is here")

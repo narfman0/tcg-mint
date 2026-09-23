@@ -42,9 +42,14 @@ class Workspace:
     describer: str = "claude"      # the vision model behind `mint describe`: claude (the API) or ollama (local)
     describe_model: str = ""       # its model name; empty = the describer's default
     ollama_url: str = "http://127.0.0.1:11434"
+    # the ComfyUI checkout itself, when it is on this machine. Only `mint doctor` wants it, and
+    # only for the weights a node pack downloads for itself: those never appear in the node's
+    # options list (it offers every name it could fetch), so the server cannot be asked.
+    comfy_root: str = ""
 
     CONFIG = "mint.toml"
-    KEYS = ("maker", "maker_code", "comfy_url", "printer", "export_dir", "describer", "describe_model", "ollama_url")
+    KEYS = ("maker", "maker_code", "comfy_url", "printer", "export_dir", "describer", "describe_model",
+            "ollama_url", "comfy_root")
 
     @classmethod
     def from_env(cls, home=None):
@@ -53,6 +58,8 @@ class Workspace:
         conf = {k: v for k, v in read_config(home / cls.CONFIG).items() if k in cls.KEYS}
         if os.environ.get("COMFY_URL"):
             conf["comfy_url"] = os.environ["COMFY_URL"]
+        if os.environ.get("COMFY_ROOT"):
+            conf["comfy_root"] = os.environ["COMFY_ROOT"]
         return cls(home, cards, **conf)
 
     @property
@@ -64,6 +71,14 @@ class Workspace:
         """export_dir with ~ expanded; a relative one lies under the workspace."""
         p = Path(os.path.expanduser(self.export_dir))
         return p if p.is_absolute() else self.home / p
+
+    @property
+    def comfy_path(self):
+        """The ComfyUI checkout as a Path, or None when it is not set or not there."""
+        if not self.comfy_root:
+            return None
+        p = Path(os.path.expanduser(self.comfy_root))
+        return p if p.is_dir() else None
 
     @property
     def fonts(self):

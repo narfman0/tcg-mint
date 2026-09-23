@@ -15,6 +15,17 @@ def test_from_env_reads_mint_toml(tmp_path, monkeypatch):
     assert ws.fonts == ws.home / "fonts" and ws.sets == ws.home / "sets" and ws.path("a", "b") == ws.home / "a" / "b"
 
 
+def test_comfy_root_is_optional_and_must_exist(tmp_path, monkeypatch):
+    monkeypatch.setenv("MINT_HOME", str(tmp_path))
+    monkeypatch.delenv("COMFY_ROOT", raising=False)
+    assert Workspace.from_env().comfy_path is None  # unset: doctor then says what gets fetched
+    (tmp_path / "mint.toml").write_text(f'comfy_root = "{tmp_path / "nowhere"}"\n')
+    assert Workspace.from_env().comfy_path is None  # set but absent is the same as unset
+    (tmp_path / "ComfyUI").mkdir()
+    monkeypatch.setenv("COMFY_ROOT", str(tmp_path / "ComfyUI"))
+    assert Workspace.from_env().comfy_path == tmp_path / "ComfyUI"
+
+
 def test_env_overrides_file_and_locates_cards(tmp_path, monkeypatch):
     (tmp_path / "mint.toml").write_text('comfy_url = "http://box:1"\n')
     monkeypatch.setenv("MINT_HOME", str(tmp_path))
