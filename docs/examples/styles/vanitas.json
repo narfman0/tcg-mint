@@ -1,0 +1,13 @@
+{
+  "name": "vanitas",
+  "prompt": "dutch golden age oil painting, baroque tenebrism, chiaroscuro, single raking candlelight against deep black shadow, glazed oil on canvas, craquelure, rich umber and ochre and bone white, memento mori mood, museum old master",
+  "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, nude, nsfw, photograph, digital art, anime, flat colors, bright daylight, pastel, neon",
+  "control": "depth",
+  "control_strength": 0.6,
+  "control_end": 0.85,
+  "denoise": 0.85,
+  "steps": 30,
+  "cfg": 6,
+  "seed": 31,
+  "seed_rule": "stable"
+}

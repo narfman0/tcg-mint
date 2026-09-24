@@ -1,0 +1,16 @@
+{
+  "name": "detail",
+  "prompt": "hyperrealistic rendering of the same scene, lifelike materials and surface texture, physically plausible light and shadow, crisp micro-detail, sharp focus, natural colour, the original palette and composition kept",
+  "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, grain, noise, speckle, jpeg artifacts, canvas texture, visible brush strokes, painterly, cartoon, 3d render, cgi, smooth plastic skin, waxy, oversaturated, flat",
+  "control": "canny",
+  "control_strength": 0.85,
+  "control_end": 0.45,
+  "denoise": 0.5,
+  "steps": 40,
+  "cfg": 5.0,
+  "seed": 23,
+  "seed_rule": "stable",
+  "refine": 0.35,
+  "refine_scale": 1.5,
+  "color_match": 0.7
+}

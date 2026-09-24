@@ -24,10 +24,12 @@ build/
 dist/
 .venv/
 
-# your sets, style templates and settings: the workspace's, never the repo's (docs/examples/ shows the shapes)
-sets/
-styles/
-mint.toml
+# your sets, style templates and settings: the workspace's, never the repo's (docs/examples/ shows
+# the shapes). Anchored to the root: unanchored, `styles/` also swallowed docs/examples/styles/,
+# so the templates that directory's README points at were never in the repo at all.
+/sets/
+/styles/
+/mint.toml
 
 # subagent worktrees
 .claude/worktrees/

@@ -1,0 +1,13 @@
+{
+  "name": "linocut",
+  "prompt": "two-colour screen print, linocut poster, bold flat shapes, limited palette of bone white and moss green and dried-blood red on black, coarse halftone and ink texture, hand-pulled print, graphic minimalism, high contrast",
+  "negative": "blurry, low quality, text, watermark, signature, frame, border, deformed, nude, nsfw, photograph, painting, gradients, soft shading, 3d render, many colors, rainbow, anime",
+  "control": "canny",
+  "control_strength": 0.8,
+  "control_end": 0.85,
+  "denoise": 0.9,
+  "steps": 30,
+  "cfg": 7,
+  "seed": 53,
+  "seed_rule": "stable"
+}
