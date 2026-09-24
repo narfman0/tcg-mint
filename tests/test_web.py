@@ -566,3 +566,34 @@ def test_the_cleanup_page_lists_what_could_go_and_removes_only_what_is_picked(cl
     # an id that is no longer a candidate comes back under `missed`
     again = client.post("/api/cleanup", json={"ids": [item["id"]], "keep_days": 3}).json()
     assert again["removed"] == 0 and again["missed"] == [item["id"]]
+
+
+# --- a metered ComfyUI is never asked by the page on its own ------------------------------------
+
+def _count_comfy(monkeypatch, alive=True):
+    from mint import comfy
+    calls = []
+    monkeypatch.setattr(comfy.Comfy, "alive", lambda self: calls.append("alive") or alive)
+    monkeypatch.setattr(comfy.Comfy, "nodes", lambda self: calls.append("nodes") or {"IPAdapterUnifiedLoader"})
+    monkeypatch.setattr(comfy.Comfy, "options", lambda self, node, inp: calls.append("options") or [])
+    return calls
+
+
+def test_metered_comfy_is_asked_only_by_the_check(client, monkeypatch):
+    calls = _count_comfy(monkeypatch)
+    client.ws.comfy_url = "https://gpu.example"   # not this machine: every request may wake a rented GPU
+    c = client.get("/api/workspace").json()["comfy"]
+    assert c["metered"] and c["checked"] is None and c["alive"] is False and c["ipadapter"] is False
+    assert "not been asked" in c["wan"]["hint"]
+    assert calls == []
+    c = client.post("/api/comfy/check").json()
+    assert c["alive"] and c["checked"] and c["ipadapter"] and calls[:2] == ["alive", "nodes"]
+    n = len(calls)
+    c = client.get("/api/workspace").json()["comfy"]
+    assert c["alive"] and len(calls) == n  # what the check found, without asking again
+
+
+def test_local_comfy_is_asked_freely(client, monkeypatch):
+    calls = _count_comfy(monkeypatch)
+    c = client.get("/api/workspace").json()["comfy"]
+    assert not c["metered"] and c["alive"] and c["checked"] and "alive" in calls

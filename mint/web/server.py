@@ -6,6 +6,7 @@ import queue
 import random
 import threading
 import time
+import urllib.parse
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -32,7 +33,7 @@ from .. import (
 )
 from ..art import Art, cut_base
 from ..cards import Cards, default_printing, oddness, warnings
-from ..errors import MintError
+from ..errors import ComfyError, MintError
 from ..manifest import Manifest, frame_hash
 from . import pdfs
 from .jobs import Jobs
@@ -58,16 +59,35 @@ class State:
     def comfy(self):
         return comfy.client(self.ws)
 
+    def comfy_metered(self):
+        """Whether asking ComfyUI anything has a price. A server on this machine is asked freely;
+        one anywhere else is taken to be a GPU rented by the second, which wakes -- and bills --
+        for a status check as readily as for a job, and stays up for its keep-warm window after
+        each one. An open tab would keep it warm forever. So a metered server is touched only by a
+        job, or by the page's own check (the status dot); the workbench otherwise shows what it
+        last learned."""
+        host = urllib.parse.urlsplit(self.ws.comfy_url).hostname or ""
+        return host not in ("127.0.0.1", "localhost", "::1")
+
     def comfy_alive(self):
         t, alive = self._comfy
+        if self.comfy_metered():
+            return alive  # what the last job or check found; never asked from here
         if time.time() - t > 5:
             alive = self.comfy().alive()
             self._comfy = (time.time(), alive)
         return alive
 
+    def comfy_checked(self):
+        """When ComfyUI was last asked (epoch seconds), or None if never."""
+        return self._comfy[0] or None
+
     def comfy_nodes(self):
-        """The node types ComfyUI has, asked at most once a minute (the listing is large); empty when down."""
+        """The node types ComfyUI has, asked at most once a minute (the listing is large); empty when
+        down. A metered server's listing is whatever the last check fetched."""
         t, nodes = self._nodes
+        if self.comfy_metered():
+            return nodes
         if time.time() - t > 60:
             nodes = self.comfy().nodes() if self.comfy_alive() else set()
             self._nodes = (time.time(), nodes)
@@ -77,10 +97,44 @@ class State:
         """Whether `animate` could run now: ComfyUI up with the Wan nodes and every file the sets'
         motion blocks (or the defaults) name, and ffmpeg on PATH; else why not, in one line."""
         t, info = self._wan
+        if self.comfy_metered():
+            return info or {"ready": False, "hint": "ComfyUI has not been asked yet: press its dot to check"}
         if time.time() - t > 60 or info is None:
             info = self._wan_check()
             self._wan = (time.time(), info)
         return info
+
+    def comfy_check(self):
+        """Ask ComfyUI now, whatever it costs: alive, its nodes, and whether Wan is ready. The
+        page's status dot does this on a metered server; a job does it as a side effect."""
+        now = time.time()
+        alive = self.comfy().alive()
+        self._comfy = (now, alive)
+        self._nodes = (now, self.comfy().nodes() if alive else set())
+        self._wan = (now, self._wan_check())
+        return self.comfy_status()
+
+    def comfy_status(self):
+        """The `comfy` block of /api/workspace: what is known, and whether asking costs."""
+        return {"url": self.ws.comfy_url, "alive": self.comfy_alive(), "metered": self.comfy_metered(),
+                "checked": self.comfy_checked(),
+                # what the inspire mode needs: the ComfyUI_IPAdapter_plus node pack
+                "ipadapter": "IPAdapterUnifiedLoader" in self.comfy_nodes(),
+                # what animate needs: the Wan 2.2 files in ComfyUI and ffmpeg here (else why not)
+                "wan": self.wan_info()}
+
+    def comfy_ready(self):
+        """The client a job runs on, required to be up -- and what that found is what the page
+        shows next, so a metered server needs no separate check once a job has run."""
+        server = self.comfy()
+        try:
+            server.require()
+        except ComfyError:
+            self._comfy = (time.time(), False)
+            raise
+        if self.comfy_metered():
+            self.comfy_check()
+        return server
 
     def _wan_check(self):
         if not loop.have_ffmpeg():
@@ -253,11 +307,7 @@ def create_app(ws):
         except MintError:
             count = 0
         return {"home": str(ws.home), "maker": ws.maker, "maker_code": ws.maker_code,
-                "comfy": {"url": ws.comfy_url, "alive": S.comfy_alive(),
-                          # what the inspire mode needs: the ComfyUI_IPAdapter_plus node pack
-                          "ipadapter": "IPAdapterUnifiedLoader" in S.comfy_nodes(),
-                          # what animate needs: the Wan 2.2 files in ComfyUI and ffmpeg here (else why not)
-                          "wan": S.wan_info()},
+                "comfy": S.comfy_status(),
                 "cards": {"path": str(ws.cards_file), "count": count},
                 # who writes subject lines from pictures (describe.py), and whether they could now
                 "describer": S.describer_info(),
@@ -643,6 +693,11 @@ def create_app(ws):
         if keep_days < 0:
             raise HTTPException(400, "keep_days cannot be negative")
         return cleanup.grouped(cleanup.candidates(ws, keep_days, set))
+
+    @app.post("/api/comfy/check")
+    def comfy_check():
+        """Ask ComfyUI now. The page's status dot on a metered server; free ones are asked anyway."""
+        return S.comfy_check()
 
     @app.post("/api/cleanup")
     def cleanup_remove(body: dict):
@@ -1066,8 +1121,7 @@ def submit_enhance(S, st, names, body):
     base, model, force = body.get("base") or "crop", body.get("model") or upscale.DEFAULT_MODEL, bool(body.get("force"))
 
     def run(job):
-        server = S.comfy()
-        server.require()
+        server = S.comfy_ready()
         cards = S.cards()
         job.step(0, len(names))
         made = []
@@ -1110,8 +1164,7 @@ def submit_animate(S, st, names, body):
         info = S.wan_info()
         if not info["ready"]:
             raise MintError(f"animate cannot run: {info['hint']}")
-        server = S.comfy()
-        server.require()
+        server = S.comfy_ready()
         cards = S.cards()
         job.step(0, len(names) * takes)
         made = []
@@ -1156,8 +1209,7 @@ def submit_describe(S, st, names, body):
         describer = S.describer()
         server = None
         if generate:
-            server = S.comfy()
-            server.require()
+            server = S.comfy_ready()
         cards = S.cards()
         job.step(0, len(names) * per)
         written, made = [], []
@@ -1223,8 +1275,7 @@ def submit_restyle(S, st, names, body):
     seeds = [seed] if takes == 1 else [random.randrange(1, 2 ** 31) for _ in range(takes)]
 
     def run(job):
-        server = S.comfy()
-        server.require()
+        server = S.comfy_ready()
         cards = S.cards()
         job.step(0, len(names) * takes)
         made = []

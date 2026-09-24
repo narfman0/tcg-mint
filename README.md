@@ -212,7 +212,12 @@ mint serve --host 0.0.0.0  # reachable from a phone on the same network
 mint serve --stop          # end the one running for this workspace (Ctrl-C in its terminal also works)
 ```
 
-A local page over the workspace, for comparing and deciding. It fits a phone
+A local page over the workspace, for comparing and deciding. Its status dot
+is ComfyUI. A server on this machine is asked freely; one anywhere else
+(`COMFY_URL`) is taken to be *metered* -- a GPU rented by the second wakes,
+and bills, for a status check as readily as for a job, and an open tab would
+keep it warm forever -- so the page never asks on its own: the dot shows what
+the last job or check found, and clicking it asks now. It fits a phone
 too: the set nav scrolls, tiles and images fall into two columns, and every
 control is thumb-sized. It is installable — *add to home screen* gives it an
 icon and its own window, and a service worker keeps the page shell so the app

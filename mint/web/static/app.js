@@ -147,8 +147,26 @@ function renderNav() {
     `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}">${esc(s.code)}</a>`).join('') +
     (STATIC ? '' : `<a href="#/all" class="all ${r.code === ALL ? 'on' : ''}" title="every set on one board">all</a><a href="#/styles" class="all ${r.view === 'styles' ? 'on' : ''}" title="style templates">styles</a>` +
      `<a href="#/cleanup" class="all ${r.view === 'cleanup' ? 'on' : ''}" title="what could be removed, and what it weighs">cleanup</a>`);
-  $('#comfy').className = 'dot' + (state.ws?.comfy?.alive ? ' on' : '');
-  $('#comfy').title = `ComfyUI ${state.ws?.comfy?.url}: ${state.ws?.comfy?.alive ? 'running' : 'not running'}`;
+  renderComfyDot();
+}
+/* The status dot. A local ComfyUI is asked freely and the dot just says. One elsewhere is metered
+   (a rented GPU wakes for a status check as readily as for a job), so the workbench never asks on
+   its own: the dot shows what the last job or check found, and clicking it asks now. */
+function renderComfyDot() {
+  const c = state.ws?.comfy || {}, dot = $('#comfy');
+  const unknown = c.metered && !c.checked;
+  dot.className = 'dot' + (c.alive ? ' on' : unknown ? ' unknown' : '') + (c.metered ? ' ask' : '');
+  const when = c.checked ? `checked ${ago(c.checked)}` : 'not asked yet';
+  dot.title = `ComfyUI ${c.url}: ` + (c.metered ? `${unknown ? 'unknown' : c.alive ? 'running' : 'not running'} (${when}; metered, so the workbench only asks when you click here or run a job)`
+                                              : (c.alive ? 'running' : 'not running'));
+  dot.onclick = c.metered ? checkComfy : null;
+}
+function ago(t) { const s = Math.max(0, Date.now() / 1000 - t); return s < 90 ? `${Math.round(s)}s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; }
+async function checkComfy() {
+  const dot = $('#comfy'); dot.className = 'dot ask busy'; dot.title = 'asking ComfyUI (a cold GPU takes a minute)';
+  try { state.ws.comfy = await api('/api/comfy/check', {method: 'POST'}); toast(state.ws.comfy.alive ? 'ComfyUI is up' : 'ComfyUI is not answering', !state.ws.comfy.alive); }
+  catch (e) { toast(e.message, true); }
+  renderComfyDot(); go();
 }
 function renderJobstrip() {
   const running = Object.values(state.jobs).filter(j => j.state === 'running')[0];
