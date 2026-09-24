@@ -117,9 +117,14 @@ def styles_in_use(ws):
 
 
 def check_comfy(ws, r, styles):
-    server = comfy.Comfy(ws.comfy_url)
+    server = comfy.client(ws)
     if not server.alive():
-        r.fail("comfyui", f"nothing answers at {ws.comfy_url}; start it, or set COMFY_URL")
+        if server.refused():
+            r.fail("comfyui", f"{ws.comfy_url} refused the request: "
+                   + ("the token (COMFY_TOKEN) is not the one it wants" if ws.comfy_token
+                      else "it wants a bearer token; set COMFY_TOKEN"))
+        else:
+            r.fail("comfyui", f"nothing answers at {ws.comfy_url}; start it, or set COMFY_URL")
         return
     r.ok("comfyui", ws.comfy_url)
     have = server.nodes()
@@ -196,7 +201,7 @@ def check_motion(ws, r, motions):
     model file the blocks name (with where to fetch a missing one), and ffmpeg."""
     if not motions:
         return
-    server = comfy.Comfy(ws.comfy_url)
+    server = comfy.client(ws)
     if server.alive():
         have = server.nodes()
         missing = [n for n in wan.NODES if n not in have]

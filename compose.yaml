@@ -1,0 +1,22 @@
+# The workbench on a server: `docker compose up -d --build`, then http://<host>:8300/.
+#
+# The workspace directory (MINT_WORKSPACE, default: this directory) holds fonts/, art/, sets/,
+# styles/, the card file and mint.toml; the image holds only code. Anything secret comes from
+# .env beside this file (.env.example lists the keys) and never from here.
+services:
+  mint:
+    build: .
+    image: tcg-mint
+    ports:
+      - "${MINT_PORT:-8300}:8300"
+    volumes:
+      - "${MINT_WORKSPACE:-.}:/workspace"
+    environment:
+      COMFY_URL: ${COMFY_URL:-}          # empty: mint.toml's comfy_url, else 127.0.0.1 (meaningless in here)
+      COMFY_TOKEN: ${COMFY_TOKEN:-}      # the bearer token a proxied ComfyUI wants
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}   # only `mint describe` with the claude describer
+    # the uid the workspace's files should belong to on the host (id -u / id -g there)
+    user: "${MINT_UID:-1000}:${MINT_GID:-1000}"
+    # Chromium screenshots a 3264x4464 page through shared memory; Docker's default 64 MB is not enough
+    shm_size: 1gb
+    restart: unless-stopped

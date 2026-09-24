@@ -58,7 +58,9 @@ cd .. && .venv/bin/pip install -r custom_nodes/comfyui_controlnet_aux/requiremen
 ```
 
 `COMFY_URL` (or `comfy_url` in `mint.toml`) points mint at a server
-elsewhere.
+elsewhere; `COMFY_TOKEN` (`comfy_token`) is the bearer token one behind an
+authenticating proxy wants on every request. The README's Docker section runs
+mint itself on a machine with no GPU at all.
 
 ### The model files
 

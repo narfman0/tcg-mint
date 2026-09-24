@@ -72,3 +72,20 @@ def test_aux_ckpts_checked_on_disk_when_comfy_root_is_set(ws, tmp_path, monkeypa
     assert by_what["aux depth"][0] == "ok"
     assert by_what["aux lineart"][0] == "warn"  # sk_model*.pth are not there
     assert r.failed == 0  # the pack fetches a missing one itself; never a failure
+
+
+def test_comfy_check_tells_a_refusal_from_a_dead_server(ws, monkeypatch):
+    from mint import comfy
+    monkeypatch.setattr(comfy.Comfy, "alive", lambda self: False)
+    monkeypatch.setattr(comfy.Comfy, "refused", lambda self: True)
+    r = Rec()
+    doctor.check_comfy(ws, r, [])
+    assert r.lines[0][0] == "fail" and "set COMFY_TOKEN" in r.lines[0][2]
+    ws.comfy_token = "t"
+    r = Rec()
+    doctor.check_comfy(ws, r, [])
+    assert "not the one it wants" in r.lines[0][2]
+    monkeypatch.setattr(comfy.Comfy, "refused", lambda self: False)
+    r = Rec()
+    doctor.check_comfy(ws, r, [])
+    assert "nothing answers" in r.lines[0][2]

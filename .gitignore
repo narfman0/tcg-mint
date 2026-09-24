@@ -24,15 +24,19 @@ build/
 dist/
 .venv/
 
-# your sets and style templates: the workspace's, never the repo's (docs/examples/ shows the shapes)
+# your sets, style templates and settings: the workspace's, never the repo's (docs/examples/ shows the shapes)
 sets/
 styles/
+mint.toml
 
 # subagent worktrees
 .claude/worktrees/
 
 # workbench thumbnails and other caches
 .cache/
+
+# compose's environment: the ComfyUI token and the API key live there
+.env
 
 # the workbench icons, the one set of PNGs that is source
 !mint/web/static/*.png

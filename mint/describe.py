@@ -221,7 +221,7 @@ def main(argv=None):
             from . import comfy
             if st.style is None:
                 raise MintError(f"{a.set} has no `style` block to generate in")
-            server = comfy.Comfy(ws.comfy_url)
+            server = comfy.client(ws)
             server.require()
         cards, art = Cards(ws.cards_file), Art(ws.art)
         for name in names:

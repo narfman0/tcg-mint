@@ -95,8 +95,8 @@ def main(argv=None):
         import uvicorn
 
         from .web.server import create_app
-    except ImportError:
-        sys.exit("the workbench needs fastapi and uvicorn: pip install -e '.[web]'")
+    except ImportError as e:
+        sys.exit(f"the workbench needs fastapi and uvicorn: pip install -e '.[web]'  ({e})")
     url = f"http://{a.host}:{a.port}/"
     print(f"workbench on {url}  (workspace {ws.home})" + ("  -- reloading on code changes" if a.reload else ""))
     if a.open:

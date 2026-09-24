@@ -1,0 +1,7 @@
+# the image gets the code and nothing of the workspace: art/ and out/ alone are gigabytes
+*
+!pyproject.toml
+!README.md
+!LICENSE
+!mint/
+mint/**/__pycache__/

@@ -27,8 +27,8 @@ mint = "mint.__main__:main"
 [project.urls]
 Repository = "https://github.com/narfman0/tcg-mint"
 
-[tool.setuptools]
-packages = ["mint"]
+[tool.setuptools.packages.find]
+include = ["mint*"]  # mint and mint.web; a plain (non-editable) install shipped no workbench without the latter
 
 [tool.setuptools.package-data]
 mint = ["*.html", "designs/*", "fonts/*", "web/static/*"]

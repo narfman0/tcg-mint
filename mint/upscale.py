@@ -84,7 +84,7 @@ def main(argv=None):
         names = a.names or (st.names() if st else [])
         if not names:
             ap.error("give card names or a --set")
-        server = comfy.Comfy(ws.comfy_url)
+        server = comfy.client(ws)
         server.require()
         cards, art = Cards(ws.cards_file), Art(ws.art)
         for name in names:

@@ -64,6 +64,24 @@ The first lookup builds a small SQLite index beside the card file
 (`oracle-cards.jsonl.idx`, a few seconds); after that finding a card is
 instant, and the index rebuilds itself whenever the card file changes.
 
+### On a server: Docker
+
+Nothing here needs a GPU -- ComfyUI is reached over the network -- so the
+workbench can live on any always-on box:
+
+```sh
+cp .env.example .env          # COMFY_URL, COMFY_TOKEN, ANTHROPIC_API_KEY; the uid that owns the workspace
+docker compose up -d --build  # http://<host>:8300/
+docker compose run --rm mint mint doctor      # any command, against the same workspace
+```
+
+The image (`Dockerfile`) holds the code, Chromium and ffmpeg; the workspace
+is a bind mount at `/workspace`, this directory unless `MINT_WORKSPACE` in
+`.env` says otherwise, and every file the container writes there belongs to
+`MINT_UID`. Inside, `~` is `/tmp`, so give `export_dir` in `mint.toml` a
+path under the workspace (`export_dir = "export"`) if the PDF page's exports
+should survive. `mint print` wants a CUPS queue and stays on the desktop.
+
 ## Sets
 
 A set is a JSON file in `sets/` (`docs/examples/set.json` shows one of every
@@ -138,6 +156,8 @@ where the workbench exports a PDF to, and who reads a card's picture for
 maker = "narfman0"
 maker_code = "BLS"
 comfy_url = "http://127.0.0.1:8188"
+comfy_token = ""              # a ComfyUI behind an authenticating proxy wants a bearer token on every
+                              # request; COMFY_TOKEN in the environment is the better place for it
 printer = "EPSON_ET_8500"
 export_dir = "~/Desktop"
 describer = "claude"          # or "ollama"; claude reads ANTHROPIC_API_KEY from the environment
@@ -342,8 +362,11 @@ mint upscale --model RealESRGAN_x4plus.pth "Cyclonic Rift"
 
 4x-UltraSharp is the default: on painted card art it keeps canvas grain and
 brushwork where Real-ESRGAN x4plus goes smooth and plasticky. `COMFY_URL`
-points at a server elsewhere. `mint/comfy.py` is a ~100-line client (upload,
-queue a workflow, fetch outputs) that any other ComfyUI workflow can reuse.
+points at a server elsewhere, and `COMFY_TOKEN` is the bearer token one behind
+an authenticating proxy wants (a GPU rented by the second, say): every request
+carries it, and `mint doctor` tells a refused token apart from a server that is
+down. `mint/comfy.py` is a ~100-line client (upload, queue a workflow, fetch
+outputs) that any other ComfyUI workflow can reuse.
 
 ## Art styles: one look per set
 

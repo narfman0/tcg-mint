@@ -56,7 +56,7 @@ class State:
         return Cards(self.ws.cards_file)  # a SQLite connection per thread
 
     def comfy(self):
-        return comfy.Comfy(self.ws.comfy_url)
+        return comfy.client(self.ws)
 
     def comfy_alive(self):
         t, alive = self._comfy

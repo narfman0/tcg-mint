@@ -2,7 +2,10 @@
 
 ComfyUI's HTTP API takes a workflow as a graph of nodes ("API format" JSON),
 runs it, and exposes the outputs. We use it as the image backend: upscaling
-and style workflows. The URL comes from the workspace (COMFY_URL).
+and style workflows. The URL comes from the workspace (COMFY_URL), and so does
+an optional bearer token (COMFY_TOKEN) for a server that sits behind an
+authenticating proxy -- a ComfyUI on a GPU host elsewhere. Every request
+carries it; a local server never sees one.
 """
 import json
 import os
@@ -14,16 +17,29 @@ import uuid
 
 from .errors import ComfyError
 
-__all__ = ["Comfy", "ComfyError", "upscale_workflow"]
+__all__ = ["Comfy", "ComfyError", "client", "upscale_workflow"]
+
+
+def client(ws):
+    """The workspace's ComfyUI: its URL and, when it has one, its token."""
+    return Comfy(ws.comfy_url, ws.comfy_token)
 
 
 class Comfy:
-    def __init__(self, url="http://127.0.0.1:8188"):
+    def __init__(self, url="http://127.0.0.1:8188", token=""):
         self.url = url.rstrip("/")
+        self.token = token or ""
+
+    def _request(self, path, data=None, headers=None):
+        """A Request for path, with the bearer token when there is one."""
+        h = dict(headers or {})
+        if self.token:
+            h["Authorization"] = f"Bearer {self.token}"
+        return urllib.request.Request(self.url + path, data=data, headers=h)
 
     def _json(self, path, data=None):
-        req = urllib.request.Request(self.url + path, data=json.dumps(data).encode() if data is not None else None,
-                                     headers={"Content-Type": "application/json"})
+        req = self._request(path, json.dumps(data).encode() if data is not None else None,
+                            {"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.load(r)
 
@@ -31,6 +47,17 @@ class Comfy:
         try:
             self._json("/system_stats")
             return True
+        except (urllib.error.URLError, TimeoutError):
+            return False
+
+    def refused(self):
+        """True when the server is there but turned the request away (401/403): the token is
+        missing or wrong, which `alive()` would only report as down."""
+        try:
+            self._json("/system_stats")
+            return False
+        except urllib.error.HTTPError as e:
+            return e.code in (401, 403)
         except (urllib.error.URLError, TimeoutError):
             return False
 
@@ -56,8 +83,13 @@ class Comfy:
             return None
 
     def require(self):
-        if not self.alive():
-            raise ComfyError(f"no ComfyUI at {self.url}; start it with: python main.py --listen 127.0.0.1 --port 8188")
+        if self.alive():
+            return
+        if self.refused():
+            raise ComfyError(f"ComfyUI at {self.url} refused the request: "
+                             + ("the token (COMFY_TOKEN) is not the one it wants" if self.token
+                                else "it wants a bearer token; set COMFY_TOKEN"))
+        raise ComfyError(f"no ComfyUI at {self.url}; start it with: python main.py --listen 127.0.0.1 --port 8188")
 
     def upload(self, path, subfolder="tcg-mint"):
         """Copy a file into ComfyUI's input/ so a LoadImage node can see it. Returns the name to reference."""
@@ -69,8 +101,7 @@ class Comfy:
                 f"Content-Type: application/octet-stream\r\n\r\n").encode() + data + \
                f"\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"subfolder\"\r\n\r\n{subfolder}\r\n".encode() + \
                f"--{boundary}\r\nContent-Disposition: form-data; name=\"overwrite\"\r\n\r\ntrue\r\n--{boundary}--\r\n".encode()
-        req = urllib.request.Request(self.url + "/upload/image", data=body,
-                                     headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        req = self._request("/upload/image", body, {"Content-Type": f"multipart/form-data; boundary={boundary}"})
         with urllib.request.urlopen(req, timeout=120) as r:
             info = json.load(r)
         return f"{info['subfolder']}/{info['name']}" if info.get("subfolder") else info["name"]
@@ -94,7 +125,7 @@ class Comfy:
         """Download one output image ({filename, subfolder, type}) to dest."""
         q = urllib.parse.urlencode({"filename": image["filename"], "subfolder": image.get("subfolder", ""),
                                     "type": image.get("type", "output")})
-        with urllib.request.urlopen(self.url + "/view?" + q, timeout=120) as r, open(dest, "wb") as f:
+        with urllib.request.urlopen(self._request("/view?" + q), timeout=120) as r, open(dest, "wb") as f:
             f.write(r.read())
 
     def run_to_file(self, workflow, dest, timeout=600):

@@ -27,19 +27,21 @@ def test_comfy_root_is_optional_and_must_exist(tmp_path, monkeypatch):
 
 
 def test_env_overrides_file_and_locates_cards(tmp_path, monkeypatch):
-    (tmp_path / "mint.toml").write_text('comfy_url = "http://box:1"\n')
+    (tmp_path / "mint.toml").write_text('comfy_url = "http://box:1"\ncomfy_token = "filed"\n')
     monkeypatch.setenv("MINT_HOME", str(tmp_path))
     monkeypatch.setenv("COMFY_URL", "http://other:2")
+    monkeypatch.setenv("COMFY_TOKEN", "from-env")
     monkeypatch.setenv("MINT_CARDS", str(tmp_path / "shared" / "cards.jsonl"))
     ws = Workspace.from_env()
     assert ws.comfy_url == "http://other:2"
+    assert ws.comfy_token == "from-env"
     assert ws.cards_file == tmp_path / "shared" / "cards.jsonl"
     assert ws.maker == "narfman0"  # untouched keys keep their defaults
 
 
 def test_defaults_without_config(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    for k in ("MINT_HOME", "MINT_CARDS", "COMFY_URL"):
+    for k in ("MINT_HOME", "MINT_CARDS", "COMFY_URL", "COMFY_TOKEN"):
         monkeypatch.delenv(k, raising=False)
     ws = Workspace.from_env()
     assert ws.home == tmp_path.resolve()
