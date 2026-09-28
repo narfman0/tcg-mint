@@ -112,6 +112,50 @@ const setOf = c => c.inSet || state.set.code;
 const styleOf = c => c.setStyle !== undefined ? c.setStyle : state.set.style;
 const cardOf = name => state.set && state.set.cards_detail.find(c => c.name === name);
 
+/* --- redrawing over a half-typed line --------------------------------------- */
+/* A page redraws whole -- a job lands an image, a picker turns, a save comes back -- and the text
+   lines that only commit on change (a card's subject, its motion line) used to go with it
+   mid-sentence. Whatever is being typed in is marked below, and a redraw through `redraw` hands
+   the new HTML that field's own element back, with its text, its caret and its selection. A field
+   is the same field across two renders when `fieldKey` says so: by its id (the card page), or by
+   what it edits on which card (the edit page's table, whose cells carry no id).
+
+   `typed` means the field holds something the server has not confirmed. It is set on the first
+   keystroke and cleared by whoever saves the field, on the answer -- not when the field is left:
+   a save that fails (or a server that is gone) leaves the mark on, and the words survive the
+   redraw that follows instead of being drawn over with what was on disk. */
+const fieldKey = el => el.id ? `#${el.id}`
+  : el.dataset.k ? `k:${el.closest('[data-name]')?.dataset.name || ''}:${el.dataset.k}`  // a card's cell in the edit table
+  : el.dataset.s ? `s:${el.dataset.s}`                                                   // a set field beside that table
+  : null;
+document.addEventListener('input', e => { if (e.target.dataset && fieldKey(e.target)) e.target.dataset.typed = '1'; }, true);
+/* the field is on disk now: it can take what the next render says again. Takes elements, or ids. */
+const saved = (...els) => els.forEach(el => {
+  el = typeof el === 'string' ? $('#' + el) : el;
+  if (el && el.dataset) delete el.dataset.typed;
+});
+
+function redraw(host, html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const act = document.activeElement;
+  const fields = new Map();
+  tmp.querySelectorAll('input, textarea').forEach(el => { const k = fieldKey(el); if (k && !fields.has(k)) fields.set(k, el); });
+  let focused = null, at = null;
+  host.querySelectorAll('input, textarea').forEach(old => {
+    if (old !== act && !old.dataset.typed) return;
+    const fresh = fields.get(fieldKey(old));
+    if (!fresh || fresh.tagName !== old.tagName || fresh.type !== old.type) return;
+    if (old === act) { focused = old; try { at = [old.selectionStart, old.selectionEnd]; } catch { at = null; } }
+    fresh.replaceWith(old);  // the element itself moves into the new page, handlers and all
+  });
+  host.replaceChildren(...tmp.childNodes);
+  if (focused && focused.isConnected) {
+    focused.focus();
+    if (at && at[0] != null) try { focused.setSelectionRange(at[0], at[1]); } catch { /* not a text field */ }
+  }
+}
+
 /* --- routing --------------------------------------------------------------- */
 function route() {
   const h = location.hash.replace(/^#\/?/, '');
@@ -346,7 +390,7 @@ function bindTile(t) {
   };
 }
 /* A job finished one card (an `item` event): fetch that card's detail alone, swap it into the
-   set, and redraw just its tile -- or the card page, if that is what is open. So a batch of 80
+   set, and redraw just its tile -- or, on the card page, just the sections the image shows in. So a batch of 80
    restyles shows each as it lands rather than when the whole job ends; the final refresh on
    `done` still brings the look picker's counts and the filters up to date. */
 async function arrived(d) {
@@ -367,7 +411,7 @@ async function arrived(d) {
     if (!t) return;
     const tmp = document.createElement('div'); tmp.innerHTML = tileHtml(st.cards_detail[i]);
     const fresh = tmp.firstElementChild; bindTile(fresh); t.replaceWith(fresh);
-  } else if (r.view === 'card' && r.name === d.name && !r.key) card(r);
+  } else if (r.view === 'card' && r.name === d.name && !r.key) card(r, 'images');
 }
 function board() {
   const st = state.set, code = st.code, all = !!st.all;
@@ -871,7 +915,10 @@ function motionRow(c) {
             ${c.motion_hash ? `<span class="muted mono" title="the clip the motion recipe names now, from ${esc(c.motion_recipe?.base || '')}">${(c.variants || []).some(v => v.hash === c.motion_hash) ? 'made' : 'would make'} ${c.motion_hash}</span>` : ''}
             ${wan.ready ? '' : `<span class="warn" title="${esc(wan.hint)}">animate is off: ${esc(wan.hint)}</span>`}</span>`;
 }
-async function card(r) {
+/* `only` -- from `arrived`, a job's image landing on the open card page -- swaps just the sections
+   an image changes. The head stays: its subject and motion lines (and the caret in them), its open
+   printings grid, the printings that were fetched once. */
+async function card(r, only) {
   const c = cardOf(r.name);
   const code = state.set.code, st = state.set;
   if (!c) { $('#main').innerHTML = `<div class="empty">no card ${esc(r.name)} in ${esc(code)}</div>`; return; }
@@ -892,7 +939,7 @@ async function card(r) {
     : c.style_hash ? `<span class="muted">none yet: the recipe would make <span class="mono">${c.style_hash}</span>; generate one below, or keep any variant</span>`
     : '<span class="muted">no style and no pick: the plain art</span>';
   const renders = groups.find(g => g.renders);
-  $('#main').innerHTML = `
+  const head = `
     <div class="cardhead">
       <div><h1>${esc(c.name)} <span class="muted mono">${c.number ?? ''}</span></h1>
         <div class="kv">
@@ -910,15 +957,16 @@ async function card(r) {
           ${(c.warnings || []).map(w => `<span>warning</span><span class="warn">${esc(w)}</span>`).join('')}
         </div></div>
       <div class="row" style="margin-left:auto"><a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a><a class="pill" href="#/set/${esc(code)}/lab">lab</a></div>
-    </div>
-    ${generatePanel(c, cols)}
-    <section class="sect">
+    </div>`;
+  const images = `
+    <section class="sect" id="images">
       <h2>images</h2>
       ${A && B ? abPanel(A, B) : `<p class="muted">Pick <b>A</b> and <b>B</b> on two images to wipe between them.</p>`}
       <div class="groups">${groups.filter(g => !g.renders && g.cols.length).map(g => `<div class="group"><h3>${esc(g.title)}${g.cols.some(x => x.kind !== 'crop') ? trashBtn('delete-group', g.title, g.title === 'source' ? 'delete the enhances of the crop' : `delete every image in ${g.title}`) : ''}</h3><div class="cols">${g.cols.map(x => columnHtml(x, c)).join('')}</div></div>`).join('')
         || `<div class="empty">no images yet: ${c.card.illustration_id ? '<button class="small" data-cjob="crops" title="Scryfall\'s art crop of this printing into the art cache">fetch the crop</button>' : 'this printing has no art;'} or generate one</div>`}</div>
-    </section>
-    <section class="sect">
+    </section>`;
+  const cardSect = `
+    <section class="sect" id="cardsect">
       <h2>card</h2>
       <div class="kv">
         <span title="the image a styled render uses: the card's pick, else the variant its recipe hashes to">styled art</span><span class="row">${styledLine}</span>
@@ -932,10 +980,27 @@ async function card(r) {
       ${renders.cols.length ? `<p class="muted">${renders.cols.length} render${renders.cols.length > 1 ? 's' : ''} kept, newest first — a render that differs from the last (another design, other knobs, newer art) is a file of its own beside it. Pin the one the card prints as; <code>mint gc</code> offers the rest.</p>
         <div class="cols renders">${renders.cols.map(x => columnHtml(x, c)).join('')}</div>` : ''}
     </section>`;
-  const put = body => api(`/api/sets/${code}/cards/${encodeURIComponent(c.name)}`, {method: 'PUT', body}).then(() => refresh()).catch(e => toast(e.message, true));
+  const parts = [['#gen', generatePanel(c, cols)], ['#images', images], ['#cardsect', cardSect]];
+  const partial = !!only && parts.every(([sel]) => $(sel));
+  if (partial) parts.forEach(([sel, html]) => {
+    const tmp = document.createElement('div'); tmp.innerHTML = html;
+    $(sel).replaceWith(tmp.firstElementChild);
+  });
+  else redraw($('#main'), head + parts.map(([, html]) => html).join(''));
+  /* A field saved on this card (subject, design, seed, the picked art...): the PUT answers with the
+     card's own detail, so that one card goes into the set and the page draws itself again -- the
+     workspace and the whole set are not reloaded, and `redraw` keeps whatever is being typed. */
+  const FIELD = {pose: 'posepath', base: 'from'};  // a field whose input is not named for its key
+  const put = body => api(`/api/sets/${code}/cards/${encodeURIComponent(c.name)}`, {method: 'PUT', body}).then(d => {
+    saved(...Object.keys(body).map(k => FIELD[k] || k));
+    const i = st.cards_detail.findIndex(x => x.name === c.name);
+    if (i < 0) return refresh();
+    st.cards_detail[i] = d;
+    card(r);
+  }).catch(e => toast(e.message, true));
   // printings: a grid of art crops, each fetched from Scryfall the first time it is shown
   const cardUrl = `/api/sets/${code}/cards/${encodeURIComponent(c.name)}`;
-  api(`${cardUrl}/printings`).then(ps => {
+  if (!partial) api(`${cardUrl}/printings`).then(ps => {
     const box = $('#printings'); if (!box) return;
     $('#printing-n').textContent = ps.length < 2 ? 'one printing on file — `mint cards --kind default_cards` fetches them all' : `${ps.length} printings`;
     const d = ps.find(p => p.default);
@@ -969,7 +1034,10 @@ async function card(r) {
     submit({kind: 'animate', set: code, names: [c.name], base, motion, takes: m.takes,
             seed: c.entry.seed == null && m.takes === 1 ? 1 + Math.floor(Math.random() * 2 ** 31) : undefined}, `card page: ${c.name} (animate)`);
   };
-  $('#describe').onclick = () => submit({kind: 'describe', set: code, names: [c.name], force: true}, `card page: ${c.name}`);
+  $('#describe').onclick = () => {
+    delete $('#subject').dataset.typed;  // the describer replaces the line: its answer wins over anything typed first
+    submit({kind: 'describe', set: code, names: [c.name], force: true}, `card page: ${c.name}`);
+  };
   $('#dpi').onchange = e => { state.dpi = +e.target.value; };
   // the generate panel
   $('#gen').ontoggle = e => { state.genOpen = e.target.open; };
@@ -986,7 +1054,7 @@ async function card(r) {
   if ($('#pinseed')) $('#pinseed').onclick = () => put({seed: c.recipe?.seed ?? 1 + Math.floor(Math.random() * 2 ** 31)});
   if ($('#resetentry')) $('#resetentry').onclick = () => put({base: null, pose: null, seed: null, remix: null});
   bindTakes();
-  $('#takes').addEventListener('change', () => card(r));  // the ESRGAN checkbox shows for drafts
+  if ($('#takes')) { const keep = $('#takes').onchange; $('#takes').onchange = e => { keep(e); card(r); }; }  // the ESRGAN checkbox shows for drafts
   if ($('#upscale')) $('#upscale').onchange = e => { state.upscale = e.target.checked; };
   document.querySelectorAll('[data-ab]').forEach(b => b.onclick = e => {
     e.stopPropagation(); const key = b.closest('.col').dataset.key;
@@ -1006,7 +1074,7 @@ async function card(r) {
     else if (j === 'render-styled') render(true);
   });
   document.querySelectorAll('.col [data-open]').forEach(p => p.onclick = () => { V.fromPage = true; location.hash = colHash(code, c.name, p.closest('.col').dataset.key); });
-  if (r.key) { const slides = columnSlides(c); openViewer('columns', slides, slides.findIndex(x => x.key === r.key)); }
+  if (r.key && !partial) { const slides = columnSlides(c); openViewer('columns', slides, slides.findIndex(x => x.key === r.key)); }
   document.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
     const act = b.dataset.act, arg = b.dataset.arg, names = [c.name];
     if (act === 'keep') put({pick: arg});
@@ -1356,7 +1424,7 @@ function edit() {
   const entryOf = c => c.entry || {};
   const remixOpts = c => `<option value="">style's (${esc(st.style?.remix || 'restyle')})</option>` +
     Object.keys(REMIX).map(m => `<option value="${m}" ${entryOf(c).remix === m ? 'selected' : ''}>${m}</option>`).join('');
-  $('#main').innerHTML = `
+  redraw($('#main'), `
     <div class="row"><h1>${esc(code)} <span class="muted">edit</span></h1>
       <a class="pill" href="#/set/${esc(code)}">← ${esc(code)}</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a>
       <span class="muted mono">${esc(st.path)}</span></div>
@@ -1420,14 +1488,14 @@ function edit() {
         <div class="toolbar"><button class="danger" id="delset">delete set ${esc(code)}</button>
           <span class="muted">removes ${esc(st.path)} and its .css; renders in out/${esc(code.toLowerCase())}/ and the art cache stay</span></div>
       </div>
-    </div>`;
+    </div>`);
   // set fields: one PATCH per change; a new code moves the page to it
   document.querySelectorAll('[data-s]').forEach(el => el.onchange = () => {
     const k = el.dataset.s; let v = el.value;
     if (k === 'size') v = v === '' ? null : parseInt(v, 10);
     api(`/api/sets/${code}`, {method: 'PATCH', body: {[k]: v === '' ? null : v}})
-      .then(d => { state.set = d; state.setCode = d.code; toast(`${k} saved`); if (k === 'code') { state.ws = null; location.hash = `#/set/${d.code}/edit`; } else loadWorkspace().then(() => { if (k === 'base') edit(); }); })
-      .catch(e => { toast(e.message, true); edit(); });
+      .then(d => { saved(el); state.set = d; state.setCode = d.code; toast(`${k} saved`); if (k === 'code') { state.ws = null; location.hash = `#/set/${d.code}/edit`; } else loadWorkspace().then(() => { if (k === 'base') edit(); }); })
+      .catch(e => { toast(e.message, true); edit(); });  // the mark stays on: the redraw keeps the words, not what is on disk
   });
   // style block
   if ($('#knobs')) $('#knobs').onclick = () => { E.knobs = !E.knobs; E.values = {...st.style}; edit(); };
@@ -1460,7 +1528,7 @@ function edit() {
     if (k === 'number' || k === 'seed') v = v === '' ? null : parseInt(v, 10);
     else v = v || null;
     api(`/api/sets/${code}/cards/${encodeURIComponent(name)}`, {method: 'PUT', body: {[k]: v}})
-      .then(d => { const i = st.cards_detail.findIndex(c => c.name === name); if (i >= 0) st.cards_detail[i] = d; toast(`${name}: ${k} saved`); })
+      .then(d => { saved(el); const i = st.cards_detail.findIndex(c => c.name === name); if (i >= 0) st.cards_detail[i] = d; toast(`${name}: ${k} saved`); })
       .catch(e => toast(e.message, true));
   });
   const order = () => st.cards_detail.map(c => c.name);
