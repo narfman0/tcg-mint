@@ -21,6 +21,7 @@ COMMANDS = {
     "cleanup":   ("list what could be removed, with what it weighs; removes nothing", "cleanup"),
     "back":      ("render the BLS card back", "back"),
     "impose":    ("lay rendered PNGs out 3x3 on a printable PDF", "impose"),
+    "foil":      ("proof, treat and calibrate cards for foil stock", "foil"),
     "export":    ("a set as a folder MPC Autofill's desktop tool can upload", "export"),
     "serve":     ("the workbench: compare art and recipes in a browser", "serve"),
     "gallery":   ("export a set as a static read-only gallery page", "gallery"),

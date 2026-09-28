@@ -18,6 +18,7 @@ from .. import (
     comfy,
     describe,
     export,
+    foil,
     frame,
     impose,
     loop,
@@ -317,6 +318,8 @@ def create_app(ws):
                 "current_job": S.jobs.current.to_dict() if S.jobs.current else None,
                 "print": {"stocks": sorted(printing.STOCKS), "paper": list(impose.PAPER), "printer": ws.printer,
                           "export_dir": str(ws.export_path)},
+                # the foil profiles either destination can treat its images with (mint/foil.py)
+                "foil": {"profiles": list(foil.PROFILES), "default": foil.DEFAULT_PROFILE, "local": "sticker"},
                 # what an MPC Autofill export offers: MakePlayingCards' cardstocks and the DPI it tops out at
                 "mpc": {"stocks": list(export.STOCKS), "stock": export.DEFAULT_STOCK, "max_dpi": export.MAX_DPI,
                         "size": list(export.MPC_BLEED)}}
@@ -950,17 +953,25 @@ def submit_printrun(S, st, names, body):
     styled, dpi = bool(body.get("styled")), int(body.get("dpi") or 1200)
     paper, bleed, sheet_dpi = body.get("paper") or "letter", float(body.get("bleed") or 0.04), int(body.get("sheet_dpi") or 600)
     stock, copies = body.get("stock") or None, max(1, int(body.get("copies") or 1))
+    foil_profile = body.get("foil") or None
+    foil_strength = float(body.get("foil_strength") or 1.0)
     if paper not in impose.PAPER:
         raise HTTPException(400, f"paper is one of {', '.join(impose.PAPER)}")
     if stock and stock not in printing.STOCKS:
         raise HTTPException(400, f"stock is one of {', '.join(sorted(printing.STOCKS))}")
+    if foil_profile and foil_profile not in foil.PROFILES:
+        raise HTTPException(400, f"foil is one of {', '.join(foil.PROFILES)}")
     out_dir = S.out_dir(st)
     key = "styled" if styled else "plain"
     title = (f"print run: {st.code} {key}, {len(names)} card(s) on {paper}"
-             + (f", {copies}x on {stock}" if stock else ", PDF only"))
+             + (f", {copies}x on {stock}" if stock else ", PDF only")
+             + (f", treated for foil ({foil_profile})" if foil_profile else ""))
     what = (f"renders the {len(names)} card(s) whose {key} render is missing or stale at {dpi} dpi, lays them out 3x3 on "
             f"{paper} with {bleed}in bleed at {sheet_dpi} dpi into out/{st.code.lower()}/print/"
-            + (f", and prints {copies} copy(ies) on {stock} to {S.ws.printer}" if stock else ""))
+            + (f", and prints {copies} copy(ies) on {stock} to {S.ws.printer}" if stock else "")
+            + (f". Each card is treated for foil first ({foil_profile} at {foil_strength:g}): foil has no white "
+               f"ink under the ink, so the floor is raised and the midtones lifted, and pure black is held so the "
+               f"border and the rules text still go matte" if foil_profile else ""))
 
     def run(job):
         # named when it runs, with the job's id: two runs queued in the same minute keep their own files
@@ -986,7 +997,8 @@ def submit_printrun(S, st, names, body):
             if not r:
                 raise MintError(f"{n}: no {key} render to print")
             files.append(r["path"])
-        pages = impose.impose(files, str(pdf), paper, bleed, sheet_dpi, log=job.say)
+        pages = impose.impose(files, str(pdf), paper, bleed, sheet_dpi, log=job.say,
+                              foil=foil_profile, foil_strength=foil_strength)
         job.made(set=st.code, name=f"{pages} page(s)", kind="pdf", file=pdf.name, path=str(pdf))
         job.step(len(need) + 1)
         if stock:
@@ -998,7 +1010,8 @@ def submit_printrun(S, st, names, body):
         job.step(len(need) + 2)
         return {"pdf": str(pdf), "pages": pages, "rendered": need}
     return S.jobs.submit("printrun", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi, "paper": paper,
-                                             "stock": stock, "copies": copies, "what": what, "dest": str(out_dir / "print")}, run)
+                                             "stock": stock, "copies": copies, "foil": foil_profile, "what": what,
+                                             "dest": str(out_dir / "print")}, run)
 
 
 def want_for(S, st, name):
@@ -1019,12 +1032,21 @@ def submit_export(S, st, names, body):
     fmt = body.get("format") or "png"
     if stock not in export.STOCKS:
         raise HTTPException(400, f"stock is one of {', '.join(export.STOCKS)}")
+    # the foil select carries the profile, so picking one is what orders holographic fronts
+    foil_profile = body.get("foil") or None
+    if foil_profile and foil_profile not in foil.PROFILES:
+        raise HTTPException(400, f"foil is one of {', '.join(foil.PROFILES)}")
+    foil_strength = float(body.get("foil_strength") or 1.0)
     out_dir = S.out_dir(st) / "mpc"
     key = "styled" if styled else "plain"
-    title = f"export {st.code} for MPC Autofill: {len(names)} card(s) {key} @ {dpi} dpi"
+    title = (f"export {st.code} for MPC Autofill: {len(names)} card(s) {key} @ {dpi} dpi"
+             + (f", holographic ({foil_profile})" if foil_profile else ""))
     what = (f"writes {len(names)} card image(s) at {dpi} DPI -- MPC's 2.72x3.70in card with its bleed -- and "
             f"cards.xml beside them, into out/{st.code.lower()}/mpc/; a card whose {key} render is missing or "
-            f"stale is rendered first")
+            f"stale is rendered first"
+            + (f". The order asks for holographic fronts and every image is treated for it ({foil_profile} at "
+               f"{foil_strength:g}): MPC's foil has no white ink under the CMYK, so an untreated file comes back "
+               f"dark. The images will look washed out on screen" if foil_profile else ""))
 
     def run(job):
         job.step(0, len(names) + 1)
@@ -1035,13 +1057,15 @@ def submit_export(S, st, names, body):
             done[0] = min(len(names), done[0] + 1)
             job.step(done[0])
         r = export.export(S.ws, st, names, out_dir, styled=styled, dpi=dpi, stock=stock,
-                          card_back=body.get("back") or "auto", fmt=fmt, foil=bool(body.get("foil")),
+                          card_back=body.get("back") or "auto", fmt=fmt, foil=bool(foil_profile),
+                          foil_profile=foil_profile, foil_strength=foil_strength,
                           absolute=bool(body.get("absolute")), log=log)
         job.made(set=st.code, name=f"{r['fronts']} card(s)", kind="mpc", file="cards.xml", path=r["xml"])
         job.step(len(names) + 1)
         return r
     return S.jobs.submit("export", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi,
-                                           "stock": stock, "what": what, "dest": str(out_dir)}, run)
+                                           "stock": stock, "foil": foil_profile, "what": what,
+                                           "dest": str(out_dir)}, run)
 
 
 def submit_themes(S, st, names, body):

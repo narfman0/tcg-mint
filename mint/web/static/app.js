@@ -24,6 +24,7 @@ const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mod
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
                takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false,
                mpcStock: '', mpcDpi: 800,  // MakePlayingCards' cardstock and the export's resolution
+               foil: '', mpcFoil: '',  // the foil profile each destination treats its images with ('' = none)
                clean: null,  // the cleanup page: {report, sel:Set, days, set, busy}
                motion: {loop: '', length: 0, takes: 1}};  // the card page's animate knobs for this run ('' / 0 = the block's)
 
@@ -441,10 +442,12 @@ function board() {
         <button data-job="printrun" title="render what is missing or stale, impose, and print if a stock is picked">print run · ${state.mode}</button>
         <select id="paper">${(state.ws.print?.paper || ['letter']).map(p => `<option ${state.paper === p ? 'selected' : ''}>${p}</option>`).join('')}</select>
         <select id="stock" title="what is in the tray; PDF only makes the file and prints nothing"><option value="">PDF only</option>${(state.ws.print?.stocks || []).map(s => `<option ${state.stock === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <select id="foil" title="foil in the tray has no white ink under the ink, so the cards are lifted on the way to the PDF: the floor raised and the midtones opened, with pure black held so the border and the rules text still go matte"><option value="">plain paper</option>${(state.ws.foil?.profiles || []).map(f => `<option ${state.foil === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
       </span>
       <span class="stage" title="an MPC Autofill folder under out/${esc(code.toLowerCase())}/mpc/: every card as an image at MakePlayingCards' size, and the cards.xml its desktop tool reads. Put the tool in the folder and run it there"><span class="lbl">order</span>
         <button data-job="export" title="each card's render in the mode picked above (made where missing or stale), cropped to MPC's 2.72×3.70in card and written with cards.xml">export for MPC · ${state.mode}</button>
         <select id="mpcstock" title="the cardstock the order asks MakePlayingCards for">${(state.ws.mpc?.stocks || []).map(x => `<option ${(state.mpcStock || state.ws.mpc?.stock) === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+        <select id="mpcfoil" title="picking a profile sets cards.xml's &lt;foil&gt; tag and treats every image for it -- MPC's holo is a rainbow layer under the CMYK with no white ink over it, so an untreated file comes back dark. 'flat' orders the foil and treats nothing"><option value="">no foil</option>${(state.ws.foil?.profiles || []).map(f => `<option ${state.mpcFoil === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
         <select id="mpcdpi" title="MPC's press tops out at 800 DPI and the desktop tool downscales past it">${[300, 600, 800].map(d => `<option ${state.mpcDpi === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span>
       </span>
       <label class="missing" title="each job skips the cards that already have its product: an enhance of the crop, art in the look, a plain or styled render that is not stale. The count is what it would make"><input type="checkbox" id="missing" ${state.missing ? 'checked' : ''}> only what's missing</label>
@@ -478,6 +481,8 @@ function board() {
   $('#paper').onchange = e => { state.paper = e.target.value; };
   $('#stock').onchange = e => { state.stock = e.target.value; };
   if ($('#mpcstock')) $('#mpcstock').onchange = e => { state.mpcStock = e.target.value; };
+  if ($('#foil')) $('#foil').onchange = e => { state.foil = e.target.value; };
+  if ($('#mpcfoil')) $('#mpcfoil').onchange = e => { state.mpcFoil = e.target.value; };
   if ($('#mpcdpi')) $('#mpcdpi').onchange = e => { state.mpcDpi = +e.target.value; };
   document.querySelectorAll('[data-job]').forEach(b => b.onclick = () => {
     const dpi = +$('#dpi').value, job = b.dataset.job;
@@ -500,8 +505,8 @@ function board() {
         'crops': {kind: 'crops', set: s, names: list},
         'restyle': lookTemplate(styled) !== null && {kind: 'restyle', set: s, names: list, template: lookTemplate(styled), takes: state.takes},
         'newcards': lookTemplate(styled) !== null && {kind: 'describe', set: s, names: list, generate: true, template: lookTemplate(styled)},
-        'printrun': {kind: 'printrun', set: s, names: list, styled: state.mode === 'styled', dpi, paper: state.paper || 'letter', stock: state.stock || null},
-        'export': {kind: 'export', set: s, names: list, styled: state.mode === 'styled', dpi: state.mpcDpi, stock: state.mpcStock || undefined},
+        'printrun': {kind: 'printrun', set: s, names: list, styled: state.mode === 'styled', dpi, paper: state.paper || 'letter', stock: state.stock || null, foil: state.foil || undefined},
+        'export': {kind: 'export', set: s, names: list, styled: state.mode === 'styled', dpi: state.mpcDpi, stock: state.mpcStock || undefined, foil: state.mpcFoil || undefined},
       };
       const origin = `${all ? 'all-sets board' : code + ' board'}: ${n ? `${n} selected` : 'all cards'}${state.missing ? ', only what\'s missing' : ''}${all ? ` (${s})` : ''}`;
       if (jobs[job]) submit(jobs[job], origin);

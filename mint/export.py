@@ -2,6 +2,7 @@
 
     mint export --set sets/bls1.json [--styled] [--dpi 800] [--out DIR]
                 [--stock "(S30) Standard Smooth"] [--foil] [--back auto|none|FILE]
+                [--foil-profile holo|flat] [--foil-strength 1]
                 [--format png|jpeg] [--absolute] [--no-render] ["Card Name" ...]
 
 The folder holds `images/` -- one file per card, in collector order -- and
@@ -29,6 +30,18 @@ always is. `--no-render` exports only what is already there, and says so when
 a render is too small for the DPI asked for. A double-faced card
 whose back has been rendered (`mint render --faces`) has that back printed
 behind it; every other card gets the common card back.
+
+`--foil` orders holographic fronts -- cards.xml's <foil> tag, which is the only
+thing about the order MakePlayingCards needs told. Nothing about the geometry
+changes: the images, their size, their bleed and their DPI are what they were.
+What does change is the file's tone, because MPC's holo is a rainbow layer under
+the CMYK with no white ink over it: the file is read as a transmittance against a
+mirror instead of a reflectance against paper, so an untreated card comes back
+dark and flat. `--foil` therefore also runs every image -- the fronts, any own
+backs, and the common back, which is on the same stock -- through mint.foil's
+`holo` profile. `--foil-profile flat` orders the foil and treats nothing, and
+`--foil-strength` scales the treatment: calibrate it with `mint foil --calibrate`
+against foil in your own tray before spending an order on a guess.
 """
 import argparse
 import os
@@ -40,6 +53,7 @@ from pathlib import Path
 from PIL import Image
 
 from . import back, frame, render, renders, sets, workspace
+from . import foil as foil_mod
 from .art import Art
 from .browser import Browser
 from .cards import Cards
@@ -76,9 +90,13 @@ def safe(name):
     return re.sub(r"\s+", " ", out).strip(" .") or "card"
 
 
-def mpc_image(src, dest, dpi, fmt="png", quality=95):
+def mpc_image(src, dest, dpi, fmt="png", quality=95, foil_profile=None, foil_strength=1.0):
     """One render as an MPC card image: cropped to the 2.72x3.70 bleed rectangle about its middle,
-    resampled to `dpi`, and stamped with that resolution. Returns (width, height)."""
+    resampled to `dpi`, and stamped with that resolution. Returns (width, height).
+
+    `foil_profile` (a mint.foil profile or its name) treats the image for a mirror substrate. It runs
+    last, after the resample, so the curve's held blacks are measured on the pixels that get printed
+    rather than on ones LANCZOS is about to move."""
     with Image.open(src) as im:
         im = im.convert("RGB")
         want = MPC_BLEED[0] / MPC_BLEED[1]
@@ -92,6 +110,8 @@ def mpc_image(src, dest, dpi, fmt="png", quality=95):
         im = im.crop(box)
         size = (round(MPC_BLEED[0] * dpi), round(MPC_BLEED[1] * dpi))
         im = im.resize(size, Image.LANCZOS)
+        if foil_profile:
+            im = foil_mod.prep(im, foil_profile, foil_strength)
         dest.parent.mkdir(parents=True, exist_ok=True)
         if fmt == "jpeg":
             im.save(dest, "JPEG", quality=quality, subsampling=0, dpi=(dpi, dpi))
@@ -166,6 +186,7 @@ README = """\
 images/     one file per card, {w}x{h} px: {bw}x{bh}in at {dpi} DPI, which is
             MakePlayingCards' standard-size card ({cw}x{ch}in) inside its bleed.
 cards.xml   the order: which image goes in which slot, on {stock}{foilnote}.
+{foilpara}
 
 To order:
 
@@ -184,14 +205,21 @@ takes them too: upload images/ and the names sort into collector order.
 
 
 def export(ws, st, names, out_dir, *, styled=False, dpi=MAX_DPI, stock=DEFAULT_STOCK, foil=False,
-           card_back="auto", fmt="png", quality=95, absolute=False, render_missing=True, log=print):
-    """Write the MPC Autofill folder. Returns {"dir", "images", "xml", "rendered", "size"}."""
+           foil_profile=None, foil_strength=1.0, card_back="auto", fmt="png", quality=95,
+           absolute=False, render_missing=True, log=print):
+    """Write the MPC Autofill folder. Returns {"dir", "images", "xml", "rendered", "size"}.
+
+    `foil` sets cards.xml's <foil> and, unless `foil_profile` says otherwise, treats every image for
+    the holo substrate. The profile is only consulted when `foil` is on: a treated file printed on
+    ordinary stock would just be a washed-out card."""
     if dpi > MAX_DPI:
         raise MintError(f"{dpi} DPI is past MPC's {MAX_DPI}; the desktop tool would downscale it anyway")
     if stock not in STOCKS:
         raise MintError(f"stock is one of {', '.join(STOCKS)}")
     if fmt not in ("png", "jpeg"):
         raise MintError("format is png or jpeg")
+    # the profile is the order's, not the image's: no foil, no treatment
+    prep = foil_mod.profile(foil_profile or foil_mod.DEFAULT_PROFILE) if foil else None
     mode = "styled" if styled else "plain"
     out_dir = Path(out_dir)
     render_dir = ws.home / "out" / st.code.lower()
@@ -229,7 +257,7 @@ def export(ws, st, names, out_dir, *, styled=False, dpi=MAX_DPI, stock=DEFAULT_S
         if under_dpi(pick, dpi):
             log(f"warning: {name}: its render was made at {pick['dpi']} DPI and this export is {dpi} -- "
                 f"the card itself, frame and text, is being blown up. Re-render it, or drop --no-render")
-        mpc_image(Path(pick["path"]), out_dir / rel, dpi, fmt, quality)
+        mpc_image(Path(pick["path"]), out_dir / rel, dpi, fmt, quality, prep, foil_strength)
         fronts.append((slot, str(out_dir / rel) if absolute else rel, name))
         head = art_headroom(pick, dpi)
         if head and head[0] > SOFT:
@@ -242,7 +270,7 @@ def export(ws, st, names, out_dir, *, styled=False, dpi=MAX_DPI, stock=DEFAULT_S
         bs = renders.backs_of(render_dir, number, styled)
         if bs:
             brel = f"images/{number:03d}b {safe(bs[0]['card'])}.{fmt if fmt == 'png' else 'jpg'}"
-            mpc_image(Path(bs[0]["path"]), out_dir / brel, dpi, fmt, quality)
+            mpc_image(Path(bs[0]["path"]), out_dir / brel, dpi, fmt, quality, prep, foil_strength)
             backs.append((slot, str(out_dir / brel) if absolute else brel, bs[0]["card"]))
         slot += 1
 
@@ -255,14 +283,14 @@ def export(ws, st, names, out_dir, *, styled=False, dpi=MAX_DPI, stock=DEFAULT_S
             try:
                 with Browser(600) as b:
                     b.render(back.build_html(ws), tmp, fit=False)
-                mpc_image(tmp, out_dir / rel, dpi, fmt, quality)
+                mpc_image(tmp, out_dir / rel, dpi, fmt, quality, prep, foil_strength)
             finally:
                 if tmp.exists():
                     tmp.unlink()
         else:
             if not Path(card_back).is_file():
                 raise MintError(f"no card back at {card_back}")
-            mpc_image(Path(card_back), out_dir / rel, dpi, fmt, quality)
+            mpc_image(Path(card_back), out_dir / rel, dpi, fmt, quality, prep, foil_strength)
         cardback = str(out_dir / rel) if absolute else rel
 
     xml = out_dir / "cards.xml"
@@ -272,9 +300,18 @@ def export(ws, st, names, out_dir, *, styled=False, dpi=MAX_DPI, stock=DEFAULT_S
     (out_dir / "README.txt").write_text(README.format(
         code=st.code, n=len(fronts), rule="=" * len(head), w=size[0], h=size[1], dpi=dpi,
         bw=MPC_BLEED[0], bh=MPC_BLEED[1], cw=MPC_CUT[0], ch=MPC_CUT[1], stock=stock,
-        foilnote=", holographic front" if foil else ""))
+        foilnote=", holographic front" if foil else "",
+        foilpara=("\nThese images are treated for foil: their floor is raised and their midtones\n"
+                  "lifted, because MPC's holo is a rainbow layer under the CMYK with no white ink\n"
+                  "over it, so an untreated file comes back dark. Pure black is held where it is --\n"
+                  "the border and the rules text are meant to go matte. They will look washed out on\n"
+                  "a monitor. That is the point; judge them on foil, not on screen."
+                  if prep else "")))
     log(f"{out_dir}: {len(fronts)} front(s), {len(backs)} own back(s), {size[0]}x{size[1]} px at {dpi} DPI, "
         f"bracket {bracket(len(fronts))}")
+    if foil:
+        log(f"holographic: <foil>true</foil>, images treated for {foil_profile or foil_mod.DEFAULT_PROFILE} at "
+            f"strength {foil_strength:g}" if prep else "holographic: <foil>true</foil>, images left untreated")
     if soft:
         log(f"{len(soft)} card(s) whose art does not fill the window at {dpi} DPI: {', '.join(soft[:8])}"
             + (f" and {len(soft) - 8} more" if len(soft) > 8 else ""))
@@ -291,7 +328,10 @@ def main(argv=None):
     ap.add_argument("--dpi", type=int, default=MAX_DPI, help=f"card image resolution (default {MAX_DPI}, MPC's max)")
     ap.add_argument("--out", help="the folder to write (default: out/<code>/mpc/)")
     ap.add_argument("--stock", default=DEFAULT_STOCK, choices=STOCKS, help="MakePlayingCards cardstock")
-    ap.add_argument("--foil", action="store_true", help="order holographic fronts")
+    ap.add_argument("--foil", action="store_true", help="order holographic fronts, and treat the images for foil")
+    ap.add_argument("--foil-profile", default=None, choices=list(foil_mod.PROFILES),
+                    help=f"how to treat the images for foil (default {foil_mod.DEFAULT_PROFILE}; `flat` treats nothing)")
+    ap.add_argument("--foil-strength", type=float, default=1.0, help="scale the foil treatment (default 1)")
     ap.add_argument("--back", default="auto", help="the common card back: auto (mint back), none, or an image")
     ap.add_argument("--format", default="png", choices=("png", "jpeg"), dest="fmt")
     ap.add_argument("--quality", type=int, default=95, help="JPEG quality (default 95)")
@@ -304,7 +344,8 @@ def main(argv=None):
         names = list(a.names) or st.names()
         out = a.out or ws.home / "out" / st.code.lower() / "mpc"
         export(ws, st, names, out, styled=a.styled, dpi=a.dpi, stock=a.stock, foil=a.foil, card_back=a.back,
-               fmt=a.fmt, quality=a.quality, absolute=a.absolute, render_missing=not a.no_render)
+               foil_profile=a.foil_profile, foil_strength=a.foil_strength, fmt=a.fmt, quality=a.quality,
+               absolute=a.absolute, render_missing=not a.no_render)
     except MintError as e:
         sys.exit(str(e))
 

@@ -264,6 +264,27 @@ def test_printrun_job_takes_paper_and_stock(client):
     assert client.get("/api/workspace").json()["print"]["paper"] == ["letter", "a4"]
 
 
+def test_printrun_and_export_take_a_foil_profile(client):
+    """Foil is a select on both stages, and the profile is what the job carries: a print run treats
+    the sheet on its way to the tray, and an export both treats the images and sets cards.xml's tag."""
+    from mint import foil
+    client.post("/api/sets", json={"code": "TST", "name": "t", "names": ["Alpha"]})
+    ws = client.get("/api/workspace").json()
+    assert ws["foil"]["profiles"] == list(foil.PROFILES) and ws["foil"]["default"] == foil.DEFAULT_PROFILE
+
+    r = client.post("/api/jobs", json={"kind": "printrun", "set": "TST", "stock": "thick", "foil": "sticker"})
+    assert r.status_code == 200, r.text
+    assert r.json()["params"]["foil"] == "sticker" and "treated for foil (sticker)" in r.json()["title"]
+    r = client.post("/api/jobs", json={"kind": "export", "set": "TST", "foil": "holo"})
+    assert r.status_code == 200 and r.json()["params"]["foil"] == "holo"
+    assert "holographic (holo)" in r.json()["title"]
+    # no profile picked is no foil at all, on either stage
+    r = client.post("/api/jobs", json={"kind": "export", "set": "TST"})
+    assert r.json()["params"]["foil"] is None and "holographic" not in r.json()["title"]
+    for kind in ("printrun", "export"):
+        assert client.post("/api/jobs", json={"kind": kind, "set": "TST", "foil": "glitter"}).status_code == 400
+
+
 def _pdf(path, pages=2):
     from PIL import Image
     ims = [Image.new("RGB", (120, 160), (200 + i * 20, 200, 200)) for i in range(pages)]
@@ -529,7 +550,19 @@ def test_the_board_exports_a_set_for_mpc_autofill(client):
         assert (mpc / rel).is_file()
     with Image.open(mpc / ids[0]) as im:
         assert im.size == (816, 1110)   # 2.72 x 3.70in at 300 DPI
+        untreated = im.getpixel((408, 555))
     assert client.post("/api/jobs", json={"kind": "export", "set": "TST", "stock": "(S99) Glitter"}).status_code == 400
+
+    # the same export ordered on foil: the tag is set, and every image is lifted off its floor
+    r = client.post("/api/jobs", json={"kind": "export", "set": "TST", "dpi": 300, "back": "none", "foil": "holo"})
+    assert r.status_code == 200
+    client.settle()
+    job = [j for j in client.get("/api/jobs").json() if j["kind"] == "export"][0]
+    assert job["state"] == "done", (job["error"], job["log"])
+    assert ET.fromstring((mpc / "cards.xml").read_text()).find("details").findtext("foil") == "true"
+    with Image.open(mpc / ids[0]) as im:
+        assert im.size == (816, 1110)   # the geometry MPC wants is the geometry it still gets
+        assert all(a > b for a, b in zip(im.getpixel((408, 555)), untreated))
 
 
 def test_the_cleanup_page_lists_what_could_go_and_removes_only_what_is_picked(client):

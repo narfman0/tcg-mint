@@ -1,0 +1,46 @@
+{
+  "code": "FOIL",
+  "name": "Foil test",
+  "size": 9,
+  "note": "Nine cards, one imposed page, each owning one thing foil does differently from paper.\n\nMPC's holo and foil sticker paper are both a mirror under the CMYK with no white ink over it, so the file is read as a transmittance rather than a reflectance: a pixel shines to the extent its brightest channel is high, and ink thick enough to bury every channel buries the foil with it. The reflection is also specular, so the whole card reads darker and flatter off its angle, the shadows losing their separation first.\n\nEvery printing is pinned, and each was chosen by measuring its crop rather than from memory -- the art is the variable under test, so it must not move when Scryfall's newest printing does. Two numbers below: V is the mean of each pixel's brightest channel (how much foil gets through at all) and DEAD is the fraction of the picture with no channel above 64/255 (where it is buried whatever the lift does). Mean luminance is the wrong measure here and was discarded: it weights red at 0.299, so a blazing red picture scores as dark.\n\n  1 Necropotence (ema:98)  THE FLOOR. The mono-black band over a buried crop (V 0.31, DEAD 0.47), under a text box filled edge to edge with black rules text. More of this card is ink than any other, which is the whole point: if card 1 is acceptable on foil, everything is.\n  2 Swords to Plowshares (voc:99)  THE CEILING FOR A COLOURED FRAME. The mono-white band over the brightest crop that still reads as a Magic card (V 0.75, DEAD 0.03), and a warm band where card 3's is cool.\n  3 Sol Ring (30a:131)  METAL OVER METAL. The artifact band is the one frame colour that could read as real metal rather than merely bright. Tedin's original art is a metal ring and the brightest crop in the set (V 0.93, DEAD 0.00), over a cool grey-blue band and a nearly empty text box -- the most uninterrupted shine any of these nine can offer.\n  4 Lightning Bolt (fdc:163)  SATURATION. The most saturated crop that is still landscape (sat 0.58); the more saturated ones are full-art printings whose tall crop the M15 window would cut in half. Heavy ink over a rainbow substrate is the muddy case, and where the profile's saturation pullback earns its keep or does not.\n  5 Urza, Lord High Artificer (cmm:130)  THE SMALLEST TYPE IN THE SET. Four abilities force the fitter down to its smallest size, over the biggest light area a normal card has. The profile's hold is what keeps that type matte black instead of grey; this is the card you read at arm's length to find out whether it worked.\n  6 Gaea's Cradle (usg:321)  THE WIDEST FLAT AREA. A land's band is the largest uninterrupted stretch of one colour on any card, and nothing in this crop is buried (DEAD 0.00), so contouring or banding from the lift shows here before anywhere else.\n  7 Jace, the Mind Sculptor (2xm:56)  FURNITURE. Four loyalty rows means the tall layout: the shield, the badges and the loyalty box are drawn in near-black and must stay matte while the box around them shines. The art is genuinely dark (V 0.38, DEAD 0.42), so the furniture is judged against a dark ground, not a bright one.\n  8 Island (lci:288)  THE CUT EDGE. A full-art basic: picture to all four edges, no border to frame the shine and no furniture to hide behind, and the brightest of them (V 0.67, DEAD 0.00). Scryfall crops full-art basics at 0.84:1 against this design's 0.73, which is the one shape fullart takes cleanly.\n  9 Atraxa, Praetors' Voice (2xm:190, retro)  THE FRAME ON ITS OWN. The 1997 frame is mostly light cream, the opposite of M15's dark mass, and may simply be the better frame for foil. It carries the gold band, and its art is the most buried in the set (V 0.19, DEAD 0.75) -- which makes it the control for card 1: two dead pictures, opposite frames, so whatever shines here is the frame and nothing else.\n\nPrint it beside `mint foil --calibrate` and judge them together: the calibration sheet says where the floor is, these nine say whether the floor matters. Before a real order, run enhance over the set -- Scryfall's crops are about 2.7x short of the window at 800 DPI, which is a separate problem from foil but turns up in the same print.",
+  "cards": {
+    "Necropotence": {
+      "number": 1,
+      "printing": "ema:98"
+    },
+    "Swords to Plowshares": {
+      "number": 2,
+      "printing": "voc:99"
+    },
+    "Sol Ring": {
+      "number": 3,
+      "printing": "30a:131"
+    },
+    "Lightning Bolt": {
+      "number": 4,
+      "printing": "fdc:163"
+    },
+    "Urza, Lord High Artificer": {
+      "number": 5,
+      "printing": "cmm:130"
+    },
+    "Gaea's Cradle": {
+      "number": 6,
+      "printing": "usg:321"
+    },
+    "Jace, the Mind Sculptor": {
+      "number": 7,
+      "printing": "2xm:56"
+    },
+    "Island": {
+      "number": 8,
+      "printing": "lci:288",
+      "design": "auto"
+    },
+    "Atraxa, Praetors' Voice": {
+      "number": 9,
+      "printing": "2xm:190",
+      "design": "retro"
+    }
+  }
+}

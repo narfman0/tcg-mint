@@ -187,6 +187,7 @@ comfy_root = ""               # the ComfyUI checkout, when it is on this machine
 | `mint cleanup` | the same question as a list you pick from, with what each item weighs; prints only — the workbench's Cleanup page is where things are removed |
 | `mint doctor` | check the card file, the fonts, a Chromium launch, ComfyUI's nodes, every model file the styles name, and the Wan files and ffmpeg when a set has a motion block |
 | `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
+| `mint foil` | proof, treat and calibrate cards for foil stock — MPC's holo or foil in your own tray |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
 | `mint export` | a set as a folder MPC Autofill's desktop tool runs in: a card image each at MakePlayingCards' size, and the `cards.xml` order beside them |
 | `mint serve` | the workbench: compare art, recipes and frames in a browser, and run the tools from it |
@@ -199,6 +200,7 @@ mint upscale --set sets/bls1.json
 mint render  --set sets/bls1.json --out proofs
 mint impose  --out proofs/bls1.pdf proofs/0*.png
 mint export  --set sets/bls1.json          # -> out/bls1/mpc/, for MPC Autofill
+mint foil    --proof proofs/005.png        # what it would look like on foil
 mint print   --test proofs/bls1.pdf        # one page on plain paper first
 mint print   -p matte proofs/bls1.pdf
 ```
@@ -307,7 +309,11 @@ a phone, front it with https (`tailscale serve 8300` does it in one line).
   renders the cards whose render is missing or stale, lays them out 3×3 as
   a PDF under `out/<code>/print/`, and, when a stock is picked, sends it to
   the workspace's printer at 100% with `mint print`'s checks. The PDF is
-  linked from the job and opens on the set's pdf page.
+  linked from the job and opens on the set's pdf page. The *foil* select
+  beside the stock treats the cards on the way through, for foil in the tray.
+- **Order for MPC** (*order* on the board) — the export, with the cardstock,
+  the resolution, and a *foil* select that both sets `cards.xml`'s `<foil>`
+  and treats every image for it.
 - **Pdfs** (*pdfs* on the board) — the set's print runs and `mint impose`'s
   `out/<code>.pdf`, newest first, with every page of the picked one shown
   as an image (poppler's `pdftoppm` renders them, cached like thumbnails).
@@ -763,6 +769,85 @@ MPC's press tops out and where the tool downscales anything larger, so that is
 the default. A render is 2.72 × 3.72 in, drawn for a 2.5 × 3.5 in cut, so the
 export trims 0.01 in of bleed off the top and bottom — nothing in the card
 moves or squashes, and 0.10 in of bleed is left for MPC to cut into.
+
+### Foil
+
+MakePlayingCards' holographic foil is ordered by one tag — `cards.xml`'s
+`<foil>`, which `--foil` sets. Nothing else about the order changes: the same
+images, at the same size, with the same bleed and the same DPI.
+
+What changes is the file. MPC's holo is a rainbow layer under the CMYK with no
+white ink over it, so the card is read as a *transmittance* against a mirror
+instead of a reflectance against paper. White in the file is the foil at full
+brightness; black is ink thick enough to hide it. And the reflection is
+specular, so off its angle the whole card reads darker and flatter than the
+same file on paper, with the shadows losing their separation first. An M15
+render is close to the worst case for that — black border, dark textured frame,
+a mid-dark text box — and untreated it comes back dim rather than shiny.
+
+So `--foil` also runs every image (the fronts, any own backs, and the common
+back, which is on the same stock) through a tone pass: the floor raised, the
+shadows opened, the saturation backed off a little because the substrate now
+brings its own colour. Three things are deliberate about its shape.
+
+**Pure black is held where it is.** The border, the art's bevel and the rules
+text are the parts that *should* go matte, the way a real foil's text does, and
+lifting them to grey is what makes a treated card look washed out instead of
+shiny.
+
+**The lift fades out toward white**, so each pixel is raised in proportion to
+the room it has left. This one was learned the hard way. White is clamped, so a
+curve that keeps lifting as it approaches white squeezes everything against the
+ceiling: with a plain gamma the local contrast at the top is `(1 - lift) /
+gamma`, about half. Half was enough to swallow the retro frame's white title on
+its gold band — the band rose from 130 to 180 while the lettering stayed at 255,
+and 40% of the title's contrast went with it. The black hold is no help there,
+because it protects dark ink on light grounds and this is the opposite case.
+Concentrating the lift where the pixels are actually buried fixes it, and
+separates the bottom of the range *better* than the untapered curve did (62
+levels of spread across the first 10% of input against 46) while moving a mid
+band a third less far.
+
+**What that costs is overall brightness** — the midtones land near 164/255
+where an untapered curve put them at 181. The cost is real and is the right way
+to pay it: the range between the floor and white is fixed, so slope handed to
+one part is taken from another, and the dimness of a mirror seen off its angle
+is not something an 8-bit file can fix in the first place. Tilting the card is
+what fixes that.
+
+```sh
+mint foil --proof out/bls1/005.png        # on paper | on foil | on foil, prepped
+mint export --set sets/bls1.json --foil   # <foil>true</foil>, images treated
+mint export --set sets/bls1.json --foil --foil-profile flat   # order it untreated
+```
+
+A treated image looks washed out on a monitor. That is the point — judge it on
+foil, not on screen, which is what `--proof` is for: the print is ink times
+substrate, so multiplying the card by a modelled foil is a fair preview.
+
+**Calibrate before you order.** Foil sticker paper in your own printer has no
+white ink under the ink either, so it reproduces the physics at the cost of a
+sheet instead of an order:
+
+```sh
+mint foil --calibrate --card out/bls1/005.png   # -> out/foil-cal/, nine cards on one page
+mint print -p thick out/foil-cal/foil-calibration-sticker.pdf
+mint impose --foil sticker --out sheet.pdf out/bls1/0*.png
+```
+
+The sheet carries a neutral wedge and the frame's own nine colours, each
+untreated beside treated, and the card you point it at at five strengths. Print
+it, look at it under a lamp, and set `--foil-strength` from what you see. An
+inkjet on sticker foil and MPC's press on holo stock do not share a curve, so
+the *strength* does not carry over — but they share the physics, so every design
+decision the sheet settles does: which frame colours still read as foil, how
+dark a picture can be before the lift stops helping, whether the back needs its
+own treatment. The numbers in `mint foil --list` are a starting point, not a
+measurement.
+
+The one thing no curve can fix is a dark picture. The lift only redistributes
+what the render already has; a night scene has no light areas to turn into
+shine, and the fix for that is the art.
 
 ### Does the art have the pixels?
 

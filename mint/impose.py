@@ -1,6 +1,7 @@
 """Lay rendered cards out on printable pages.
 
-    mint impose [--paper letter|a4] [--bleed 0.04] [--dpi 600] [--out sheet.pdf] card.png ...
+    mint impose [--paper letter|a4] [--bleed 0.04] [--dpi 600] [--out sheet.pdf]
+                [--foil sticker|holo|silver] [--foil-strength 1] card.png ...
 
 Nine cards per page (3x3) at exactly 2.5x3.5in plus `bleed` on every side, so
 you cut on the 2.5x3.5 grid and never see a white edge. Every cut line is drawn
@@ -14,6 +15,12 @@ because three rows of full-bleed cards do not fit on Letter. Images are
 resampled to --dpi first (600 is past what an inkjet resolves and keeps the
 PDF a sensible size); the PDF is produced by Chromium, which embeds PNGs
 losslessly at their exact physical size.
+
+`--foil` treats the cards for a mirror substrate on the way through (mint.foil):
+foil sticker paper has no white ink under the ink either, so the same lift that
+an MPC holo order wants is what a sheet on foil in your own tray wants. Only the
+cards are treated -- the cut lines stay as they are, since the green is there to
+be seen against a black bleed and lifting it would not help.
 """
 import argparse
 import os
@@ -23,6 +30,7 @@ import tempfile
 
 from PIL import Image
 
+from . import foil as foil_mod
 from .browser import Browser
 
 PAPER = {"letter": (8.5, 11.0), "a4": (8.27, 11.69)}
@@ -34,8 +42,9 @@ MARK = 0.2           # length of the cut ticks in the page margins, inches
 GREEN = "#00ff00"    # the cut line over the cards: bright, and not a colour a black border hides
 
 
-def prepare(path, bleed, dpi, tmpdir, i):
-    """Crop a render down to the requested bleed and resample to dpi."""
+def prepare(path, bleed, dpi, tmpdir, i, foil=None, foil_strength=1.0):
+    """Crop a render down to the requested bleed and resample to dpi, and treat it for `foil` when
+    one is given (last, so the held blacks are the pixels that reach the paper)."""
     im = Image.open(path)
     ppi = im.width / (CARD[0] + 2 * RENDER_BLEED)  # the render's own pixels per inch
     trim = round((RENDER_BLEED - bleed) * ppi)
@@ -43,6 +52,8 @@ def prepare(path, bleed, dpi, tmpdir, i):
     w = round((CARD[0] + 2 * bleed) * dpi)
     h = round((CARD[1] + 2 * bleed) * dpi)
     im = im.resize((w, h), Image.LANCZOS)
+    if foil:
+        im = foil_mod.prep(im, foil, foil_strength)
     out = os.path.join(tmpdir, f"{i:03d}.png")
     im.save(out, compress_level=6)
     return out
@@ -84,8 +95,9 @@ def page_html(paths, paper, bleed):
     return "\n".join(parts)
 
 
-def impose(cards, out, paper="letter", bleed=0.04, dpi=600, log=print):
+def impose(cards, out, paper="letter", bleed=0.04, dpi=600, log=print, foil=None, foil_strength=1.0):
     """Lay the rendered PNGs out on pages into the PDF `out`; returns the page count."""
+    foil = foil_mod.profile(foil) if foil else None
     if bleed > RENDER_BLEED:
         raise ValueError(f"renders only carry {RENDER_BLEED}in of bleed")
     if paper not in PAPER:
@@ -109,7 +121,8 @@ def impose(cards, out, paper="letter", bleed=0.04, dpi=600, log=print):
         # a few pages per Chromium run: decoded 600 DPI PNGs are ~10 MB each and a
         # whole 90-card set in one document was enough to get the process killed
         for c0 in range(0, len(cards), chunk):
-            prepared = [prepare(path, bleed, dpi, tmp, c0 + i) for i, path in enumerate(cards[c0:c0 + chunk])]
+            prepared = [prepare(path, bleed, dpi, tmp, c0 + i, foil, foil_strength)
+                        for i, path in enumerate(cards[c0:c0 + chunk])]
             pages = [prepared[i:i + per_page] for i in range(0, len(prepared), per_page)]
             fn = os.path.join(tmp, f"sheet{len(parts)}.html")
             open(fn, "w").write(css + "\n".join(page_html(pg, paper, bleed) for pg in pages))
@@ -123,7 +136,8 @@ def impose(cards, out, paper="letter", bleed=0.04, dpi=600, log=print):
         else:
             subprocess.run(["pdfunite", *parts, out], check=True)
     npages = -(-len(cards) // per_page)
-    log(f"{out}: {npages} page(s), {len(cards)} cards, {paper} at 100%, {bleed}in bleed, {dpi} DPI")
+    log(f"{out}: {npages} page(s), {len(cards)} cards, {paper} at 100%, {bleed}in bleed, {dpi} DPI"
+        + (f", treated for foil at strength {foil_strength:g}" if foil else ""))
     return npages
 
 
@@ -134,9 +148,12 @@ def main(argv=None):
     ap.add_argument("--bleed", type=float, default=0.04, help="inches of bleed kept around each card (default 0.04)")
     ap.add_argument("--dpi", type=int, default=600, help="resample cards to this before embedding (default 600)")
     ap.add_argument("--out", default="sheet.pdf")
+    ap.add_argument("--foil", default=None, choices=list(foil_mod.PROFILES),
+                    help="treat the cards for foil stock in the tray (mint foil --list)")
+    ap.add_argument("--foil-strength", type=float, default=1.0, help="scale the foil treatment (default 1)")
     a = ap.parse_args(argv)
     try:
-        impose(a.cards, a.out, a.paper, a.bleed, a.dpi)
+        impose(a.cards, a.out, a.paper, a.bleed, a.dpi, foil=a.foil, foil_strength=a.foil_strength)
     except ValueError as e:
         ap.error(str(e))
 
