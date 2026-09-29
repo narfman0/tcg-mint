@@ -211,3 +211,115 @@ def test_a_double_faced_card_prints_its_own_back(ws):
     assert front.findtext("slots") == back.findtext("slots") == "0"   # the back goes behind its front
     assert back.findtext("id") == "images/001b Aberrant Fixture.png"
     assert (out / back.findtext("id")).is_file()
+
+
+def test_an_image_many_slots_share_is_named_once():
+    """<slots> is a comma-separated set to the desktop tool, so a back behind a whole set is one
+    <card> with every slot on it -- not one upload per card that happens to be identical."""
+    groups = export.group_slots([(0, "images/back SLV.png", "SLV back"), (1, "images/001b Aberrant.png", "Aberrant"),
+                                 (2, "images/back SLV.png", "SLV back")])
+    assert groups == [([0, 2], "images/back SLV.png", "SLV back"),
+                      ([1], "images/001b Aberrant.png", "Aberrant")]
+    xml = ET.fromstring(export.order_xml([(i, f"images/{i}.png", "x") for i in range(3)],
+                                         [(0, "b.png", "B"), (2, "b.png", "B")], "back.png"))
+    assert [c.findtext("slots") for c in xml.find("backs").findall("card")] == ["0,2"]
+
+
+@pytest.mark.render
+def test_a_union_order_prints_each_sets_own_back(ws):
+    """Three decks in one batch: each set's cards carry that set's back, so the piles can be told
+    apart afterwards. More than one image under <backs> is what puts MakePlayingCards into its
+    different-backs mode, and that is all the order file has to say."""
+    slv = sets.from_dict({"code": "SLV", "name": "s", "back": {"word": "SLIVERS", "symbol": "lgn"},
+                          "cards": {"Alpha": {"number": 1}}})
+    gsh = sets.from_dict({"code": "GSH", "name": "g", "back": {"word": "DINOS", "paper": ["#c2a25c"] * 4},
+                          "cards": {"Alpha": {"number": 1}, "Beta, the Second": {"number": 2}}})
+    plain = sets.from_dict({"code": "PLN", "name": "p", "cards": {"Beta, the Second": {"number": 9}}})
+    for st in (slv, gsh, plain):
+        sets.save(ws.sets / f"{st.code.lower()}.json", st)
+    parts = [(sets.load(ws.sets / f"{st.code.lower()}.json"), st.names()) for st in (slv, gsh, plain)]
+
+    out = ws.home / "mpc"
+    r = export.export_union(ws, parts, out, dpi=300, log=lambda m: None)
+    assert r["fronts"] == 4 and r["sets"] == ["SLV", "GSH", "PLN"]
+
+    # a card two decks both play is two slots and prints twice: its copies want different backs
+    # each image is named with its set's code: every set numbers from 001, so Alpha would otherwise
+    # be written twice to the same path and one deck would get the other's card
+    assert sorted(p.name for p in (out / "images").iterdir()) == [
+        "GSH 001 Alpha.png", "GSH 002 Beta the Second.png", "PLN 009 Beta the Second.png",
+        "SLV 001 Alpha.png", "back GSH.png", "back SLV.png", "back.png"]
+
+    root = ET.fromstring((out / "cards.xml").read_text())
+    assert root.find("details").findtext("quantity") == "4"
+    assert root.find("details").findtext("bracket") == "18"
+    backs = {c.findtext("id"): c.findtext("slots") for c in root.find("backs").findall("card")}
+    assert backs == {"images/back SLV.png": "0", "images/back GSH.png": "1,2"}
+    assert root.findtext("cardback") == "images/back.png"   # PLN has no block: slot 3 falls through
+    for rel in backs | {root.findtext("cardback"): ""}:
+        assert (out / rel).is_file()
+    assert "different-backs mode" in (out / "README.txt").read_text()
+
+
+@pytest.mark.render
+def test_a_double_faced_card_keeps_its_own_back_in_a_union(ws):
+    """The set's back is the fallback for its slots, not an override: a transform card still
+    prints its own reverse."""
+    dfc = synthetic_card(name="Delver Fixture // Aberrant Fixture", layout="transform", card_faces=[
+        dict(name="Delver Fixture", type_line="Creature — Fixture", mana_cost="{U}", oracle_text="Flying",
+             power="1", toughness="1", colors=["U"], artist="Nobody",
+             illustration_id="aaaaaaaa-0000-0000-0000-000000000000", image_uris={"art_crop": "x"}),
+        dict(name="Aberrant Fixture", type_line="Creature — Fixture", mana_cost="", oracle_text="Flying",
+             power="3", toughness="2", colors=["U"], artist="Nobody",
+             illustration_id="bbbbbbbb-0000-0000-0000-000000000000", image_uris={"art_crop": "x"}),
+    ])
+    dfc.pop("image_uris"), dfc.pop("illustration_id")
+    ws.cards_file.write_text("\n".join(json.dumps(c) for c in [dfc, synthetic_card(
+        name="Alpha", collector_number="1", illustration_id="00000001-0000-0000-0000-000000000000")]) + "\n")
+    for iid in ("aaaaaaaa-0000-0000-0000-000000000000", "bbbbbbbb-0000-0000-0000-000000000000",
+                "00000001-0000-0000-0000-000000000000"):
+        Image.new("RGB", (284, 200), (40, 90, 160)).save(ws.art / (iid + ".jpg"))
+    st = sets.from_dict({"code": "TST", "name": "t", "back": {"word": "TEST"},
+                         "cards": {"Delver Fixture": {"number": 1}, "Alpha": {"number": 2}}})
+    sets.save(ws.sets / "tst.json", st)
+    st = sets.load(ws.sets / "tst.json")
+
+    out = ws.home / "mpc"
+    export.export_union(ws, [(st, st.names())], out, dpi=300, card_back="none", log=lambda m: None)
+    backs = {c.findtext("id"): c.findtext("slots")
+             for c in ET.fromstring((out / "cards.xml").read_text()).find("backs").findall("card")}
+    assert backs == {"images/001b Aberrant Fixture.png": "0", "images/back TST.png": "1"}
+
+
+def test_a_set_cannot_be_in_one_order_twice(ws):
+    st = sets.from_dict({"code": "TST", "cards": {}})
+    with pytest.raises(MintError, match="in the order twice"):
+        export.export_union(ws, [(st, []), (st, [])], ws.home / "mpc")
+    with pytest.raises(MintError, match="name at least one set"):
+        export.export_union(ws, [], ws.home / "mpc")
+
+
+@pytest.mark.render
+def test_an_order_exports_its_counts_as_slots(ws):
+    """Two copies of a card are two slots sharing one image -- <slots> is a set to the desktop
+    tool -- and a card counted 0 is not in the order at all."""
+    from mint import orders
+    st = sets.from_dict({"code": "TST", "name": "t", "back": {"word": "TEST"},
+                         "cards": {"Alpha": {"number": 1}, "Beta, the Second": {"number": 2}}})
+    sets.save(ws.sets / "tst.json", st)
+    o = orders.from_dict({"name": "october", "dpi": 300,
+                          "sets": [{"code": "TST", "cards": {"Alpha": 3, "Beta, the Second": 0}}]})
+    orders.save(ws.orders / "october.json", o)
+
+    parts = o.parts(orders.loaded_sets(ws, o))
+    assert parts[0][1] == ["Alpha", "Alpha", "Alpha"]
+    out = ws.home / "mpc"
+    r = export.export_union(ws, parts, out, dpi=300, card_back="none", log=lambda m: None)
+    assert r["fronts"] == 3
+    # three slots, one file: a second copy of a card is another slot, not another image
+    assert sorted(p.name for p in (out / "images").iterdir()) == ["001 Alpha.png", "back TST.png"]
+    root = ET.fromstring((out / "cards.xml").read_text())
+    fronts = root.find("fronts").findall("card")
+    assert len(fronts) == 1 and fronts[0].findtext("slots") == "0,1,2"
+    assert root.find("details").findtext("quantity") == "3"
+    assert [c.findtext("slots") for c in root.find("backs").findall("card")] == ["0,1,2"]

@@ -23,6 +23,7 @@ from .. import (
     impose,
     loop,
     newset,
+    orders,
     printing,
     render,
     renders,
@@ -221,6 +222,30 @@ def source_dict(src):
             "label": (src.variant.label if src.variant else src.label) or None} if src else None
 
 
+def find_order(S, slug):
+    try:
+        return orders.find(S.ws, slug)
+    except MintError as e:
+        raise HTTPException(404, str(e)) from None
+
+
+def order_dict(S, o, cards=False):
+    """An order as the workbench reads it: what it says, what it costs, and -- with `cards` -- a
+    row per card of every set in it, with the count the order prints."""
+    loaded = orders.loaded_sets(S.ws, o)
+    d = {"slug": o.slug, "name": o.name, "note": o.note, "stock": o.stock, "dpi": o.dpi,
+         "mode": o.mode, "foil": o.foil, "foil_strength": o.foil_strength,
+         "sets": [{"code": e.code, "copies": e.copies, "cards": dict(e.cards)} for e in o.sets],
+         "bill": o.bill(loaded)}
+    if cards:
+        d["detail"] = [{"code": st.code, "name": st.name, "back": bool(st.back),
+                        "copies": o.entry(st.code).copies,
+                        "cards": [{"name": n, "number": st.cards[n].number, "count": o.entry(st.code).count(n)}
+                                  for n in st.names()]}
+                       for st in (loaded.get(e.code.upper()) for e in o.sets) if st is not None]
+    return d
+
+
 def card_summary(card):
     keys = ("name", "full_name", "set", "collector_number", "illustration_id", "type_line", "artist", "rarity",
             "mana_cost", "released_at", "layout")
@@ -323,6 +348,87 @@ def create_app(ws):
                 # what an MPC Autofill export offers: MakePlayingCards' cardstocks and the DPI it tops out at
                 "mpc": {"stocks": list(export.STOCKS), "stock": export.DEFAULT_STOCK, "max_dpi": export.MAX_DPI,
                         "size": list(export.MPC_BLEED)}}
+
+    # --- orders -------------------------------------------------------------------------
+    # An order is a union of sets (orders.py): it holds only what it changes about them, so a card
+    # added to a deck is in the order the moment it is in the set. Everything here edits counts.
+    @app.get("/api/orders")
+    def list_orders():
+        return [order_dict(S, o) if not isinstance(o, str) else {"error": o} for o in orders.every(ws)]
+
+    @app.post("/api/orders")
+    def post_order(body: dict):
+        name = (body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(400, "an order needs a name")
+        fn = ws.orders / f"{orders.slug(name)}.json"
+        if fn.exists():
+            raise HTTPException(409, f"there is already an order called {orders.slug(name)!r}")
+        o = orders.Order(name=name, note=body.get("note") or None)
+        for code in body.get("sets") or []:
+            o.add_set(code)
+        orders.save(fn, o)
+        return order_dict(S, orders.load(fn))
+
+    @app.get("/api/orders/{slug}")
+    def get_order(slug: str):
+        return order_dict(S, find_order(S, slug), cards=True)
+
+    @app.put("/api/orders/{slug}")
+    def put_order(slug: str, body: dict):
+        """What the order is printed on. Anything not named is left as it was."""
+        o = find_order(S, slug)
+        if "stock" in body and body["stock"] and body["stock"] not in export.STOCKS:
+            raise HTTPException(400, f"stock is one of {', '.join(export.STOCKS)}")
+        if "foil" in body and body["foil"] and body["foil"] not in foil.PROFILES:
+            raise HTTPException(400, f"foil is one of {', '.join(foil.PROFILES)}")
+        if "mode" in body and body["mode"] not in orders.MODES:
+            raise HTTPException(400, f"mode is one of {', '.join(orders.MODES)}")
+        for k in ("name", "note", "stock", "dpi", "mode", "foil", "foil_strength"):
+            if k in body:
+                setattr(o, k, body[k] or None if k in ("note", "stock", "foil") else body[k])
+        orders.save(o.path, o)
+        return order_dict(S, o, cards=True)
+
+    @app.delete("/api/orders/{slug}")
+    def delete_order(slug: str):
+        o = find_order(S, slug)
+        o.path.unlink()
+        return {"deleted": o.slug}
+
+    @app.post("/api/orders/{slug}/sets")
+    def post_order_set(slug: str, body: dict):
+        o = find_order(S, slug)
+        code = (body.get("code") or "").upper()
+        S.find_set(code)  # 404s if the workspace has no such set, rather than writing a dead line
+        o.add_set(code, int(body.get("copies", 1)))
+        orders.save(o.path, o)
+        return order_dict(S, o, cards=True)
+
+    @app.delete("/api/orders/{slug}/sets/{code}")
+    def delete_order_set(slug: str, code: str):
+        o = find_order(S, slug)
+        try:
+            o.drop_set(code)
+        except MintError as e:
+            raise HTTPException(404, str(e)) from None
+        orders.save(o.path, o)
+        return order_dict(S, o, cards=True)
+
+    @app.put("/api/orders/{slug}/cards")
+    def put_order_card(slug: str, body: dict):
+        """How many of one card to print. A count back at the set's default drops the exception,
+        so the file keeps saying only what it changes."""
+        o = find_order(S, slug)
+        count = int(body.get("count", 1))
+        if not 0 <= count <= 99:
+            raise HTTPException(400, "count is a whole number from 0 to 99")
+        try:
+            o.set_count(body["code"], body["name"], count)
+        except (MintError, KeyError) as e:
+            raise HTTPException(400, str(e)) from None
+        orders.save(o.path, o)
+        return order_dict(S, o, cards=True)
 
     # --- sets ---------------------------------------------------------------------------
     @app.get("/api/sets/{code}")
@@ -731,7 +837,8 @@ def create_app(ws):
         names = body.get("names") or (st.names() if st else [])
         submit = {"render": submit_render, "enhance": submit_enhance, "restyle": submit_restyle, "themes": submit_themes,
                   "printrun": submit_printrun, "describe": submit_describe, "animate": submit_animate,
-                  "crops": submit_crops, "export": submit_export}.get(kind)
+                  "crops": submit_crops, "export": submit_export,
+                  "order-export": submit_order_export}.get(kind)
         if not submit:
             raise HTTPException(400, f"unknown job kind {kind!r}")
         job = submit(S, st, names, body)
@@ -1066,6 +1173,53 @@ def submit_export(S, st, names, body):
     return S.jobs.submit("export", title, {"set": st.code, "names": names, "styled": styled, "dpi": dpi,
                                            "stock": stock, "foil": foil_profile, "what": what,
                                            "dest": str(out_dir)}, run)
+
+
+def submit_order_export(S, st, names, body):
+    """A whole order as one MPC Autofill folder, under out/orders/<slug>/mpc/. The order says which
+    sets, how many of each card, and what it is printed on; each set's cards carry its own back, so
+    the decks come back sortable. Cards missing a render are rendered first, as for a set."""
+    o = find_order(S, body.get("order") or "")
+    parts = o.parts(orders.loaded_sets(S.ws, o))
+    if not parts:
+        raise HTTPException(400, f"{o.name}: no set in this order is in the workspace")
+    bill = o.bill(orders.loaded_sets(S.ws, o))
+    total, out_dir = bill["total"], S.ws.home / "out" / "orders" / o.slug / "mpc"
+    dpi = int(body.get("dpi") or o.dpi or export.MAX_DPI)
+    stock = body.get("stock") or o.stock or export.DEFAULT_STOCK
+    if stock not in export.STOCKS:
+        raise HTTPException(400, f"stock is one of {', '.join(export.STOCKS)}")
+    profile = body.get("foil") or o.foil
+    if profile and profile not in foil.PROFILES:
+        raise HTTPException(400, f"foil is one of {', '.join(foil.PROFILES)}")
+    styled = o.mode == "styled"
+    title = (f"export {o.name} for MPC Autofill: {total} card(s) over {len(parts)} set(s), {o.mode} @ {dpi} dpi"
+             + (f", holographic ({profile})" if profile else ""))
+    what = (f"writes {total} card image(s) at {dpi} DPI into out/orders/{o.slug}/mpc/, with cards.xml beside "
+            f"them. Each set's cards print behind that set's own back, so the decks can be told apart "
+            f"afterwards. The order is billed at the {bill['bracket']}-card bracket"
+            + (f", and {bill['headroom']} slot(s) of it are paid for and empty" if bill["headroom"] else "")
+            + (f". Holographic fronts, every image treated ({profile})" if profile else ""))
+
+    def run(job):
+        job.step(0, total + 1)
+        done = [0]
+
+        def log(msg):
+            job.say(msg)
+            done[0] = min(total, done[0] + 1)
+            job.step(done[0])
+        r = export.export_union(S.ws, parts, out_dir, styled=styled, dpi=dpi, stock=stock,
+                                card_back=body.get("back") or "auto", foil=bool(profile),
+                                foil_profile=profile, foil_strength=float(body.get("foil_strength")
+                                                                          or o.foil_strength),
+                                absolute=bool(body.get("absolute")), log=log)
+        job.made(set=o.slug, name=f"{r['fronts']} card(s)", kind="mpc", file="cards.xml", path=r["xml"])
+        job.step(total + 1)
+        return r
+    return S.jobs.submit("order-export", title, {"order": o.slug, "names": [], "styled": styled, "dpi": dpi,
+                                                 "stock": stock, "foil": profile, "what": what,
+                                                 "dest": str(out_dir)}, run)
 
 
 def submit_themes(S, st, names, body):

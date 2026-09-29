@@ -103,6 +103,10 @@ class Workspace:
         return self.home / "styles"
 
     @property
+    def orders(self):
+        return self.home / "orders"
+
+    @property
     def cache(self):
         return self.home / ".cache"
 
@@ -113,6 +117,10 @@ class Workspace:
     def style_files(self):
         """Every style template, styles/*.json, by name."""
         return sorted(self.styles.glob("*.json"))
+
+    def order_files(self):
+        """Every order, orders/*.json, by name."""
+        return sorted(self.orders.glob("*.json")) if self.orders.is_dir() else []
 
     def path(self, *parts):
         return self.home.joinpath(*parts)

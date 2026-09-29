@@ -132,6 +132,10 @@ kind of entry; `sets/` and `styles/` are yours and git ignores both):
   (the bars tinted silver, gold or orange by rarity). The defaults are the
   texture, the bevel, the grain and the stamp on; each reaches the frame as a CSS custom property of
   the same name (`--art-bevel`), so the set's css can still override any.
+- A `back` block gives the set its own card back — a wordmark, an emblem and
+  two palettes — so that an order unioning several sets can be sorted by its
+  backs afterwards. ["Orders"](#orders-one-batch-a-back-per-set) has the keys;
+  without a block the set prints the common back.
 - A `.css` file with the same name (`sets/bls1.css`; `docs/examples/set.css`) is injected after the
   base frame rules, so each set can carry its own frame identity: colours,
   textures, bar shapes, anything.
@@ -189,7 +193,8 @@ comfy_root = ""               # the ComfyUI checkout, when it is on this machine
 | `mint impose` | lay rendered PNGs out 3×3 on Letter/A4 with bleed and cut marks, as a 100 % PDF |
 | `mint foil` | proof, treat and calibrate cards for foil stock — MPC's holo or foil in your own tray |
 | `mint print` | send a PDF to an Epson ET-8500 at true 100 % with the right black for the stock |
-| `mint export` | a set as a folder MPC Autofill's desktop tool runs in: a card image each at MakePlayingCards' size, and the `cards.xml` order beside them |
+| `mint order` | build the batch that goes to the printer: which sets, how many of which cards, and what the bracket costs |
+| `mint export` | a set or an order as a folder MPC Autofill's desktop tool runs in: a card image each at MakePlayingCards' size, and the `cards.xml` order beside them |
 | `mint serve` | the workbench: compare art, recipes and frames in a browser, and run the tools from it |
 | `mint gallery` | export a set as a static, read-only gallery page |
 
@@ -199,7 +204,9 @@ End to end, on this machine:
 mint upscale --set sets/bls1.json
 mint render  --set sets/bls1.json --out proofs
 mint impose  --out proofs/bls1.pdf proofs/0*.png
+mint order   new october --set slv --set gsh --set ure   # one batch, a back per set
 mint export  --set sets/bls1.json          # -> out/bls1/mpc/, for MPC Autofill
+mint export  --order october               # -> out/orders/october/mpc/
 mint foil    --proof proofs/005.png        # what it would look like on foil
 mint print   --test proofs/bls1.pdf        # one page on plain paper first
 mint print   -p matte proofs/bls1.pdf
@@ -745,6 +752,7 @@ crossover set will always warn — that's a deck decision, not a render one.
 ```sh
 mint export --set sets/bls1.json                 # -> out/bls1/mpc/
 mint export --set sets/bls1.json --styled --dpi 600 --stock "(M31) Linen"
+mint export --set sets/slv.json --set sets/gsh.json --set sets/ure.json
 ```
 
 ```
@@ -759,6 +767,117 @@ there. The paths in `cards.xml` are relative, so the folder can be moved or
 zipped; `--absolute` writes full paths for running the tool from elsewhere.
 The images are ordinary files at MPC's size, so MakePlayingCards' own uploader
 takes them too — their names sort into collector order.
+
+### Orders: one batch, a back per set
+
+A set is an aggregate of cards. An **order** is a union of sets — the batch that
+goes to the printer as one job:
+
+```sh
+mint order new october --set slv --set gsh --set ure
+mint order set october SLV "Sol Ring" 2     # how many of one card to print
+mint order drop-card october SLV Plains     # the same as `set … 0`
+mint order show october                     # the bill, and what the bracket costs
+mint export --order october                 # -> out/orders/october/mpc/
+```
+
+An order holds only what it *changes* about its sets — which sets, and how many
+of which cards — so a card added to a deck is in the order the moment it is in
+the set. There is no second place that claims to know what a deck contains.
+Everything an order says about a card is one number, **how many copies**:
+
+| | |
+|---|---|
+| `copies` | the set's default, 1 unless the line says otherwise |
+| `cards[name]` | that card's own count, overriding the default |
+| `0` | not printed — how a card comes out of the order |
+| `"copies": 0` | nothing from this set but the cards named — how one card comes out of a big set without listing the other two hundred |
+
+```json
+{
+  "name": "october",
+  "stock": "(S30) Standard Smooth", "dpi": 800, "mode": "styled",
+  "sets": [
+    {"code": "SLV"},
+    {"code": "GSH", "cards": {"Plains": 0, "Sol Ring": 2}},
+    {"code": "BLS1", "copies": 0, "cards": {"Cyclonic Rift": 1}}
+  ]
+}
+```
+
+Each set's cards print behind that set's own back, which is how three decks come
+back sortable — slivers on the sliver deck's backs, dinosaurs on the dinosaur
+deck's — with nothing on the fronts to say which deck a card is from. Two copies
+of a card are two slots sharing one image, since `<slots>` is a set to the
+desktop tool, and nothing has to be ticked at MakePlayingCards: more than one
+distinct image under `<backs>` is exactly what it branches on to put the project
+into its different-backs mode.
+
+Several `--set` do the same thing without a file, for a one-off:
+
+```sh
+mint export --set sets/slv.json --set sets/gsh.json --set sets/ure.json
+```
+
+Either way the images carry their set's code (`SLV 001 Sliver Overlord.png`),
+because every set numbers from 001 and they would otherwise overwrite each other.
+MPC's ceiling is 612 cards per project, and the desktop tool splits past it.
+
+### What the bracket costs
+
+`mint order show` is the one to run before spending money, because
+MakePlayingCards sells **fixed project sizes, not cards**:
+
+```
+18, 36, 55, 72, 90, 108, 126, 144, 162, 180, 198, 216, 234, 396, 504, 612
+```
+
+An order is billed at the next size up, so 283 cards are billed as 396 and 113
+slots are paid for and empty. The workbench draws that as a meter; `mint order
+show` prints it:
+
+```
+  SLV     100 card(s)  back SLV.png       Sliver Overlord EDH
+  GSH      90 card(s)  back GSH.png       Gishath, hits you with the whole zoo
+  URE      93 card(s)  back URE.png       Ureni, the song keeps going
+
+  total   283 card(s)  ->  bracket 396
+
+113 slot(s) are paid for and empty: MakePlayingCards bills the order at the next
+project size up, so anything you add up to 396 costs nothing more.
+```
+
+This is also the honest cost of a back per set. A card two decks both play is
+two slots and prints twice, because its copies want different backs — an order
+costs the sum of its parts, not the size of their union. Three decks that shared
+one copy of every staple were never three playable decks.
+
+The workbench has all of this under **orders** in the nav: a card list per set
+with a stepper on every row, a filter, the bracket meter, and the export button.
+A set board's **add to order** pill puts that set in one without leaving the page.
+
+A set says what its back looks like in a `back` block:
+
+```json
+"back": {
+  "word": "SLIVERS", "sub": "THE HIVE", "symbol": "lgn",
+  "paper": ["#7fa88f", "#5c8470", "#31513f", "#1b2e23"],
+  "oval":  ["#cfe8d8", "#8fbfa4", "#4c7d63", "#2a4a39"],
+  "ink":   "#10201a"
+}
+```
+
+`symbol` is a set code whose expansion symbol is already cached under
+`symbols/sets` (`lgn` for slivers, `xln` for Ixalan's dinosaurs, `dtk` for
+dragons) or the path to an SVG of your own; leave it out for the BLS mountain.
+Only the two palettes are given — the rings around the oval, the field's
+highlights and the glow behind the emblem are derived from them, so a back in
+cold green keeps none of the warm brown trim of the one it started from. Draw
+one on its own with `mint back --set sets/slv.json --out back.png`.
+
+A set with no `back` block prints the common back, and so does every card in a
+single-set export: nothing about that case changes, file names included. A
+double-faced card still prints its own reverse either way.
 
 The geometry is MPC Autofill's own, not a guess. Its desktop tool reads a
 card's resolution off the image's height alone (`img_dpi = 10 * round(height *
@@ -890,8 +1009,9 @@ the card's own choice, and is exported with a warning instead.
 Cards with no render, or with one gone stale, are rendered first; `--no-render`
 exports only what is on disk. A card pinned to a render (below) exports that
 one. A double-faced card whose back has been rendered gets that back in the
-order's `<backs>` at its own slot; every other card gets the common card back,
-which `--back` takes as `auto` (`mint back`), `none`, or an image of your own.
+order's `<backs>` at its own slot; every other card gets its set's back if it
+has one, else the common card back, which `--back` takes as `auto` (`mint
+back`), `none`, or an image of your own.
 
 ## What's not here yet
 

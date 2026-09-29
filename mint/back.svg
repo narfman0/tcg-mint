@@ -1,0 +1,40 @@
+<!-- The BLS mountain: the common back's emblem, drawn inside the oval's 172x214 box.
+     Its own colours, not the set's: a set that wants another mark names one in its
+     back block's `symbol` rather than recolouring this one. -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="45%" r="45%">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity=".95"/>
+      <stop offset=".45" stop-color="#e8862e" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#e8862e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a2614"/><stop offset="1" stop-color="#160e07"/>
+    </linearGradient>
+    <linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a3320"/><stop offset="1" stop-color="#1c120a"/>
+    </linearGradient>
+  </defs>
+  <!-- fireball glow behind the summit -->
+  <ellipse cx="86" cy="92" rx="62" ry="58" fill="url(#glow)"/>
+  <!-- mushroom cloud: cap, then stem widening into the crater -->
+  <path fill="url(#cloud)" d="M86 52 c-30 0 -46 14 -46 30 c0 10 8 17 20 19 c-4 6 0 12 8 12 c10 0 14 -6 12 -12
+    c8 4 18 -2 18 -10 c0 -3 -2 -6 -5 -8 c14 -2 22 -10 22 -19 c0 -12 -14 -12 -29 -12z"/>
+  <path fill="url(#cloud)" d="M74 108 c2 -8 22 -8 24 0 c4 10 -2 22 -12 22 c-10 0 -16 -12 -12 -22z"/>
+  <path fill="url(#cloud)" d="M70 128 c6 -6 26 -6 32 0 l6 16 h-44z"/>
+  <!-- cloud highlights -->
+  <path fill="none" stroke="#e9c48f" stroke-width="1.6" stroke-linecap="round"
+    d="M52 78 c4 -12 20 -18 34 -18 M104 66 c8 2 14 6 16 12 M62 104 c4 4 10 6 16 5"/>
+  <!-- the mountain, summit blown into a crater -->
+  <path fill="url(#rock)" stroke="#0d0804" stroke-width="1.4" stroke-linejoin="round"
+    d="M14 190 L56 128 L64 138 L70 130 L78 145 L94 145 L102 130 L110 140 L118 128 L158 190z"/>
+  <!-- crater rim lit by the blast -->
+  <path fill="none" stroke="#f3c574" stroke-width="1.8" stroke-linecap="round" d="M62 138 L70 130 L78 145 L94 145 L102 130 L110 140"/>
+  <!-- flung debris -->
+  <g fill="#1c120a">
+    <path d="M36 96 l5 -4 l2 6z"/><path d="M132 90 l6 -2 l-1 6z"/><path d="M44 116 l4 -3 l1 5z"/>
+    <path d="M128 118 l5 -4 l1 6z"/><path d="M148 104 l4 -1 l-1 5z"/><path d="M26 124 l4 -2 l0 5z"/>
+  </g>
+  <!-- snow / ridge lines on the flanks -->
+  <path fill="none" stroke="#5a3d22" stroke-width="1.2" stroke-linecap="round" d="M60 150 L52 170 M112 150 L124 174 M86 150 L84 178"/>
+  <!-- ground line -->
+  <path fill="#0d0804" d="M8 190 h156 v6 h-156z" opacity=".85"/>

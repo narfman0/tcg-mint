@@ -164,6 +164,8 @@ function route() {
   if (p[0] === 'jobs') return {view: 'jobs'};
   if (p[0] === 'styles') return {view: 'styles', name: p[1]};
   if (p[0] === 'cleanup') return {view: 'cleanup'};
+  if (p[0] === 'orders') return {view: 'orders'};
+  if (p[0] === 'order') return {view: 'order', slug: p[1]};
   if (p[0] === 'all') return p[1] === 'view' ? {view: 'viewer', code: ALL, inSet: p[2], name: p[3]} : {view: 'board', code: ALL};
   if (p[0] === 'set') return {view: p[2] === 'view' ? 'viewer' : p[2] || 'board', code: p[1], name: p[3], key: p[4] === 'view' ? p[5] : undefined};
   return {view: 'home'};
@@ -173,7 +175,7 @@ async function go() {
   try {
     if (!state.ws) await loadWorkspace();
     if (r.code && (!state.set || state.set.code.toLowerCase() !== r.code.toLowerCase())) { await loadSet(r.code); state.sel.clear(); }
-    const views = {home, board, card, lab, frame, jobs, viewer, edit, styles, pdfs, cleanup};
+    const views = {home, board, card, lab, frame, jobs, viewer, edit, styles, pdfs, cleanup, orders, order};
     if (r.view !== 'viewer' && !(r.view === 'card' && r.key)) closeViewer();
     (views[r.view] || home)(r);
     renderNav();
@@ -191,6 +193,7 @@ function renderNav() {
   $('#setnav').innerHTML = (state.ws?.sets || []).map(s =>
     `<a href="#/set/${esc(s.code)}" class="${r.code && r.code.toLowerCase() === s.code.toLowerCase() ? 'on' : ''}">${esc(s.code)}</a>`).join('') +
     (STATIC ? '' : `<a href="#/all" class="all ${r.code === ALL ? 'on' : ''}" title="every set on one board">all</a><a href="#/styles" class="all ${r.view === 'styles' ? 'on' : ''}" title="style templates">styles</a>` +
+     `<a href="#/orders" class="all ${r.view === 'orders' || r.view === 'order' ? 'on' : ''}" title="what goes to the printer in one batch">orders</a>` +
      `<a href="#/cleanup" class="all ${r.view === 'cleanup' ? 'on' : ''}" title="what could be removed, and what it weighs">cleanup</a>`);
   renderComfyDot();
 }
@@ -256,7 +259,7 @@ function home() {
       </a>`).join('') || `<div class="empty">${ws.sets.length ? 'nothing matches' : 'no set files in sets/ — <code>mint newset</code> makes one'}</div>`;
   $('#main').innerHTML = `
     <div class="row"><h1>Sets</h1>
-      ${STATIC ? '' : `<a class="pill" href="#/all">all sets on one board</a><a class="pill" href="#/styles">styles</a>`}
+      ${STATIC ? '' : `<a class="pill" href="#/all">all sets on one board</a><a class="pill" href="#/orders">orders</a><a class="pill" href="#/styles">styles</a>`}
       <input type="text" id="q" placeholder="filter sets" value="${esc(state.q || '')}" style="margin-left:auto">
       ${STATIC ? '' : '<button id="newset">new set</button>'}
     </div>
@@ -454,7 +457,7 @@ function board() {
     : 'each card with its styled art: its pick, else the recipe\'s variant';
   $('#main').innerHTML = `
     <div class="row"><h1>${esc(code)} <span class="muted">${esc(st.name)}</span></h1>
-<button class="pill" id="gallery" title="flip through the cards full-screen">gallery</button>${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a><a class="pill" href="#/set/${esc(code)}/pdfs" title="the set's PDFs: view, download, export">pdfs</a>`}
+<button class="pill" id="gallery" title="flip through the cards full-screen">gallery</button>${all ? '' : `<a class="pill" href="#/set/${esc(code)}/edit">edit</a><a class="pill" href="#/set/${esc(code)}/lab">recipe lab</a><a class="pill" href="#/set/${esc(code)}/frame">frame</a><a class="pill" href="#/set/${esc(code)}/pdfs" title="the set's PDFs: view, download, export">pdfs</a><button class="pill" id="toorder" title="put this set in an order: a batch of several sets printed together, each behind its own back">add to order</button>`}
       <span class="muted">${st.cards_detail.length} cards${all ? ` across ${st.sets.length} sets` : ''}${st.style && !all ? ` · style ${esc(st.style.name)}` : ''}${st.base && !all ? ` · from <b>${esc(st.base)}</b>` : ''}${all ? '' : ` · <span class="mono">${esc(st.path)}</span>`}</span></div>
     <div class="toolbar">
       <span class="seg">${['plain', 'styled'].map(m => `<button data-mode="${m}" class="${state.mode === m ? 'on' : ''}">${m}</button>`).join('')}</span>
@@ -511,6 +514,28 @@ function board() {
   $('#sort').onchange = e => { state.sort = e.target.value; board(); };
   document.querySelectorAll('[data-sheet]').forEach(b => b.onclick = () => { state.sheet = b.dataset.sheet === 'true'; board(); });
   $('#gallery').onclick = () => { const cs = boardCards(); if (!cs.length) return toast('nothing to show'); V.fromPage = true; location.hash = viewHash(setOf(cs[0]), cs[0].name); };
+  /* Put this set in an order -- an existing one, or a new one named after it. The order holds only
+     the set's code, so what it prints follows the set from here on. */
+  if ($('#toorder')) $('#toorder').onclick = async () => {
+    let list = [];
+    try { list = (await api('/api/orders')).filter(o => !o.error); } catch (e) { return toast(e.message, true); }
+    const free = list.filter(o => !o.sets.some(e => e.code === code.toUpperCase()));
+    const already = list.filter(o => o.sets.some(e => e.code === code.toUpperCase()));
+    const pick = prompt(
+      `Put ${code} in which order?\n\n` +
+      (free.length ? free.map(o => `  ${o.slug} (${o.bill.total} cards)`).join('\n') + '\n\n' : '') +
+      (already.length ? `already in: ${already.map(o => o.slug).join(', ')}\n\n` : '') +
+      'Type a name. An order that does not exist yet is created.',
+      free[0]?.slug || code.toLowerCase());
+    if (!pick) return;
+    const found = list.find(o => o.slug === pick || o.name === pick);
+    try {
+      const o = found || await api('/api/orders', {method: 'POST', body: {name: pick}});
+      await api(`/api/orders/${encodeURIComponent(o.slug)}/sets`, {method: 'POST', body: {code}});
+      toast(`${code} added to ${o.slug}`);
+      if (confirm(`${code} is in "${o.slug}". Open the order?`)) location.hash = `#/order/${o.slug}`;
+    } catch (e) { toast(e.message, true); }
+  };
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { state.mode = b.dataset.mode; board(); });
   document.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { state.show = b.dataset.show; board(); });
   if ($('#style')) $('#style').onchange = e => { state.style = e.target.value; board(); };
@@ -1818,6 +1843,154 @@ async function cleanup() {
       if (out.missed.length) toast(`${out.missed.length} were no longer safe to remove and were left`, true);
     } catch (e) { toast(e.message, true); }
     C.busy = false; C.report = null; C.sel = new Set(); redraw();
+  };
+}
+
+/* --- orders ------------------------------------------------------------------------- */
+/* An order is the batch that goes to the printer: a union of sets, holding only what it changes
+   about them (which sets, how many of which cards), so a card added to a deck is in the order the
+   moment it is in the set. The number worth looking at is the bracket -- MakePlayingCards sells
+   fixed project sizes, not cards, so an order is billed at the next size up and the slots between
+   are paid for either way. */
+async function orders() {
+  const list = await api('/api/orders');
+  const row = o => `
+    <a class="setcard" href="#/order/${esc(o.slug)}">
+      <h3>${esc(o.name)} <span class="muted">${o.sets.map(x => esc(x.code)).join(' ') || 'empty'}</span></h3>
+      <div class="meta">${o.bill.total} card(s) · billed at ${o.bill.bracket}${o.bill.headroom
+        ? ` · <b>${o.bill.headroom}</b> paid for and empty` : ' · exactly full'}
+        ${o.bill.problems.length ? `<div class="bad">${o.bill.problems.map(esc).join('<br>')}</div>` : ''}</div>
+    </a>`;
+  $('#main').innerHTML = `
+    <div class="row"><h1>Orders</h1>
+      <span class="muted">what goes to the printer in one batch</span>
+      <span style="margin-left:auto"></span>
+      <button id="neworder">new order</button>
+    </div>
+    <p class="muted">MakePlayingCards sells fixed project sizes, so an order is billed at the next one up.
+      Putting several decks in one order pays that once, and each set's cards print behind its own back.</p>
+    <div class="panel" id="neworder-form" hidden></div>
+    <div class="setlist">${list.filter(o => !o.error).map(row).join('')
+      || '<div class="empty">no orders yet — <b>new order</b>, or <code>mint order new</code></div>'}</div>
+    ${list.filter(o => o.error).map(o => `<div class="panel bad">${esc(o.error)}</div>`).join('')}`;
+  $('#neworder').onclick = () => {
+    const f = $('#neworder-form');
+    f.hidden = !f.hidden;
+    if (f.hidden) return;
+    f.innerHTML = `<label>name <input id="oname" placeholder="october" style="width:16em"></label>
+      <label>note <input id="onote" placeholder="what this order is for" style="width:22em"></label>
+      <div class="muted" style="margin:.5em 0">sets: ${(state.ws.sets || []).filter(x => !x.error).map(x =>
+        `<label class="inline"><input type="checkbox" class="oset" value="${esc(x.code)}"> ${esc(x.code)}</label>`).join(' ')}</div>
+      <button class="primary" id="ocreate">create</button>`;
+    $('#oname').focus();
+    $('#ocreate').onclick = async () => {
+      const name = $('#oname').value.trim();
+      if (!name) return toast('an order needs a name', true);
+      try {
+        const o = await api('/api/orders', {method: 'POST', body: {name, note: $('#onote').value.trim() || null,
+          sets: [...document.querySelectorAll('.oset:checked')].map(c => c.value)}});
+        location.hash = `#/order/${o.slug}`;
+      } catch (e) { toast(e.message, true); }
+    };
+  };
+}
+
+async function order(r) {
+  const O = state.ord || (state.ord = {slug: null, q: '', open: {}, changed: false});
+  if (O.slug !== r.slug || !O.data) { O.slug = r.slug; O.data = await api(`/api/orders/${encodeURIComponent(r.slug)}`); }
+  const o = O.data, b = o.bill, q = O.q.toLowerCase();
+  const reload = async () => { O.data = await api(`/api/orders/${encodeURIComponent(O.slug)}`); order(r); };
+  const put = async (path, body, method = 'PUT') => {
+    try { O.data = await api(`/api/orders/${encodeURIComponent(O.slug)}${path}`, {method, body}); order(r); }
+    catch (e) { toast(e.message, true); }
+  };
+  const pct = Math.min(100, Math.round(b.total / b.bracket * 100));
+  const notIn = (state.ws.sets || []).filter(x => !x.error && !o.sets.some(e => e.code === x.code.toUpperCase()));
+  const setBlock = d => {
+    const e = o.sets.find(x => x.code === d.code) || {copies: 1};
+    const rows = d.cards.filter(c => !q || c.name.toLowerCase().includes(q));
+    return `<div class="panel order-set">
+      <h2><a href="#/set/${esc(d.code)}">${esc(d.code)}</a> <span class="muted">${esc(d.name || '')}</span>
+        <span class="muted">${d.cards.reduce((n, c) => n + c.count, 0)} card(s) ·
+          ${d.back ? `back ${esc(d.code)}.png` : '<span class="warn">no back block: prints the common back</span>'}</span>
+        <span style="margin-left:auto"></span>
+        <label class="muted" title="how many of each of this set's cards, unless the card says otherwise. 0 means nothing from this set but the cards you give a count to">each
+          <input type="number" class="ocopies" data-code="${esc(d.code)}" min="0" max="99" value="${e.copies}" style="width:4.5em"></label>
+        <button class="small" data-dropset="${esc(d.code)}">take out</button></h2>
+      <div class="order-rows">${rows.map(c => `
+        <div class="order-row ${c.count === 0 ? 'out' : c.count > 1 ? 'many' : ''}">
+          <span class="mono num">${c.number == null ? '' : String(c.number).padStart(3, '0')}</span>
+          <span class="nm">${esc(c.name)}</span>
+          <span class="qty">
+            <button class="small" data-step="-1" data-code="${esc(d.code)}" data-card="${esc(c.name)}" ${c.count ? '' : 'disabled'}>−</button>
+            <b>${c.count}</b>
+            <button class="small" data-step="1" data-code="${esc(d.code)}" data-card="${esc(c.name)}">+</button>
+          </span>
+        </div>`).join('') || '<div class="empty">nothing matches</div>'}</div>
+    </div>`;
+  };
+  $('#main').innerHTML = `
+    <div class="row"><h1>${esc(o.name)}</h1>
+      <a class="pill" href="#/orders">all orders</a>
+      <span style="margin-left:auto"></span>
+      <select id="omode" title="which render of each card the order prints">${['plain', 'styled'].map(m =>
+        `<option ${o.mode === m ? 'selected' : ''}>${m}</option>`).join('')}</select>
+      <select id="ostock" title="the cardstock the order asks MakePlayingCards for">${(state.ws.mpc?.stocks || []).map(x =>
+        `<option ${(o.stock || state.ws.mpc?.stock) === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>
+      <select id="ofoil" title="holographic fronts, with every image treated for the substrate"><option value="">no foil</option>${(state.ws.foil?.profiles || []).map(f =>
+        `<option ${o.foil === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select>
+      <select id="odpi">${[300, 600, 800].map(d => `<option ${(o.dpi || 800) === d ? 'selected' : ''}>${d}</option>`).join('')}</select><span class="muted">dpi</span>
+      <button class="primary" id="oexport" title="every card at MakePlayingCards' size with cards.xml beside it, under out/orders/${esc(o.slug)}/mpc/. Cards missing a render are rendered first">export for MPC</button>
+    </div>
+    ${o.note ? `<p class="muted">${esc(o.note)}</p>` : ''}
+    <div class="panel bracket">
+      <div class="row"><b>${b.total} card(s)</b><span class="muted">billed at the ${b.bracket}-card bracket</span>
+        <span style="margin-left:auto"></span>
+        ${b.headroom ? `<b class="accent">${b.headroom} slot(s) paid for and empty</b>` : '<b>exactly full</b>'}</div>
+      <div class="meter"><i style="width:${pct}%"></i></div>
+      <p class="muted">MakePlayingCards sells fixed project sizes, not cards, so this order costs the same
+        anywhere from ${b.under == null ? 1 : b.under + 1} to ${b.bracket} cards.
+        ${b.headroom ? `Anything you add up to ${b.bracket} is free.` : ''}
+        ${b.drop ? ` Dropping ${b.drop} card(s) would fall back to the ${b.under} bracket.` : ''}</p>
+      ${b.problems.length ? `<div class="bad">${b.problems.map(esc).join('<br>')}</div>` : ''}
+    </div>
+    <div class="row">
+      <input type="text" id="oq" placeholder="filter cards" value="${esc(O.q)}">
+      ${notIn.length ? `<select id="oadd"><option value="">add a set…</option>${notIn.map(x =>
+        `<option value="${esc(x.code)}">${esc(x.code)} — ${esc(x.name)}</option>`).join('')}</select>` : ''}
+      <span class="muted" style="margin-left:auto">${o.mode} renders · <code>mint export --order ${esc(o.slug)}</code></span>
+      <button class="small" id="odel">delete order</button>
+    </div>
+    ${o.detail.map(setBlock).join('') || '<div class="empty">no sets in this order yet — add one above</div>'}`;
+
+  $('#oq').oninput = e => { O.q = e.target.value; order(r); };
+  if ($('#oadd')) $('#oadd').onchange = e => e.target.value && put('/sets', {code: e.target.value}, 'POST');
+  $('#omode').onchange = e => put('', {mode: e.target.value});
+  $('#ostock').onchange = e => put('', {stock: e.target.value});
+  $('#ofoil').onchange = e => put('', {foil: e.target.value || null});
+  $('#odpi').onchange = e => put('', {dpi: +e.target.value});
+  document.querySelectorAll('[data-step]').forEach(btn => btn.onclick = () => {
+    const d = o.detail.find(x => x.code === btn.dataset.code);
+    const cur = d.cards.find(c => c.name === btn.dataset.card).count;
+    put('/cards', {code: btn.dataset.code, name: btn.dataset.card, count: Math.max(0, cur + (+btn.dataset.step))});
+  });
+  document.querySelectorAll('.ocopies').forEach(inp => inp.onchange = () =>
+    put('/sets', {code: inp.dataset.code, copies: Math.max(0, +inp.value || 0)}, 'POST'));
+  document.querySelectorAll('[data-dropset]').forEach(btn => btn.onclick = () => {
+    if (confirm(`Take ${btn.dataset.dropset} out of this order? The set and its cards are untouched.`)) {
+      put(`/sets/${encodeURIComponent(btn.dataset.dropset)}`, undefined, 'DELETE');
+    }
+  });
+  $('#odel').onclick = async () => {
+    if (!confirm(`Delete the order "${o.name}"? The sets and their cards are untouched.`)) return;
+    try { await api(`/api/orders/${encodeURIComponent(O.slug)}`, {method: 'DELETE'}); O.data = null; location.hash = '#/orders'; }
+    catch (e) { toast(e.message, true); }
+  };
+  $('#oexport').onclick = () => {
+    if (!b.total) return toast('nothing in this order', true);
+    submit({kind: 'order-export', order: o.slug, dpi: +$('#odpi').value,
+            stock: $('#ostock').value || undefined, foil: $('#ofoil').value || undefined},
+           `order ${o.slug}`);
   };
 }
 

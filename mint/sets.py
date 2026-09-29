@@ -11,6 +11,9 @@
                                            which is that cut where the design has one and the crop elsewhere
       "design": "m15",                     the frame design (frame.DESIGNS: m15, extended, borderless, fullart)
                                            or "auto" to follow each card's printing; default m15
+      "back": {"symbol": "lgn", ...},      the set's own card back (Back below; back.py draws it), so an
+                                           order that unions several sets can be sorted by its backs;
+                                           default the common BLS back
       "cards": {
         "Card Name": {"number": 1, "flavor": "...", "art": "path.png", "art_filter": "...",
                       "subject": "what the picture is of", "printing": "rvr:40",
@@ -222,6 +225,49 @@ class Frame:
                 raise SetError(f"{where}: {f.name} should be between 0 and 1, not {v!r}")
 
 
+# the BLS back's palette (back.py): the parchment field and the oval, each four radial stops from
+# the middle out, and the five dots under the oval
+PAPER = ["#b08553", "#8e6537", "#5d3f21", "#3d2814"]
+OVAL = ["#e2b06e", "#c98a48", "#9c5f2c", "#6a3d18"]
+DOTS = ["#f4ecd4", "#3b6fb5", "#2e2a2c", "#c8402d", "#2f7a48"]
+COLOR = re.compile(r"#[0-9a-fA-F]{6}")
+
+
+@dataclass
+class Back:
+    """The set's card back (back.py). A set that spells a block prints its own back behind its
+    cards, which is what makes a union order sortable by eye: the sliver deck's backs carry a
+    sliver, the dinosaur deck's a dinosaur, and nothing on the front has to change to say so.
+    A set with no block prints the common BLS back, and a block need only name what it changes.
+
+    Only the two palettes are given: the rings around the oval, the inner highlights and the
+    glow behind the emblem are all derived from them, so a back in cold blue does not keep the
+    warm brown trim of the one it started from."""
+    word: str = "BLASTED"      # the wordmark across the top
+    sub: str = "STUDIOS"       # the spaced line under it
+    tag: str = "TCG \u00b7 MINT"  # the line along the bottom
+    # the emblem inside the oval: a set code whose expansion symbol is cached under symbols/sets
+    # (lgn for slivers, xln for dinosaurs, dtk for dragons ...) or the path to an SVG of your own.
+    # None keeps the BLS mountain.
+    symbol: str | None = None
+    paper: list = field(default_factory=lambda: list(PAPER))  # the parchment field, four stops, middle out
+    oval: list = field(default_factory=lambda: list(OVAL))    # the oval, four stops, centre out
+    dots: list = field(default_factory=lambda: list(DOTS))    # the five dots under the oval
+    ink: str = "#1c1208"       # the wordmark, the emblem and the rings
+
+    def validate(self, where="back"):
+        for k, n in (("paper", 4), ("oval", 4), ("dots", 5)):
+            v = getattr(self, k)
+            if len(v) != n or not all(isinstance(c, str) and COLOR.fullmatch(c) for c in v):
+                raise SetError(f"{where}: {k} must be {n} hex colours (#rrggbb), not {v!r}")
+        if not COLOR.fullmatch(self.ink):
+            raise SetError(f"{where}: ink must be a hex colour (#rrggbb), not {self.ink!r}")
+        for k, room in (("word", 14), ("sub", 18), ("tag", 18)):
+            v = getattr(self, k)
+            if len(v) > room:
+                raise SetError(f"{where}: {k} is {len(v)} characters and the back has room for {room}")
+
+
 @dataclass
 class CardEntry:
     number: int | None = None
@@ -250,6 +296,7 @@ class SetFile:
     style: Style | None = None
     motion: Motion | None = None               # how the art is animated; None = Motion's defaults
     frame: Frame | None = None                 # the frame's dressing; None = the defaults
+    back: Back | None = None                   # the set's own card back; None = the common BLS back
     base: str | None = None                    # every card's restyle base unless its entry says: hash or label
     design: str | None = None                  # every card's frame design unless its entry says; None = m15
     cards: dict = field(default_factory=dict)  # name -> CardEntry, in collector order
@@ -448,6 +495,8 @@ class SetFile:
             d["motion"] = _slim(dataclasses.asdict(self.motion), Motion, self.motion.explicit)
         if self.frame and _slim(dataclasses.asdict(self.frame), Frame):
             d["frame"] = _slim(dataclasses.asdict(self.frame), Frame)
+        if self.back is not None:
+            d["back"] = _slim(dataclasses.asdict(self.back), Back)
         d["cards"] = {n: {k: v for k, v in dataclasses.asdict(e).items() if v is not None} for n, e in self.cards.items()}
         return d
 
@@ -526,11 +575,15 @@ def from_dict(d, where="set"):
     style = d.pop("style", None)
     motion = d.pop("motion", None)
     frame = d.pop("frame", None)
+    back = d.pop("back", None)
     cards = d.pop("cards", {})
     st = _build(SetFile, d, where)
     if frame is not None:
         st.frame = _build(Frame, frame, f"{where}: frame")
         st.frame.validate(f"{where}: frame")
+    if back is not None:
+        st.back = _build(Back, back, f"{where}: back")
+        st.back.validate(f"{where}: back")
     if style is not None:
         st.style = _build(Style, style, f"{where}: style")
         st.style.explicit = set(style)

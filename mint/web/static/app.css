@@ -390,3 +390,29 @@ body.viewing { overflow: hidden; }
   .clean-row .what, .clean-row .why { grid-column: 2 / -1; }
   .clean-row .why { display: none; }
 }
+
+/* --- orders ------------------------------------------------------------------------- */
+/* The bracket panel: MakePlayingCards sells fixed project sizes, so the bar is how much of the
+   size you are billed for is actually used, and the gap is what you have already paid for. */
+.panel.bracket { margin: 12px 0; }
+.panel.bracket p { margin: 8px 0 0; font-size: .9em; }
+.meter { height: 10px; margin-top: 10px; border-radius: 5px; background: var(--panel-2);
+  border: 1px solid var(--line-2); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.panel.order-set { margin: 12px 0; }
+.panel.order-set h2 { display: flex; align-items: baseline; gap: 10px; margin: 0; font-size: 1.05em; }
+.panel.order-set h2 label { display: flex; align-items: baseline; gap: 6px; font-size: .85em; }
+.order-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1px 14px; margin-top: 8px; }
+.order-row { display: grid; grid-template-columns: 2.6em minmax(0, 1fr) auto; gap: 8px;
+  align-items: center; padding: 3px 6px; border-radius: 3px; font-size: .92em; }
+.order-row:hover { background: var(--panel-2); }
+.order-row .num { color: var(--muted); text-align: right; }
+.order-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-row .qty { display: flex; align-items: center; gap: 6px; }
+.order-row .qty b { min-width: 1.2em; text-align: center; font-variant-numeric: tabular-nums; }
+/* a card taken out of the order stays listed, greyed, so putting it back is one click */
+.order-row.out .nm, .order-row.out .num { opacity: .4; text-decoration: line-through; }
+.order-row.out .qty b { opacity: .4; }
+.order-row.many .qty b { color: var(--accent-ink); font-weight: 700; }
+label.inline { display: inline-flex; align-items: center; gap: 4px; margin-right: .6em; }
+@media (max-width: 800px) { .order-rows { grid-template-columns: 1fr; } }

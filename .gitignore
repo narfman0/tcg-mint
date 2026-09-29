@@ -29,6 +29,7 @@ dist/
 # so the templates that directory's README points at were never in the repo at all.
 /sets/
 /styles/
+/orders/
 /mint.toml
 
 # subagent worktrees
