@@ -23,7 +23,9 @@ import argparse
 import datetime as dt
 import sys
 
-from . import frame, sets, workspace
+from pathlib import Path
+
+from . import frame, renders, sets, workspace
 from .art import Art
 from .cards import Cards
 from .errors import MintError
@@ -67,21 +69,30 @@ def keep_hashes(st, card, entry, art, render_sources):
     return keep
 
 
-def render_state(ws, st, cards, art):
-    """(stale entries [(manifest, filename, reason)], orphan files, dropped entries) for a set's out/ dir."""
+def render_state(ws, st, cards, art, owned=None):
+    """(stale entries [(manifest, filename, reason)], orphan files, dropped entries) for a set's out/ dir.
+
+    `owned` is every card name the out/ directory belongs to. It is wider than this set when two set
+    files share a code, because they then share the directory (sets/mer.json and sets/mer-missing.json
+    are both MER): a render is only orphaned when *no* set writing there still lists its card, so
+    judging by this set alone would call the other's renders abandoned and offer them for deletion."""
     out = ws.home / "out" / st.code.lower()
     m = Manifest(out)
     fh = frame_hash(st.css, frame.frame_css(st.frame))
     stale, dropped, sources = [], [], {}
+    if owned is None:
+        owned = set(st.cards) | {f.get("name") for f in _faces(cards, st)}
     for fn, e in list(m.entries.items()):
         p = out / fn
         if not p.exists():
             dropped.append(fn)
             continue
         name = e.get("card")
-        if name not in st.cards and not any(name == f.get("name") for f in _faces(cards, st)):
+        if name not in owned:
             stale.append((m, fn, "the card left the set"))
             continue
+        if name not in st.cards and not any(name == f.get("name") for f in _faces(cards, st)):
+            continue  # a set sharing this directory owns it; its own pass judges its frame and art
         try:
             card = cards.find(name, *st.lookup(name))
         except MintError:
@@ -92,12 +103,17 @@ def render_state(ws, st, cards, art):
             sources.setdefault(card["illustration_id"], set()).add((e.get("source") or {}).get("hash"))
             continue
         design = st.design_of(card)
-        want = (art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art), design=design,
-                            fetch=False) if e.get("styled")
-                else art.resolve(card, override=entry.art, design=design, fetch=False)).hash
+        src = (art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art), design=design,
+                           fetch=False) if e.get("styled")
+               else art.resolve(card, override=entry.art, design=design, fetch=False))
+        was = e.get("source") or {}
+        # the recipe hash alone does not identify a picture (renders.art_key says why): compare the
+        # illustration too, or a render whose printing changed reads as current
+        current = was.get("hash") == src.hash and (not was.get("path")
+                                                   or renders.art_key(was["path"]) == renders.art_key(src.path))
         if e.get("frame") != fh:
             stale.append((m, fn, "the frame changed"))
-        elif (e.get("source") or {}).get("hash") != want:
+        elif not current:
             stale.append((m, fn, "the art changed"))
         else:
             sources.setdefault(card["illustration_id"], set()).add((e.get("source") or {}).get("hash"))
@@ -117,25 +133,62 @@ def _faces(cards, st):
 
 
 def collect(ws, only=None, keep_days=3):
-    """The report: per set, the variants and renders that can go."""
+    """The report: per set, the variants and renders that can go. `only` names one set, either as the
+    path of its file -- every other command's --set is a path, so gc takes one rather than quietly
+    matching nothing -- or as its code. A path names exactly one file; a code names every file
+    carrying it, and two files may (sets/mer.json and sets/mer-missing.json are both MER)."""
+    stem = None
+    if only and only.lower().endswith(".json"):
+        stem, only = Path(only).stem.lower(), None
     cards, art = Cards(ws.cards_file), Art(ws.art)
     cutoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=keep_days)).isoformat()
     report = {"variants": [], "stale": [], "orphans": [], "dropped": [], "unreferenced": [], "errors": []}
     referenced = set()
+    loaded = []
     for p in ws.set_files():
         try:
-            st = sets.load(p)
+            loaded.append((p, sets.load(p)))
         except MintError as e:
             report["errors"].append(f"{p.name}: {e}")
+
+    def picked(p, st):
+        if stem is not None:
+            return p.stem.lower() == stem
+        return not only or st.code.lower() == only.lower()
+
+    # The art cache is keyed by illustration, so one picture is shared by every set that prints the
+    # card. What must stay is therefore the union over *all* sets -- their picks, recipes and the
+    # variants their renders use -- even when the report is narrowed to one set. Asking only the
+    # named set would offer another set's restyles for deletion.
+    # Keyed by file, not by code: two set files can share a code and share an out/ directory.
+    owned = {}
+    for _, st in loaded:
+        owned.setdefault(st.code.lower(), set()).update(
+            set(st.cards) | {f.get("name") for f in _faces(cards, st)})
+
+    state, sources_all = {}, {}
+    for p, st in loaded:
+        stale, orphans, dropped, m, sources = render_state(ws, st, cards, art, owned[st.code.lower()])
+        state[p] = (stale, orphans, dropped, m)
+        for illus, hs in sources.items():
+            sources_all.setdefault(illus, set()).update(hs)
+
+    keep_all = {}
+    for _, st in loaded:
+        for name in st.names():
+            try:
+                card = cards.find(name, *st.lookup(name))
+            except MintError:
+                continue
+            referenced.add(card["illustration_id"])
+            keep_all.setdefault(card["illustration_id"], set()).update(
+                keep_hashes(st, card, st.card(card), art, sources_all.get(card["illustration_id"], ())))
+
+    seen = set()
+    for p, st in loaded:
+        if not picked(p, st):
             continue
-        if only and st.code.lower() != only.lower():
-            for n in st.names():  # its cards still count as referenced
-                try:
-                    referenced.add(cards.find(n, *st.lookup(n))["illustration_id"])
-                except MintError:
-                    pass
-            continue
-        stale, orphans, dropped, m, sources = render_state(ws, st, cards, art)
+        stale, orphans, dropped, m = state[p]
         report["stale"] += [(st.code, m, fn, why) for m, fn, why in stale]
         report["orphans"] += orphans
         report["dropped"] += [(st.code, m, fn) for fn in dropped]
@@ -144,13 +197,15 @@ def collect(ws, only=None, keep_days=3):
                 card = cards.find(name, *st.lookup(name))
             except MintError:
                 continue
-            referenced.add(card["illustration_id"])
-            keep = keep_hashes(st, card, st.card(card), art, sources.get(card["illustration_id"], ()))
+            keep = keep_all.get(card["illustration_id"], ())
             for v in art.variants(card):
                 if v.hash in keep or (v.created or "") >= cutoff:
                     continue
+                if (card["illustration_id"], v.hash) in seen:  # a card two selected sets share
+                    continue
+                seen.add((card["illustration_id"], v.hash))
                 report["variants"].append((st.code, name, v))
-    if not only:
+    if not only and stem is None:  # only a whole-workspace run can tell what nothing refers to
         for d in sorted(x for x in ws.art.iterdir() if x.is_dir()):
             if d.name not in referenced:
                 report["unreferenced"].append(d)

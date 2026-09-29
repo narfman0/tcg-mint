@@ -19,7 +19,7 @@ const REMIX_BADGE = {repose: 'repose', new: 'new scene', inspire: 'inspired'};
    else any label the art cache holds); q: the board's search text. */
 /* style2: a second look shown beside the first on every tile (the set-level A/B); sort: number | name |
    colour (the shown image's hue, measured in the browser); sheet: tiles without names and badges, tighter */
-const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'styled', show: 'art', style: 'current', q: '',
+const state = {ws: null, set: null, setCode: null, jobs: {}, sel: new Set(), mode: 'plain', show: 'art', style: 'current', q: '',
                style2: '', sort: 'number', sheet: false, colours: {}, paper: 'letter', stock: '',
                ab: {a: null, b: null, wipe: 50, zoom: 1, x: 0, y: 0, blind: false, swap: false}, lab: null, frame: {},
                takes: 1, upscale: false, dpi: 1200, genOpen: true, missing: false, selecting: false,

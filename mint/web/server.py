@@ -877,7 +877,7 @@ def card_detail(S, st, name, cards=None, shared=None):
         styled = art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art), design=design,
                              fetch=False)
         info["plain"], info["styled"] = source_dict(plain), source_dict(styled)
-        want = {"plain": plain.hash, "styled": styled.hash}
+        want = {"plain": renders.ident(plain), "styled": renders.ident(styled)}
     info["renders"] = renders_for(S, st, name, want, shared=shared)
     return info
 
@@ -1015,13 +1015,13 @@ def submit_printrun(S, st, names, body):
 
 
 def want_for(S, st, name):
-    """The art hash each of plain / styled should render with now, for the stale check."""
+    """The picture each of plain / styled should render with now, for the stale check."""
     entry = st.card({"name": name})
     try:
         card = S.cards().find(name, entry.printing)
     except MintError:
         return {}
-    return renders.want_hashes(st, card, S.art, entry)
+    return renders.want_art(st, card, S.art, entry)
 
 
 def submit_export(S, st, names, body):

@@ -170,12 +170,14 @@ def test_a_set_starts_its_restyles_and_clips_from_the_cut():
 
 
 def test_the_stale_check_agrees_with_the_render_without_fetching(tmp_path):
-    """want_hashes must answer what the render will use, whether or not the file is cut yet: the
-    decision is the card's design, not what happens to be on disk."""
+    """want_art must answer what the render will use, whether or not the file is cut yet: the
+    decision is the card's design, not what happens to be on disk. It answers (hash, art_key),
+    because the hash alone does not say which illustration the picture belongs to."""
     from mint import renders
     art = Art(tmp_path)
     st = sets.from_dict(SET)
     card = textless()
-    want = renders.want_hashes(st, card, art)
-    assert want["plain"] == cut_hash("textless")
-    assert not art.cut(card, "textless", fetch=False).exists()  # nothing was fetched to answer it
+    want = renders.want_art(st, card, art)
+    cut = art.cut(card, "textless", fetch=False)
+    assert want["plain"] == (cut_hash("textless"), renders.art_key(cut))
+    assert not cut.exists()  # nothing was fetched to answer it

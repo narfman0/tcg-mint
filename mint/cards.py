@@ -7,7 +7,7 @@ lookup is a seek instead of a scan of the whole file.
 
 `oracle_cards` holds one printing per card; `default_cards` (see `mint cards
 --kind`) holds every printing, and then `printings()` lists them and `find()`
-prefers one that is not a Universes Beyond crossover.
+prefers one that is not a Universes Beyond crossover (is_universes_beyond).
 """
 import json
 import os
@@ -20,9 +20,18 @@ from .frame import printed_design
 
 BUILD_WAIT = 600  # seconds a lookup waits on a rebuild in progress before "database is locked"
 
-# Universes Beyond printings (Scryfall: security_stamp == "triangle") are not
-# wanted as art, except these: Lord of the Rings fits Magic well enough.
-UB_EXEMPT = {"ltr", "ltc"}
+# Universes Beyond printings are not wanted as art -- no crossover is, Tolkien
+# included: a set code here would be exempted, and nothing is.
+#
+# The test is `promo_types` containing "universesbeyond". The triangle security
+# stamp is kept as a fallback but no longer carries the check on its own: Magic
+# stopped stamping the crossovers once they became ordinary releases, so Marvel,
+# Spider-Man, Avatar, TMNT, Star Trek and The Hobbit all print an *oval* stamp
+# (or none) and used to score as plain black-bordered cards -- which is how the
+# newest Sol Ring became a Marvel Super Heroes Commander printing. The promo type
+# is a strict superset of the triangle in Scryfall's data: every triangle card
+# carries it, and ~4.7k more do.
+UB_EXEMPT = set()  # set codes to treat as ordinary Magic art despite the promo type
 
 
 def front_face(card):
@@ -49,7 +58,9 @@ def faces(card):
 
 
 def is_universes_beyond(card):
-    return card.get("security_stamp") == "triangle" and card.get("set") not in UB_EXEMPT
+    ub = ("universesbeyond" in (card.get("promo_types") or [])
+          or card.get("security_stamp") == "triangle")
+    return ub and card.get("set") not in UB_EXEMPT
 
 
 # The default printing: the newest one that looks like a normal card. Every printing gets
@@ -93,7 +104,10 @@ def oddness(card, design=None):
     if (card.get("released_at") or "") > TODAY():
         why.append(("unreleased", 50))
     if is_universes_beyond(card):
-        why.append(("Universes Beyond", 40))
+        # a last resort, not merely odd: ranked behind every printing that is still a
+        # normal Magic card (a Secret Lair, a promo, a showcase frame), so a crossover
+        # wins only when it is the card's only printing
+        why.append(("Universes Beyond", 90))
     t = card.get("set_type")
     if t in ODD_SET_TYPES and not mine:
         why.append((t.replace("box", "Secret Lair / box set"), ODD_SET_TYPES[t]))

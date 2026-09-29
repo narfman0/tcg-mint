@@ -55,26 +55,50 @@ def backs_of(directory, number, styled=False):
     return out
 
 
-def want_hashes(st, card, art, entry=None):
-    """The art hash each of plain / styled should render with now, for the stale check. Nothing is
-    fetched: which picture a card renders with is decided from the card and its design, not from what
-    happens to be on disk, so the answer is the render's whether or not the file is there yet."""
+def art_key(path):
+    """A picture's identity for the stale check: its illustration and file, as the last two path
+    parts ("<illustration id>/enhance-<hash>.png", "art/<illustration id>.jpg"). The recipe hash
+    alone does not identify a picture -- every card's enhance of the same recipe hashes the same,
+    so a card whose *printing* changed resolves to a different illustration under an identical
+    hash, and comparing hashes would call the old render current. Relative so moving MINT_HOME
+    does not make every render stale."""
+    p = Path(path)
+    return f"{p.parent.name}/{p.name}"
+
+
+def ident(src):
+    """A resolved picture as the stale check compares it: (hash, art_key). Anything building a
+    `want` for stale() goes through here, so the two sides cannot drift apart."""
+    return (src.hash, art_key(src.path))
+
+
+def want_art(st, card, art, entry=None):
+    """The picture each of plain / styled should render with now, as ident()s, for the stale check.
+    Nothing is fetched: which picture a card renders with is decided from the card and its design,
+    not from what happens to be on disk, so the answer is the render's whether or not the file is
+    there yet."""
     entry = entry if entry is not None else st.card(card)
     design = st.design_of(card)
-    return {"plain": art.resolve(card, override=entry.art, design=design, fetch=False).hash,
-            "styled": art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art),
-                                  design=design, fetch=False).hash}
+    return {"plain": ident(art.resolve(card, override=entry.art, design=design, fetch=False)),
+            "styled": ident(art.resolve(card, override=entry.art, style_hash=st.styled_hash(card, art=art),
+                                        design=design, fetch=False))}
+
 
 
 def stale(entry, fhash, want=None):
-    """Why this render is out of date, or None. `want` is want_hashes(); without it only the
+    """Why this render is out of date, or None. `want` is want_art(); without it only the
     frame is checked. A pinned render is never stale."""
     if entry.get("pinned"):
         return None
     if entry.get("frame") != fhash:
         return "the frame changed"
-    if want is not None and (entry.get("source") or {}).get("hash") != want.get(entry["mode"]):
-        return "the art changed"
+    if want is not None:
+        src = entry.get("source") or {}
+        w = want.get(entry["mode"])
+        # an entry from before paths were recorded can only be compared by hash
+        if w is not None and (src.get("hash") != w[0]
+                              or (src.get("path") and art_key(src["path"]) != w[1])):
+            return "the art changed"
     return None
 
 
@@ -91,7 +115,7 @@ def state(directory, st, cards, art, name, *, mode="plain", manifest=None, fhash
     entry = st.card({"name": name})
     card = cards.find(name, *st.lookup(name))
     fhash = fhash or frame_hash(st.css, frame.frame_css(st.frame))
-    want = want_hashes(st, card, art, entry)
+    want = want_art(st, card, art, entry)
     every = for_card(directory, name, entry.render, manifest)
     for r in every:
         r["stale"] = stale(r, fhash, want)
