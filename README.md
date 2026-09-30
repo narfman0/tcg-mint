@@ -796,7 +796,7 @@ Everything an order says about a card is one number, **how many copies**:
 ```json
 {
   "name": "october",
-  "stock": "(S30) Standard Smooth", "dpi": 800, "mode": "styled",
+  "stock": "(S33) Superior Smooth", "dpi": 800, "mode": "styled",
   "sets": [
     {"code": "SLV"},
     {"code": "GSH", "cards": {"Plains": 0, "Sol Ring": 2}},

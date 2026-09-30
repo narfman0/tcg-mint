@@ -3,7 +3,7 @@
     {
       "name": "october",
       "note": "the three commander decks",
-      "stock": "(S30) Standard Smooth",   what MakePlayingCards prints it on
+      "stock": "(S33) Superior Smooth",   what MakePlayingCards prints it on
       "dpi": 800, "mode": "styled",       the resolution, and which render of each card
       "foil": "holo", "foil_strength": 1, holographic fronts, and how hard they are treated
       "sets": [

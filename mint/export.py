@@ -2,7 +2,7 @@
 
     mint export --set sets/bls1.json [--set sets/gsh.json ...]
                 [--styled] [--dpi 800] [--out DIR]
-                [--stock "(S30) Standard Smooth"] [--foil] [--back auto|none|FILE]
+                [--stock "(S33) Superior Smooth"] [--foil] [--back auto|none|FILE]
                 [--foil-profile holo|flat] [--foil-strength 1]
                 [--format png|jpeg] [--absolute] [--no-render] ["Card Name" ...]
 
@@ -91,7 +91,7 @@ RENDER_DPI = 1200
 
 # MakePlayingCards' cardstocks, spelled the way the desktop tool's XML wants them
 STOCKS = ("(S27) Smooth", "(S30) Standard Smooth", "(S33) Superior Smooth", "(M31) Linen", "(P10) Plastic")
-DEFAULT_STOCK = "(S30) Standard Smooth"
+DEFAULT_STOCK = "(S33) Superior Smooth"
 # MPC's price brackets for standard-size cards; an order is billed at the next one up
 BRACKETS = (18, 36, 55, 72, 90, 108, 126, 144, 162, 180, 198, 216, 234, 396, 504, 612)
 
