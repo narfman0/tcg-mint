@@ -316,7 +316,7 @@ body.viewing { overflow: hidden; }
   details.menu > div button { padding: .6em 1em; }
   .tile .badges { gap: 4px; }
   #viewer .vnav { opacity: .5; }
-  .job .it .peek { display: none !important; }
+  .job .it .peek, .order-row .nm .peek { display: none !important; }
 }
 
 /* a phone: one gutter, the set nav scrolls, the viewer's bar keeps to what a thumb needs */
@@ -407,11 +407,18 @@ body.viewing { overflow: hidden; }
   align-items: center; padding: 3px 6px; border-radius: 3px; font-size: .92em; }
 .order-row:hover { background: var(--panel-2); }
 .order-row .num { color: var(--muted); text-align: right; }
-.order-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-row .nm { position: relative; min-width: 0; color: inherit; text-decoration: none; }
+.order-row .nm:hover .t { text-decoration: underline; }
+.order-row .nm .t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the card's render on hover, as a job's item shows its picture */
+.order-row .nm .peek { display: none; position: absolute; left: 0; top: 100%; z-index: 5; padding: 4px; background: var(--panel-2);
+  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 20px rgba(0,0,0,.4); pointer-events: none; }
+.order-row .nm:hover .peek { display: block; }
+.order-row .nm .peek img { display: block; width: 200px; }
 .order-row .qty { display: flex; align-items: center; gap: 6px; }
 .order-row .qty b { min-width: 1.2em; text-align: center; font-variant-numeric: tabular-nums; }
 /* a card taken out of the order stays listed, greyed, so putting it back is one click */
-.order-row.out .nm, .order-row.out .num { opacity: .4; text-decoration: line-through; }
+.order-row.out .nm .t, .order-row.out .num { opacity: .4; text-decoration: line-through; }
 .order-row.out .qty b { opacity: .4; }
 .order-row.many .qty b { color: var(--accent-ink); font-weight: 700; }
 label.inline { display: inline-flex; align-items: center; gap: 4px; margin-right: .6em; }

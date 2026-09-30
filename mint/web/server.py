@@ -240,10 +240,24 @@ def order_dict(S, o, cards=False):
     if cards:
         d["detail"] = [{"code": st.code, "name": st.name, "back": bool(st.back),
                         "copies": o.entry(st.code).copies,
-                        "cards": [{"name": n, "number": st.cards[n].number, "count": o.entry(st.code).count(n)}
-                                  for n in st.names()]}
+                        "cards": order_cards(S, st, o)}
                        for st in (loaded.get(e.code.upper()) for e in o.sets) if st is not None]
     return d
+
+
+def order_cards(S, st, o):
+    """A row per card of the set: the count the order prints, and the render to show on hover --
+    the one the order prints as (its mode), else the other mode's, else none."""
+    out_dir = S.out_dir(st)
+    manifest = Manifest(out_dir)  # read once for the whole set
+    other = "plain" if o.mode == "styled" else "styled"
+    rows = []
+    for n in st.names():
+        every = renders.for_card(out_dir, n, st.card({"name": n}).render, manifest)
+        r = renders.chosen(every, o.mode) or renders.chosen(every, other)
+        rows.append({"name": n, "number": st.cards[n].number, "count": o.entry(st.code).count(n),
+                     "render": r["path"] if r else None})
+    return rows
 
 
 def card_summary(card):

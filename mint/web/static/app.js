@@ -1920,7 +1920,7 @@ async function order(r) {
       <div class="order-rows">${rows.map(c => `
         <div class="order-row ${c.count === 0 ? 'out' : c.count > 1 ? 'many' : ''}">
           <span class="mono num">${c.number == null ? '' : String(c.number).padStart(3, '0')}</span>
-          <span class="nm">${esc(c.name)}</span>
+          <a class="nm" href="#/set/${esc(d.code)}/card/${encodeURIComponent(c.name)}" ${c.render ? `data-src="${img(c.render, 320)}"` : 'title="not rendered yet"'}><span class="t">${esc(c.name)}</span>${c.render ? '<span class="peek"><img alt=""></span>' : ''}</a>
           <span class="qty">
             <button class="small" data-step="-1" data-code="${esc(d.code)}" data-card="${esc(c.name)}" ${c.count ? '' : 'disabled'}>−</button>
             <b>${c.count}</b>
@@ -1963,6 +1963,10 @@ async function order(r) {
     </div>
     ${o.detail.map(setBlock).join('') || '<div class="empty">no sets in this order yet — add one above</div>'}`;
 
+  // the thumbnail loads on the first hover, not with the page
+  document.querySelectorAll('.order-row .nm[data-src]').forEach(a => a.addEventListener('mouseenter', () => {
+    const im = a.querySelector('img'); if (im && !im.src) im.src = a.dataset.src;
+  }, {once: true}));
   $('#oq').oninput = e => { O.q = e.target.value; order(r); };
   if ($('#oadd')) $('#oadd').onchange = e => e.target.value && put('/sets', {code: e.target.value}, 'POST');
   $('#omode').onchange = e => put('', {mode: e.target.value});
