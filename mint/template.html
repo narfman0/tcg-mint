@@ -231,16 +231,17 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
 .flavor { margin-top: -1px; padding-top: 8px; position: relative; }
 .flavor::before { content: ""; position: absolute; left: 2px; right: 2px; top: 0; height: 1.4px;
   background: rgba(0,0,0,.22); box-shadow: 0 .4px 0 rgba(255,255,255,.6); }
-/* the P/T plate (frame.pt_plate draws it as an inline SVG: bowed ends, sloped walls lit from the upper right, a
-   flat face): the box sits at 310.5 with its right edge at 235.7, raised off the card by a lift shadow, the number
-   centred on the face and nudged down to sit where the real one does */
-.pt { position: absolute; right: 14.3px; top: 310.5px; height: 20px;
+/* the P/T plate (frame.pt_plate draws it as an inline SVG, with the shadow it casts to its left in a margin of
+   PT_SHADOW): 41.7 x 21.2 with its top at 309.5 and its right end at 235.7, a lip the face's colour pulled toward
+   white, the face the bar's colour; the number centred on the plate and nudged to sit where the real one does */
+.pt { position: absolute; right: 14.3px; top: 309px; transform: translateY(.5px); height: 21.2px;
   display: flex; align-items: center; justify-content: center;
-  --plate: color-mix(in srgb, var(--bar) 92%, #8c9296); --face: var(--bar);
-  filter: drop-shadow(-0.9px 0.7px 1px rgba(0,0,0,.55));
-  font-family: var(--title-font); font-size: 13.4px; font-weight: 700; text-align: center; }
-.pt .plate { position: absolute; inset: 0; height: 20px; }
-.pt span { position: relative; z-index: 1; top: calc(var(--pt-dy) + 1.4px); display: block; line-height: 1; }
+  --face: color-mix(in srgb, var(--bar) 90%, #fff); --lip: color-mix(in srgb, var(--face) 60%, #fff);
+  font-family: var(--title-font); font-size: 12.95px; font-weight: 700; text-align: center; }
+.pt .plate { position: absolute; left: -5px; top: 0; }
+/* the nudge is a transform, not an offset: Chromium snaps a relative offset's text to whole CSS px (a tenth of
+   a unit at print size is six device pixels), and the loyalty shield's number is placed the same way */
+.pt > span { position: relative; z-index: 1; transform: translateY(calc(var(--pt-dy) + 1px)); display: block; line-height: 1; }
 /* the dressing, each drawn by its knob: the art window's black line; linen grain and a rarity tint over the
    bars and text box (behind their text: the boxes isolate, the layers sit at z -1); the set symbol as
    a watermark behind the rules text; the holofoil oval under the text box on rares and mythics */

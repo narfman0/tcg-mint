@@ -602,52 +602,86 @@ def crown_paths():
     return path(0, CROWN_FOOT, CROWN_FOOT), path(1.3, CROWN_FOOT_O, CROWN_FOOT_O_R)
 
 
-def pt_plate(text):
-    """The P/T plate: an inline SVG under the number. Traced off the scans: 41.7 x 20 with bowed ends, raised off
-    the card, its rim a wall sloping 2.6 down into a flat face. Lit from the upper right: the wall ring is drawn
-    four times, clipped to the four mitred wedges, so the top and right walls are dark along their whole length
-    and the bottom and left walls light, each fading a little toward the face; a thin highlight along the outer
-    top and right edges. Wider for a long number (10/10); the CSS sizes the box to match."""
-    w = max(41.7, 6.6 * len(text) + 12)
-    h, rx, dx, dy = 20.0, 3.4, 2.6, 2.4
-    def shape(x0, y0, x1, y1, r):
-        cy = (y0 + y1) / 2
-        return (f"M{x0 + r:.1f} {y0:.1f} L{x1 - r:.1f} {y0:.1f} A{r:.1f} {cy - y0:.1f} 0 0 1 {x1 - r:.1f} {y1:.1f} "
-                f"L{x0 + r:.1f} {y1:.1f} A{r:.1f} {cy - y0:.1f} 0 0 1 {x0 + r:.1f} {y0:.1f} Z")
-    outer, face = shape(0, 0, w, h, rx), shape(dx, dy, w - dx, h - dy, rx - 1.2)
-    ring = f"{outer} {face}"
-    # the wedges, mitred from where the outer arc starts to where the face's arc starts (so the end walls take the
-    # whole bowed end, not a straight-sided slice), and each wall's shade: (points, colour, opacity outer, at the face)
-    a, b = rx, dx + rx - 1.2   # x of the outer arc's start and of the face arc's start, from either end
-    walls = [
-        (f"{a},0 {w - a},0 {w - b},{dy} {b},{dy}", "#000", .5, .32),
-        (f"{w - a},0 {w},0 {w},{h} {w - a},{h} {w - b},{h - dy} {w - b},{dy}", "#000", .38, .22),
-        (f"{a},{h} {w - a},{h} {w - b},{h - dy} {b},{h - dy}", "#fff", .5, .85),
-        (f"{a},0 0,0 0,{h} {a},{h} {b},{h - dy} {b},{dy}", "#fff", .3, .55),
-    ]
-    defs, paths = [], []
-    for i, (pts, col, o_out, o_in) in enumerate(walls):
-        vert = i in (0, 2)
-        x1, y1, x2, y2 = ("0", "0", "0", "1") if vert else ("0", "0", "1", "0")
-        if i == 2:  # the bottom wall: its outer edge is at the bottom
-            y1, y2 = "1", "0"
-        if i == 1:  # the right wall: its outer edge is at the right
-            x1, x2 = "1", "0"
-        defs.append(f'<linearGradient id="w{i}" x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}">'
-                    f'<stop offset="0" stop-color="{col}" stop-opacity="{o_out}"/>'
-                    f'<stop offset="1" stop-color="{col}" stop-opacity="{o_in}"/></linearGradient>'
-                    f'<clipPath id="c{i}"><polygon points="{pts}"/></clipPath>')
-        paths.append(f'<path d="{ring}" fill-rule="evenodd" fill="url(#w{i})" clip-path="url(#c{i})"/>')
-    svg = (f'<svg class="plate" viewBox="0 0 {w:.1f} {h:.1f}" width="{w:.1f}" height="{h:.1f}" style="width:{w:.1f}px">'
-           f'<defs>{"".join(defs)}<linearGradient id="pte" x1="1" y1="0" x2="0" y2="1">'
-           f'<stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>'
-           f'<stop offset="1" stop-color="#000" stop-opacity=".45"/></linearGradient></defs>'
-           f'<path d="{outer}" fill="var(--plate)"/>{"".join(paths)}'
-           f'<path d="{outer}" fill="none" stroke="url(#pte)" stroke-width=".9"/>'
+# The P/T plate, traced off twenty-two M15 printings' scans (2017-2024, at 2.98 px per unit, each registered
+# to our frame by its band edges; the parts' edges are the half-way crossings of the brightness profiles across
+# them, their shades the medians): a raised pill, its top at 309.5 and its right end at 235.7, lit from the right.
+#   - a lip all round, the face's colour pulled 40% toward white (1.02-1.28 times the face's brightness, by the
+#     face's colour): 2.3 at the left end, 1.8 along the top, 2.4 at the right end, 1.7 along the foot; the ends
+#     bow out as half-ellipses 5.5 deep (the lower-left corner traces 194.4 at 324, 195.5 at 326.5, 196.5 at
+#     328.5, from the end's 194.0 at mid-height); the face is that silhouette inset by the lip, so the lip keeps
+#     its width round the ends
+#   - inside it the face, the title bar's colour, recessed: a dark wall 2.0 deep along its top at 0.38 of the
+#     face and 1.3 down its right at 0.5, one band that wraps the top-right corner and tapers away at the other
+#     two (a line too faint to measure down the left, 0.97; nothing along the foot); its edges are soft, the wall
+#     climbing back to the lip over a unit (85, 90, 103, 128, 163, 190 across the right end)
+#   - the lip is lit as a bevel: 1.15-1.2 of the face along the top and the foot, 1.03 down the ends
+#   - under the foot's lip a dark bevel 1.7 deep, the lip's colour falling from 0.9 to 0.3 of itself (329.0-330.7:
+#     207, 127, 88, 61 on the grey plate), the outer silhouette 21.2 tall with it
+#   - a soft shadow cast left over the text box, 4 wide and 0.45-0.55 dark at the plate's edge, none above it
+#   - the digits Beleren Bold with caps 9.4 tall (314.9-324.5), centred on the plate (their ink's centre 0.3
+#     above the plate's), a 10/10 or 11/11 set on the same plate
+# The 2003 frame's plate (design modern) is the same object without the top lip, 45 wide, and under its lip no
+# bevel but a shadow cast on the band, 3 deep, darkest at the lip (Grizzly Bears: 60, 38 on a band of 64) and
+# gone by its end; 22 tall with it (modern.css places it).
+PT_GEOMETRY = {   # w, h: the silhouette with its foot; rx: how deep its ends bow; lip: left, top, right, foot;
+                  # shade: the foot's depth, its black's opacity at the lip and at its end, and whether it is a
+                  # bevel of the lip's colour (True) or a shadow on whatever lies under it
+    "m15":    dict(w=41.7, h=21.2, rx=5.5, lip=(2.3, 1.8, 2.4, 1.7), shade=(1.7, .1, .72, True)),
+    "modern": dict(w=45.0, h=22.0, rx=5.5, lip=(2.4, 0.0, 2.4, 1.7), shade=(3.0, .62, .0, False)),
+}
+PT_SHADOW = 5.0   # the margin left of the plate the cast shadow is drawn in, inside the SVG
+
+
+def pt_plate(text, design="m15"):
+    """The P/T plate for `text` in `design`'s geometry (PT_GEOMETRY; the base plate for any other design): an
+    inline SVG under the number, the shadow it casts in a margin to its left. Wider than printed only for a text
+    longer than 10/10; the CSS sizes the box to match. Each digit is wrapped so a design whose title face has
+    old-style figures can set them lining (osf-x: the x-height forms 0 1 2; osf-d: the descending 3 4 5 7 9)."""
+    g = PT_GEOMETRY.get(design, PT_GEOMETRY["m15"])
+    w, h, rx, (sd, s0, s1, bevel) = g["w"], g["h"], g["rx"], g["shade"]
+    if len(text) > 5:
+        w = max(w, 6.6 * len(text) + 9)
+    l, t, r, b = g["lip"]
+
+    def shape(x0, y0, x1, y1, rl, rr):
+        """A box with half-ellipse ends, bowed rl deep at the left and rr at the right."""
+        ry = (y1 - y0) / 2
+        return (f"M{x0 + rl:.1f} {y0:.1f} L{x1 - rr:.1f} {y0:.1f} A{rr:.1f} {ry:.1f} 0 0 1 {x1 - rr:.1f} {y1:.1f} "
+                f"L{x0 + rl:.1f} {y1:.1f} A{rl:.1f} {ry:.1f} 0 0 1 {x0 + rl:.1f} {y0:.1f} Z")
+    lipb = h - sd                       # the lip's foot, where the bevel or the shadow begins
+    outer = shape(0, 0, w, h, rx, rx)
+    plate = shape(0, 0, w, lipb, rx, rx)   # the lip's silhouette, the foot below it
+    # the face: the plate inset by the lip (its ends' bow shrinks by the lip's width there, so the lip keeps
+    # one width round the ends); the wall: the band between the face and the face inset again 2.0 along the top
+    # and 1.3 at the right, so it wraps the top-right corner and thins to nothing at the top-left and the foot
+    fx1 = w - r                         # the face's right edge
+    face = shape(l, t, fx1, lipb - b, rx - l, rx - r)
+    inner = shape(l, t + 2.0, fx1 - 1.3, lipb - b, rx - l, rx - r - 1.3)
+    m = PT_SHADOW
+    svg = (f'<svg class="plate" viewBox="{-m:.1f} 0 {w + m:.1f} {h:.1f}" width="{w + m:.1f}" height="{h:.1f}">'
+           f'<defs><clipPath id="ptf"><path d="{face}"/></clipPath><clipPath id="pto"><path d="{outer}"/></clipPath>'
+           f'<filter id="ptb" x="-30%" y="-20%" width="160%" height="140%"><feGaussianBlur stdDeviation="1.4"/></filter>'
+           f'<filter id="ptw" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation=".32"/></filter>'
+           f'<linearGradient id="ptl" x1="0" y1="0" x2="1" y2="0">'
+           f'<stop offset="0" stop-color="#000" stop-opacity=".13"/><stop offset="{(l + 2.5) / w:.3f}" stop-color="#000" stop-opacity="0"/>'
+           f'<stop offset="{1 - (r + 2.5) / w:.3f}" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".11"/>'
+           f'</linearGradient>'
+           f'<linearGradient id="pts" x1="0" y1="0" x2="0" y2="1">'
+           f'<stop offset="0" stop-color="#000" stop-opacity="{s0}"/><stop offset="1" stop-color="#000" stop-opacity="{s1}"/>'
+           f'</linearGradient></defs>'
+           f'<path d="{plate}" transform="translate(-1.6 0)" fill="#000" fill-opacity=".6" filter="url(#ptb)"/>'
+           f'<path d="{outer if bevel else plate}" fill="var(--lip)"/>'
+           f'<path d="{plate}" fill="url(#ptl)"/>'
+           f'<rect x="0" y="{lipb:.1f}" width="{w:.1f}" height="{sd:.1f}" fill="url(#pts)" clip-path="url(#pto)"/>'
            f'<path d="{face}" fill="var(--face)"/>'
-           f'<path d="{face}" fill="none" stroke="#000" stroke-opacity=".22" stroke-width=".4"/>'
+           f'<g clip-path="url(#ptf)" filter="url(#ptw)">'
+           f'<path d="{face} {inner}" fill-rule="evenodd" fill="#000" fill-opacity=".5"/>'
+           f'<rect x="{l:.1f}" y="{t:.1f}" width="{fx1 - l:.1f}" height="2" fill="#000" fill-opacity=".22"/></g>'
            f'</svg>')
-    return f'<div class="pt" style="width:{w:.1f}px">{svg}<span>{esc(text)}</span></div>'
+    digits = "".join(
+        f'<span class="{"osf-x" if c in "012" else "osf-d" if c in "34579" else "osf"}">{c}</span>' if c.isdigit() else esc(c)
+        for c in text)
+    return f'<div class="pt" style="width:{w:.1f}px">{svg}<span>{digits}</span></div>'
 
 
 # The planeswalker's silver: one gradient shared by every badge and the loyalty shield on the page, lit from above
@@ -1293,7 +1327,7 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
     # art that much shorter (measured on Jace, the Mind Sculptor A25 62, Gideon Blackblade WAR 13 and Chandra,
     # Awakened Inferno M20 127, against the three-row Chandra, Flameshaper, Karn and Teferi)
     tall = layout == "planeswalker" and loyalty_rows(card) >= 4
-    pt = pt_plate(f'{card["power"]}/{card["toughness"]}') if card.get("power") is not None else ""
+    pt = pt_plate(f'{card["power"]}/{card["toughness"]}', design) if card.get("power") is not None else ""
     legendary = "legendary" in (card.get("frame_effects") or []) or card["type_line"].startswith("Legendary")
     # the collector line carried through from the printed card: its number and set in a wide sans, the
     # artist in the title face as small caps after a brush; the studio's credit on the right, in the rules

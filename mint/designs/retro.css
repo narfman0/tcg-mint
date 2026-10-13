@@ -194,10 +194,15 @@
 
 /* --- the power and toughness: the numerals alone, white with the drop, no plate, no lift; the box keeps the plate's
    inline width (frame.pt_plate) and the numerals sit at its right end, so a 10/10 ends where a 5/5 does --- */
-.design-retro .pt { right: 21.8px; top: 314.8px; height: 13px; justify-content: flex-end; filter: none;
-  font-size: 13.8px; color: var(--ink-plate); text-shadow: var(--drop); }
+.design-retro .pt { right: 21.8px; top: 314px; transform: none; height: 13px; justify-content: flex-end;
+  font-size: 15.6px; color: var(--ink-plate); text-shadow: var(--drop); }
 .design-retro .pt .plate { display: none; }
-.design-retro .pt span { top: 0; }
+.design-retro .pt > span { transform: none; }
+/* Almendra's figures are old-style and the prints' lining (Llanowar Elves 7ED's 1/1 has caps 10.3 tall,
+   315.8-326.1): the x-height forms 0 1 2 stretched to cap height, the dropped 3 4 5 7 9 lifted 0.115em */
+.design-retro .pt .osf-x { display: inline-block; transform: translateY(var(--osf-lift)) scaleY(1.31); transform-origin: 0 100%; }
+.design-retro .pt .osf-d { position: relative; top: -0.115em; }
+.design-retro .pt { --osf-lift: 1.65px; }
 
 /* --- a planeswalker: the frame never had one (the one retro-frame planeswalker printing, Teferi, Time Raveler SLD
    252, writes its loyalty out as prose in a plain box, a pastiche the oracle text cannot give). Rendered anyway

@@ -46,10 +46,9 @@
      edge is a bevel about 1.7 wide: a light strip along the top (14.7-16.3, 155 to the band's 100) and the right
      (231.8-233.4), a dark one down the left (16.5-18.4, 33) and along the foot (317.2-318.7, 30) -- an emboss lit
      from the upper right, as M15's plate is, but a crisp strip rather than a soft shadow;
-   - the P/T box's face runs 187.4-229.2 by 314.2-330.5 with a light rim on its left and top, a dark foot to
-     333.4 and a ring of the plate's colour 2 wide around it over the text box and the band: the M15 plate (41.7 by
-     20, frame.pt_plate) is within 4 of its face in width and 1.7 in height and stays, moved to 312 with its right
-     edge at 229.6, on a ring. It reads a little heavier than the print's, whose rim is light where the ring is dark;
+   - the P/T box is the M15 plate's object in its own geometry (frame.PT_GEOMETRY modern): 186.5-231.5 by
+     311.3-330.3, its dark line along the top at the very edge (no lip above it), lit rims 2.4 at the ends and 1.7
+     along the foot, and under the foot a soft shadow 3 deep on the band;
    - the collector block is two lines on the bottom band, the artist (a brush, then Matrix Bold) with its caps at
      322.4-327.8 and the copyright line at 332.0-335.7, both from x 19.8, in black ink on every kind but black,
      land and colourless, whose bands are dark at the foot and print white;
@@ -170,13 +169,20 @@
 .design-modern .titlebar { top: 18px; height: 20px; padding-right: 5px; }
 .design-modern .typebar { top: 197px; height: 19px; padding: 0 4.5px 0 6px; }
 /* the text: Matrix Bold on the prints is a size up from M15's Beleren -- Grizzly Bears' name has caps 9.1 tall
-   (23.9-33.0) to our 13.1 face's 7.7, its type line 7.2 (203.3-210.5) to our 6.4, the P/T digits 9.1
-   (317.0-326.1) to our 8.4 -- and the baselines sit at 33.0 in the title bar, 210.5 in the type bar, 326.1 in
-   the P/T box */
-.design-modern { --title-dy: -1.3px; --type-dy: -0.6px; --pt-dy: -2.5px; }
+   (23.9-33.0) to our 13.1 face's 7.7, its type line 7.2 (203.3-210.5) to our 6.4, the P/T digits 9.4
+   (316.2-325.6, set lining below) -- and the baselines sit at 33.0 in the title bar, 210.5 in the type bar,
+   325.6 in the P/T box */
+.design-modern { --title-dy: -1.3px; --type-dy: -0.6px; --pt-dy: -4.0px; }
 .design-modern .name { font-size: 15.4px; }
 .design-modern .type { font-size: 11.8px; }
-.design-modern .pt { font-size: 15px; }
+.design-modern .pt { font-size: 15.5px; }
+/* Matrix Bold in fonts/ carries old-style figures only, and the prints' P/T is lining (Ulamog's 10/10, the
+   bears' 2/2, caps 9.1 tall): 0, 1 and 2 are x-height forms, stretched to cap height from the baseline; 3, 4,
+   5, 7 and 9 are the lining glyphs dropped 0.167em, lifted back; 6 and 8 are lining already. Their widths are
+   the old-style forms' own: the bears' 2/2 spans 17.5 to the print's 19.4, Ulamog's 10/10 31 to its 29.8 */
+.design-modern .pt .osf-x { display: inline-block; transform: translateY(var(--osf-lift)) scaleY(1.36); transform-origin: 0 100%; }
+.design-modern .pt .osf-d { position: relative; top: -0.167em; }
+.design-modern .pt { --osf-lift: .85px; }
 /* the art window, its black line the base's ring */
 .design-modern .art { left: 21px; top: 41px; width: 208px; height: 153px; }
 /* the text box: lower and shorter, a dark line along its top and its right wall, a light rim down its left and
@@ -210,12 +216,11 @@
   clip-path: path('M-20 0 H200 V113.4 A38 8.5 0 0 1 162 121.9 H38 A38 8.5 0 0 1 0 113.4 V121.9 H-20 Z'); }
 .design-modern.planeswalker.tall.stamped .pl-text {
   clip-path: path('M0 0 H219.6 V116.6 C219.6 128.6 182.4 131.6 170.4 131.6 H49.2 C37.2 131.6 0 128.6 0 116.6 Z'); }
-/* the P/T plate, moved down and in, on a ring of the plate's colour 2 wide; the digits ride high in the printed
-   box (their centre 8 below its top, the foot of the box a 3-unit shadow): the nudges above, calibrated on
-   Grizzly Bears' render against its scan, put each baseline on the print's */
-.design-modern .pt { top: 312px; right: 20.4px; }
-.design-modern .pt::before { content: ""; position: absolute; inset: -2px; z-index: -1; border-radius: 6px / 50%;
-  background: var(--pinline); }
+/* the P/T plate in the 2003 frame's geometry (frame.PT_GEOMETRY modern: no top lip, 45 wide, 19 tall, a shadow
+   3 deep under its foot), its top at 311.3 and its right end at 231.5 (Grizzly Bears 8ED, Runeclaw Bear M11,
+   Shivan Dragon 10E, Oona SHM, Air Elemental, Ulamog V11: the dark line along the top 311.3-313.3, the lit rim
+   along the foot to 330.3, the rims 2.4 at the ends); the digits centred on it, as printed (2/2's 316.1-325.3) */
+.design-modern .pt { top: 311px; right: 18.5px; height: 22px; }
 /* the collector block on the bottom band: from x 19.8, its two lines pitched 7.9 apart with the lower's baseline
    at 335.7, in the kind's ink; the artist's name a size up, as the print's Matrix Bold is */
 .design-modern .footer { left: 20px; right: 20px; bottom: 11.5px; line-height: 1.36; color: var(--foot-ink); }
