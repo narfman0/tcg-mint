@@ -105,7 +105,7 @@
    (frame.M15_LAYOUTS). */
 .design-modern { --title-font: 'Matrix Bold', 'Beleren', 'Almendra', serif; --foot-ink: #000; }
 /* the palette: the band, the flat plate, the bars and the text box, by the card's kind; the edge tone (the
-   other-face strip, an adventure's box) a darker plate. A two-colour card stands aside (.pair): the base has
+   modal foot strip, an adventure's box) a darker plate. A two-colour card stands aside (.pair): the base has
    already put both its colours in these variables and the design has no second colour of its own */
 .design-modern.kind-W:not(.pair) { --frame: #cac2af; --pinline: #dcd9d3; --bar: #dedbd6; --box: #ddd8d4; }
 .design-modern.kind-U:not(.pair) { --frame: #678eb9; --pinline: #306195; --bar: #b1becc; --box: #d1d5df; }

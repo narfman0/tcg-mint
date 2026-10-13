@@ -17,10 +17,16 @@ Beyond the normal card the frame knows the other shapes a deck holds:
 planeswalkers (loyalty badges per ability, the loyalty shield), sagas
 (chapters down the left, the art the full height on the right), classes (the
 mirror, level bands on the right), adventures (the adventure in its own box
-beside the creature's text), split cards and battles (sideways, two half
-cards or the art beside the text), and both faces of transform and modal
-double-faced cards, each marked with its icon and naming the other face at
-the foot of the text box (`--faces` renders the backs). Colour follows the
+beside the creature's text), split cards and battles (sideways, read with
+the card's top to the left as the real ones are; a battle stacks its bars, its
+art and its text the full width, the defense shield bottom right), and both
+faces of transform and modal double-faced cards, drawn as the printed cards
+draw them: the badge at the title bar's end with the printing's own icons
+(the plain triangles, sun and moon, Ixalan's compass, Origins' spark, Kamigawa's
+fan), a plain transform back's badge at the bar's right end, the colour
+indicator before a back face's type line, a transform front's grey note of
+its back's power and toughness, and a modal card's pointed foot strip naming
+the other face's type and cost (`--faces` renders the backs). Colour follows the
 real cards too: a land that makes one colour takes that colour's pinline,
 and a two-colour card — a dual land, a fetch land by the basic types it
 finds, a spell whose every coloured pip is hybrid — runs its left colour

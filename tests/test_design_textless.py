@@ -164,7 +164,7 @@ def test_layouts_stay_m15(art, tmp_path, browser):
     """A saga in the design renders the M15 frame: its text box is still there."""
     out, sizes = render("saga", art, tmp_path, browser)
     im = Image.open(out).convert("RGB")
-    assert sizes["text"] == 9.6 and px(im, 60, 250) != (0, 0, 0)
+    assert sizes["text"] == 11 and px(im, 60, 250) != (0, 0, 0)
 
 
 @pytest.mark.render

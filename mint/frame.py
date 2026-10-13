@@ -56,7 +56,8 @@ FRAMES = {
     "G": ("#578265", "#3b5844", "#b8cdc3", "#2f5a3b", "#d3e5da", "#0f724a"),
     "gold": ("#c7b56d", "#877b4a", "#d0bf84", "#7d6530", "#f2ecd5", "#e9d37c"),
     "artifact": ("#91afbc", "#62777f", "#cedadf", "#5d6a70", "#cfdbdf", "#d8e1de"),
-    "land": ("#bd9f86", "#806c5b", "#d3b978", "#6b5a42", "#f2edd5", "#e4d575"),
+    # a plain land's bars and box the stone grey off Field of Ruin (MOC), Reliquary Tower (SOC) and Wastes (EOC)
+    "land": ("#bd9f86", "#806c5b", "#cdc7c4", "#6b5a42", "#cdc9c5", "#e4d575"),
     "C": ("#e2dad6", "#9a9591", "#bcb3ae", "#767b71", "#b3afad", "#cfd0ce"),
 }
 
@@ -66,6 +67,24 @@ FRAMES = {
 # three scans; a hybrid spell's text box is the colour's own. The bar is the median of ten scans (#d1cac5 on
 # RVR, #dbcfd3 on MH2, #d9d4d2 on UMA).
 PAIR_BAR = "#d3cbc7"
+
+# The back face of a double-faced card prints its bars in a deep version of its colour, lettered in white, and a
+# greyer text box -- the one tell of a back in hand. Medians off Insectile Aberration (INR 60), Lavaglide Pathway
+# (ZNR 264), Harnfel (KHM 123), Embrose (STX 158), Tovolar's Packleader (MID 204), Architect of Restoration
+# (NEO 34), Ormendahl (INR 287), Agadeem, the Undercrypt (ZNR 90), Explore the Vastlands (STX 6) and The Broken
+# Sky (MOM 241), by kind: (bar, box, ink). Magic Origins' backs (originpwdfc) keep the light bars.
+BACK = {
+    "W": ("#baada8", "#d9cfca", "#fff"), "U": ("#1188b0", "#aac5d8", "#fff"), "B": ("#6a6669", "#b8b3ba", "#fff"),
+    "R": ("#c34d35", "#e4c6c2", "#fff"), "G": ("#42533e", "#a4a9a9", "#fff"), "gold": ("#b39e4e", "#d1cec6", "#000"),
+    "artifact": ("#999296", "#a9a7b1", "#fff"), "land": ("#6c6970", "#bebbc2", "#fff"), "C": ("#999296", "#a9a7b1", "#fff"),
+}
+
+
+def dark_back(card):
+    """Whether a face prints the back's dark bars: the second face of a transform or modal card, except
+    Magic Origins' planeswalker backs."""
+    fam = dfc_family(card)
+    return bool(fam) and card.get("face_index", 0) == 1 and fam[0] != "spark"
 DUAL_BOX = {"W": "#f5e4ba", "U": "#b2cde8", "B": "#aba2a3", "R": "#eb9f83", "G": "#bdd6c2"}
 BASIC_TYPES = {"Plains": "W", "Island": "U", "Swamp": "B", "Mountain": "R", "Forest": "G"}
 
@@ -862,8 +881,8 @@ LEVEL_RE = re.compile(r"^(\{[^}]+\})+: Level (\d+)$")
 
 def layout_of(card):
     """Which frame a record wants: planeswalker, saga, class, adventure, split, battle, or normal.
-    Transform and modal faces come through as normal (the back face is its own record) with their
-    double-faced markers; a battle is a transform front that is a Battle."""
+    Transform and modal faces come through as normal (the back face is its own record), wearing their
+    badges and what they say of the other face; a battle is a transform front that is a Battle."""
     t = card.get("type_line") or ""
     layout = card.get("layout") or "normal"
     if layout == "split":
@@ -899,6 +918,22 @@ def glyph_uri(uri):
     return head + "," + base64.b64encode(svg).decode()
 
 
+# a saga's chapter badge: a hexagon 14 x 17 on the spine down the column's left, light with a dark edge, the
+# numeral black on it (The Restoration of Eiganjo, NEO 34)
+HEXAGON = ('<svg viewBox="0 0 14 17"><path d="M7 .6 L13.4 4.6 V12.4 L7 16.4 L.6 12.4 V4.6 Z" fill="var(--bar)" '
+           'stroke="#000" stroke-width=".8"/><path d="M7 2 L12.2 5.3 V11.7 L7 15 L1.8 11.7 V5.3 Z" fill="none" '
+           'stroke="rgba(255,255,255,.7)" stroke-width=".7"/></svg>')
+
+
+def defense_html(text):
+    """A battle's defense: a twelve-point black starburst with a white edge, the number white on it, 23 across
+    (Invasion of Tolvada, MOM 241)."""
+    pts = " ".join(f"{11.5 + (11 if i % 2 == 0 else 8.6) * math.cos(a):.2f},{11.5 + (11 if i % 2 == 0 else 8.6) * math.sin(a):.2f}"
+                   for i, a in ((i, math.pi * i / 12) for i in range(24)))
+    return (f'<div class="defense"><svg viewBox="0 0 23 23"><polygon points="{pts}" fill="#141414" stroke="#fff" '
+            f'stroke-width=".9" stroke-linejoin="round"/></svg><span>{esc(text)}</span></div>')
+
+
 def render_text(card, symbols, flavor=None, layout="normal"):
     def syms(s):
         return re.sub(r"\{[^}]+\}", lambda m: f'<img class="sym" src="{symbols.data_uri(m.group(0))}">', esc(s))
@@ -921,7 +956,7 @@ def render_text(card, symbols, flavor=None, layout="normal"):
         for p in text.split("\n") if text else []:
             m = CHAPTER_RE.match(p)
             if m:
-                nums = "".join(f"<b>{n}</b>" for n in m.group(1).split(", "))
+                nums = "".join(f"<b>{HEXAGON}<i>{n}</i></b>" for n in m.group(1).split(", "))
                 paras.append(f'<p class="chapter"><span class="numeral">{nums}</span><span>{syms(p[m.end():])}</span></p>')
             elif p.startswith("("):
                 paras.append(f'<p class="reminder">{syms(p)}</p>')
@@ -963,8 +998,156 @@ def mana(symbols, cost):
     return "".join(f'<span class="pip"><img src="{symbols.data_uri(m)}"></span>' for m in re.findall(r"\{[^}]+\}", cost or ""))
 
 
-# the double-faced markers: what sits before the name, and what the other face is called at the foot
-DFC_ICON = {("transform", 0): "☀", ("transform", 1): "☾", ("modal_dfc", 0): "▲", ("modal_dfc", 1): "▼"}
+# The double-faced badge: a black tab fused to the title bar's end, a white-ringed disc in it carrying the
+# face's icon. Measured off Delver of Secrets (INR 60), Tovolar's Huntmaster (MID 204) and Agadeem's Awakening
+# (ZNR 90): the tab 11-38.5 x 15-40.5, the disc 19.5 across centred on (25.2, 27), the name starting at 42.3.
+# Which icons a card wears is its printing's frame effect; a transform card with none takes the plain
+# triangles, and its back face carries the badge at the bar's right end, where the cost would be, as every
+# such printing since Eldraine does. The older families keep both badges on the left. A modal card's badge
+# is a white teardrop pointing off the bar's end, its icon drawn in black on it.
+DFC_FAMILIES = {  # frame effect -> (front icon, back icon, the back's badge on the right)
+    "sunmoondfc": ("sun", "moon", False),
+    "waxingandwaningmoondfc": ("waxing", "waning", False),
+    "mooneldrazidfc": ("moon", "eldrazi", False),
+    "compasslanddfc": ("compass", "land", False),
+    "originpwdfc": ("spark", "planeswalker", False),
+    "fandfc": ("fan", "shell", False),
+}
+GENERIC_DFC = ("up", "down", True)
+MODAL_DFC = ("modal-front", "modal-back", False)
+
+# the icons, white in a 20 x 20 box whose disc is centred on (10, 10); the modal pair black in the teardrop's
+# 21 x 15 box, its disc centred on (12.5, 7.5)
+DFC_ICONS = {
+    "up": '<path d="M10 5.5 L15.1 13.5 H4.9 Z"/>',
+    "down": '<path d="M10 14.5 L15.1 6.5 H4.9 Z"/>',
+    # the sun: a disc inside a ring whose twelve teeth point in at it
+    "sun": ('<circle cx="10" cy="10" r="4.2"/><circle cx="10" cy="10" r="6.7" fill="none" stroke="#fff" stroke-width="1.2"/>'
+            + "".join(f'<path d="M{10 + 6.4 * math.cos(a - .14):.2f} {10 + 6.4 * math.sin(a - .14):.2f} '
+                      f'L{10 + 4.9 * math.cos(a):.2f} {10 + 4.9 * math.sin(a):.2f} '
+                      f'L{10 + 6.4 * math.cos(a + .14):.2f} {10 + 6.4 * math.sin(a + .14):.2f} Z"/>'
+                      for a in (math.pi * i / 6 for i in range(12)))),
+    "moon": '<path d="M12.2 3.3 A6.9 6.9 0 1 0 12.2 16.7 A5.4 5.4 0 1 1 12.2 3.3 Z"/>',
+    "waxing": '<path d="M7.8 3.3 A6.9 6.9 0 1 1 7.8 16.7 A5.4 5.4 0 1 0 7.8 3.3 Z"/>',
+    "waning": '<path d="M12.2 3.3 A6.9 6.9 0 1 0 12.2 16.7 A5.4 5.4 0 1 1 12.2 3.3 Z"/>',
+    "eldrazi": ('<circle cx="10" cy="10" r="6.6" fill="none" stroke="#fff" stroke-width="1.3"/>'
+                '<circle cx="10" cy="10" r="1.6"/>'
+                + "".join(f'<path d="M10 10 L{10 + 6.6 * math.cos(a):.2f} {10 + 6.6 * math.sin(a):.2f}"'
+                          f' stroke="#fff" stroke-width="1.3"/>' for a in (-math.pi / 2, math.pi / 6, 5 * math.pi / 6))),
+    "compass": '<path d="M10 2.6 L11.7 8.3 L17.4 10 L11.7 11.7 L10 17.4 L8.3 11.7 L2.6 10 L8.3 8.3 Z"/>',
+    "land": '<path d="M3 15 L8 7.4 L11 11.4 L13.4 8.6 L17 15 Z"/>',
+    # Origins' spark: a dome over a drop
+    "spark": '<path d="M3.6 9.2 A6.4 6.4 0 0 1 16.4 9.2 L10 16.4 Z"/>',
+    "planeswalker": '<path d="M3.4 15.6 L4 9.4 L5.9 12.2 L7 6.4 L8.6 10.6 L10 2.8 L11.4 10.6 L13 6.4 L14.1 12.2 L16 9.4 L16.6 15.6 Z"/>',
+    "fan": ('<path d="M10 16.2 L4.6 5.4 A6.9 6.9 0 0 1 15.4 5.4 Z"/>'
+            '<path d="M10 16.2 L7.2 4.4 M10 16.2 L10 3.1 M10 16.2 L12.8 4.4" stroke="#000" stroke-width=".8"/>'),
+    "shell": ('<path d="M10 16.4 L3.2 8.6 A7.6 7.6 0 0 1 16.8 8.6 Z"/>'
+              '<path d="M10 16.4 L5 6 M10 16.4 L10 2.6 M10 16.4 L15 6" stroke="#000" stroke-width=".8"/>'),
+    "modal-front": '<path d="M12.5 4.1 L16.4 10.9 H8.6 Z"/>',
+    "modal-back": '<path d="M7 10.3 H12.2 L9.6 5.2 Z M12.8 4.7 H18 L15.4 9.8 Z"/>',
+}
+TEARDROP = "M0 7.5 L8 1.5 A7.5 7.5 0 1 1 8 13.5 Z"
+
+
+def dfc_family(card):
+    """(front icon, back icon, back badge on the right) for a double-faced card, None for any other."""
+    layout = card.get("layout")
+    if layout == "modal_dfc":
+        return MODAL_DFC
+    if layout != "transform":
+        return None
+    for effect in card.get("frame_effects") or []:
+        if effect in DFC_FAMILIES:
+            return DFC_FAMILIES[effect]
+    return GENERIC_DFC
+
+
+def badge_side(card):
+    """Which end of the title bar a face's badge sits at: "left", "right", or None for a single-faced card."""
+    fam = dfc_family(card)
+    if not fam:
+        return None
+    return "right" if card.get("face_index", 0) == 1 and fam[2] else "left"
+
+
+def badge_html(card):
+    """The double-faced badge for a face, "" for a single-faced card (template.html .badge)."""
+    fam = dfc_family(card)
+    if not fam:
+        return ""
+    icon = fam[card.get("face_index", 0)]
+    if icon.startswith("modal"):
+        svg = (f'<svg viewBox="0 0 21 15"><path d="{TEARDROP}" fill="#fff" stroke="#000" stroke-width=".7"/>'
+               f'<g fill="#000">{DFC_ICONS[icon]}</g></svg>')
+        return f'<div class="badge modal {badge_side(card)}">{svg}</div>'
+    svg = (f'<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.3" fill="#000" stroke="#fff" stroke-width="1"/>'
+           f'<g fill="#fff">{DFC_ICONS[icon]}</g></svg>')
+    return f'<div class="badge {badge_side(card)}">{svg}</div>'
+
+
+# the colour indicator: the disc before a back face's type line that says what colour a card with no mana cost
+# is, 7 across at x 16.5-23.5 (Delver's back, INR 60), each colour its pinline's hue, a pie of them for more
+def indicator_html(card):
+    cols = [c for c in (card.get("color_indicator") or []) if c in FRAMES]
+    if not cols:
+        return ""
+    if len(cols) == 1:
+        fill = FRAMES[cols[0]][5]
+    else:
+        step = 100 / len(cols)
+        fill = "conic-gradient(from -90deg, " + ", ".join(
+            f"{FRAMES[c][5]} {i * step:.1f}% {(i + 1) * step:.1f}%" for i, c in enumerate(cols)) + ")"
+    return f'<span class="ci" style="background: {fill}"></span>'
+
+
+def type_word(type_line):
+    """What a modal card's foot strip calls the other face: the last word of its type line (Land, Artifact,
+    the Warlock of "Legendary Creature — Human Warlock")."""
+    return (type_line or "").split()[-1] if type_line else ""
+
+
+def mana_line(face):
+    """The one line of a land's text that makes mana ("{T}: Add {B}."), None for any other face."""
+    for line in (face.get("oracle_text") or "").split("\n"):
+        if re.match(r"\{T\}: Add ", line):
+            return line
+    return None
+
+
+def strip_colours(face):
+    """The modal foot strip's colours for the face it names: (fill, ink). The front's strip takes the back's
+    frame colour and letters in white; the back's takes the front's text-box tint and letters in black
+    (Agadeem's Awakening and Birgi, ZNR 90 and KHM 123, and the Pathways). A land or colourless back
+    gives a dark grey strip."""
+    kind = land_tint(face) or frame_kind(face)
+    if face.get("face_index", 0) == 1:
+        return ("#4c4a46", "#fff") if kind in ("land", "C", "artifact") else (FRAMES[kind][0], "#000" if kind == "W" else "#fff")
+    return (FRAMES[kind][4], "#000")
+
+
+def strip_html(card, other, symbols):
+    """The foot strip of a modal double-faced card: the other face's type word and its mana cost, or a land's
+    mana line, in a pointed bar at the text box's foot (template.html .strip). Measured off ZNR 90 and KHM 123:
+    10-114 x 310-322, a notch at its left end, the point 5.5 long."""
+    fill, ink = strip_colours(other)
+    line = mana_line(other) if "Land" in (other.get("type_line") or "") else None
+    if line:
+        body = re.sub(r"\{[^}]+\}", lambda m: f'<img class="sym" src="{symbols.data_uri(m.group(0))}">', esc(line))
+        right = f'<span class="line">{body}</span>'
+    else:
+        right = f'<span class="cost">{mana(symbols, other.get("mana_cost"))}</span>'
+    shade = "light" if ink == "#000" else "dark"
+    return (f'<div class="strip {shade}" style="--strip: {fill}; --strip-ink: {ink}"><div class="fill"></div>'
+            f'<span class="notch"></span><b>{esc(type_word(other.get("type_line")))}</b>{right}</div>')
+
+
+def ghost_html(card, other):
+    """A transform front's small grey note of its back's power and toughness, at the text box's foot beside
+    the P/T plate (Delver of Secrets, INR 60; a saga's at its column's foot): "" for any other face."""
+    if (card.get("layout") != "transform" or card.get("face_index", 0) != 0 or not other
+            or other.get("power") is None):
+        return ""
+    return f'<div class="ghost-pt">{esc(other["power"])}/{esc(other["toughness"])}</div>'
 
 
 # the pinline plate: the normal frame's four elements' pinlines, painted before them (template.html .pinlines),
@@ -974,34 +1157,35 @@ PINLINES = "".join(f'<div class="pinlines {layer}">'
                    + "</div>" for layer in ("shade", "light"))
 
 
-def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer="", crown="", set_icon=None):
+def body_html(card, symbols, layout, flavor, pt_html, other_face=None, crown="", set_icon=None):
     """The markup inside .card for a layout: the bars, the art window, the text box and its
-    companions. Split builds two half cards; battle and split lie sideways (the .turn box)."""
-    ident = card.get("layout"), card.get("face_index", 0)
-    icon = f'<span class="dfc">{DFC_ICON[ident]}</span>' if ident in DFC_ICON else ""
+    companions. Split builds two half cards; battle and split lie sideways (the .turn box). A
+    double-faced card's face carries its badge, a back face its colour indicator, and what it says of
+    the other face: a modal card's foot strip, a transform front's ghost of its back's P/T."""
+    badge = badge_html(card)
     def title(c):
-        return (f'<div class="bar titlebar"><span class="name">{icon}{esc(smart(c["name"]))}</span>'
+        return (f'<div class="bar titlebar"><span class="name">{esc(smart(c["name"]))}</span>'
                 f'<span class="cost">{mana(symbols, c.get("mana_cost"))}</span></div>')
 
     def typebar(c):
         symbol = set_symbol(card["rarity"], set_icon)
-        return f'<div class="bar typebar"><span class="type">{esc(c["type_line"])}</span>{symbol}</div>'
+        return (f'<div class="bar typebar">{indicator_html(c)}<span class="type">{esc(c["type_line"])}</span>'
+                f'{symbol}</div>')
 
     other = ""
-    if other_face:
-        other_icon = DFC_ICON.get((card.get("layout"), 1 - card.get("face_index", 0)), "")
-        other = (f'<div class="other-face"><span class="dfc">{other_icon}</span> '
-                 f'{esc(other_face["name"])} <small>{esc(other_face["type_line"])}</small></div>')
+    if other_face and card.get("layout") == "modal_dfc":
+        other = strip_html(card, other_face, symbols)
+    ghost = ghost_html(card, other_face)
     if layout == "split":
         halves = []
         for f in card["card_faces"][:2]:
             halves.append(f'<div class="half"><div class="frame"></div>{title(f)}<div class="art"></div>{typebar(f)}'
                           f'<div class="textbox">{render_text(f, symbols)}</div></div>')
         return f'<div class="turn">{"".join(halves)}</div>'
-    if layout == "battle":
-        return (f'<div class="turn"><div class="frame"></div>{title(card)}<div class="art"></div>{typebar(card)}'
+    if layout == "battle":  # the landscape card: the bars and the art the full width, stacked, the shield bottom right
+        return (f'<div class="turn"><div class="frame"></div>{badge}{title(card)}<div class="art"></div>{typebar(card)}'
                 f'<div class="textbox" id="text">{render_text(card, symbols, flavor)}</div>'
-                f'<div class="defense"><span>{esc(str(card.get("defense")))}</span></div>{other}{footer}</div>')
+                f'{defense_html(str(card.get("defense")))}</div>')
     if layout == "adventure":
         main, adv = card["card_faces"][0], card["card_faces"][1]
         box = (f'<div class="textbox adventure" id="text"><div class="adv">'
@@ -1013,17 +1197,18 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, footer=""
         return f'{title(main)}<div class="art"></div>{typebar(main)}{box}{pt_html}'
     text = render_text(card, symbols, flavor, layout)
     if layout == "planeswalker":  # the box's black outline is a plate of its own under it (template.html .pw-line)
-        return (f'{PINLINES}{crown}{title(card)}<div class="art"></div>{typebar(card)}{LOYALTY_DEFS}'
+        return (f'{PINLINES}{crown}{badge}{title(card)}<div class="art"></div>{typebar(card)}{LOYALTY_DEFS}'
                 f'<div class="pw-line"></div><div class="textbox rows{loyalty_rows(card)}" id="text">{text}</div>'
-                f'{loyalty_box(str(card.get("loyalty")))}{other}')
+                f'{loyalty_box(str(card.get("loyalty")))}')
     if layout in ("saga", "class"):
-        return f'{title(card)}<div class="art"></div><div class="textbox" id="text">{text}</div>{typebar(card)}{other}'
+        return (f'{badge}{title(card)}<div class="art"></div><div class="textbox" id="text">{text}</div>'
+                f'{typebar(card)}{ghost}')
     cls = "has-pt" if pt_html else ""
     # a basic's text box carries its symbol's glyph alone as a css variable (glyph_uri), for a design's use
     sym = basic_symbol(card)
     glyph = f' style="--glyph: url({glyph_uri(symbols.data_uri(sym))})"' if sym else ""
-    return (f'{PINLINES}{crown}{title(card)}<div class="art"></div>{typebar(card)}'
-            f'<div class="textbox {cls}" id="text"{glyph}>{text}{other}</div>{pt_html}')
+    return (f'{PINLINES}{crown}{badge}{title(card)}<div class="art"></div>{typebar(card)}'
+            f'<div class="textbox {cls}" id="text"{glyph}>{text}</div>{other}{ghost}{pt_html}')
 
 
 # The security stamp at the foot of the text box, by Scryfall's security_stamp: the holofoil oval of every rare and
@@ -1094,6 +1279,9 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
             kind, kind_b = a, b
             frame, frame_b, box, box_b = FRAMES[a][0], FRAMES[b][0], FRAMES[a][4], FRAMES[b][4]
             frame_dark = mix(FRAMES[a][1], FRAMES[b][1], 0.5)
+    ink = "#000"
+    if dark_back(card) and not pair:
+        bar, box, ink = BACK[tint or kind]
     rarity = card["rarity"]
     rarity_hi = RARITY[rarity][1] if rarity in ("uncommon", "rare", "mythic") else "transparent"
     layout = layout_of(card)
@@ -1109,27 +1297,32 @@ def build_html(card, *, symbols, art_url, theme="wizards", fonts_css="", set_siz
     # the credit line drops to the bottom line beside a P/T box, and beside a planeswalker's loyalty shield
     footer_cls = " has-pt" if pt or layout == "planeswalker" else ""
     footer = (f'<div class="footer{footer_cls}"><span class="collector">'
-              f'<b>{collector_number(card)}/{set_size or "?"} {card["rarity"][0].upper()}</b><br>'
+              f'<b>{collector_number(card)}/{f"{set_size:03d}" if isinstance(set_size, int) else "?"} '
+              f'{card["rarity"][0].upper()}</b><br>'
               f'{esc(card["set"].upper())} • {esc(card.get("lang", "en").upper())} '
               f'{BRUSH}<span class="artist">{esc(card["artist"])}</span></span>'
               f'<span class="credit">{year} · {esc(maker)}</span></div>')
-    turned = layout in ("split", "battle")  # sideways: no stamp or crown; a battle's footer rides inside the turned box
-    stamp = stamp_kind(card) if not turned else None
+    turned = layout in ("split", "battle")  # sideways: no crown; the stamp and the footer sit in the portrait foot
+    stamp = stamp_kind(card)
+    side = badge_side(card)
     tpl = string.Template((PKG / "template.html").read_text())
     return tpl.substitute(
         font_link=font_link(title + body), local_fonts=fonts_css,
         title_font=stack(title), body_font=stack(body),
-        frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box, pinline=pinline,
+        frame=frame, frame_dark=frame_dark, bar=bar, bar_edge=bar_edge, box=box, pinline=pinline, bar_ink=ink,
         frame_b=frame_b, box_b=box_b, pinline_b=pinline_b,
         noise=NOISE_URI, texture=texture_uri(kind), texture_b=texture_uri(kind_b), set_css=set_css,
         legendary=" legendary" if legendary and not turned else "",
         pair=(" pair hybrid" if kind_b != kind else " pair") if pair else "",
         frame_vars=frame_vars or frame_css(),
         design=f" design-{design} rarity-{rarity} kind-{frame_kind(card)}", design_css=design_css(design),
-        watermark=watermark_uri(set_icon), rarity_hi=rarity_hi, layout=layout + (" tall" if tall else ""),
+        watermark=watermark_uri(set_icon), rarity_hi=rarity_hi,
+        layout=layout + (" tall" if tall else "") + (f" badge-{side}" if side else "")
+        + (" modal" if card.get("layout") == "modal_dfc" and other_face else "")
+        + (" ghosted" if ghost_html(card, other_face) else "") + (" back" if dark_back(card) else ""),
         stamp=stamp_html(stamp), stamped=f" stamped stamp-{stamp}" if stamp else "",
-        body=body_html(card, symbols, layout, flavor, pt, other_face, footer if layout == "battle" else "",
+        body=body_html(card, symbols, layout, flavor, pt, other_face,
                        crown=crown_html() if legendary and not turned else "", set_icon=set_icon),
-        footer="" if layout == "battle" else footer,
+        footer=footer,
         art=art_url, art_filter=art_filter or "none",
     )

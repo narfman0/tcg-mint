@@ -44,16 +44,41 @@ def front_face(card):
     return card
 
 
+ADDS_RE = re.compile(r"Add ([^.\n]*)")
+FACE_ONLY = {"power", "toughness", "loyalty", "defense", "flavor_text", "flavor_name", "color_indicator", "watermark",
+             "printed_name", "printed_text", "printed_type_line"}
+
+
+def made_mana(text):
+    """The colours a face's own text makes ("{T}: Add {U}." -> ["U"]), in WUBRGC order: the card's
+    produced_mana is the union of both faces, which paints a Pathway's blue front as a blue-red dual."""
+    syms = {m for add in ADDS_RE.findall(text or "") for m in re.findall(r"\{([WUBRGC])\}", add)}
+    return [c for c in "WUBRGC" if c in syms]
+
+
 def faces(card):
     """Every face of a card as its own renderable record: [front] for a normal card,
-    [front, back] for transform / modal DFCs. Each carries face_index and full_name."""
+    [front, back] for transform / modal DFCs. Each carries face_index and full_name, and the
+    card-wide fields that are really one face's -- produced_mana, the legendary frame effect -- are
+    rederived from the face, so a land's front is not tinted by its back's mana and a land whose
+    back is a legend wears no crown."""
     fs = card.get("card_faces")
     if not fs or "image_uris" not in fs[0]:  # split / adventure faces share one image: one card
         return [dict(card, face_index=0)]
+    # a record flattened by front_face carries the front's own fields at the top level; the keys a face only
+    # has when it applies (a creature's P/T, a planeswalker's loyalty, flavour text, the colour indicator)
+    # must not leak from the front into a back that has none
+    base = {k: v for k, v in card.items() if k not in FACE_ONLY}
     out = []
     for i, f in enumerate(fs):
-        out.append({**card, **{k: v for k, v in f.items() if k != "object"},
-                    "full_name": card.get("full_name", card["name"]), "face_index": i})
+        face = {**base, **{k: v for k, v in f.items() if k != "object"},
+                "full_name": card.get("full_name", card["name"]), "face_index": i}
+        face["produced_mana"] = made_mana(face.get("oracle_text"))
+        effects = [e for e in (card.get("frame_effects") or []) if e != "legendary"]
+        if (face.get("type_line") or "").startswith("Legendary"):
+            effects.append("legendary")
+        face["frame_effects"] = effects
+        out.append(face)
     return out
 
 

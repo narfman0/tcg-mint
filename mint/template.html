@@ -16,6 +16,7 @@ $local_fonts
   --box-b: $box_b;
   --pinline-b: $pinline_b;
   --ink: #000;
+  --bar-ink: $bar_ink;      /* the bars' lettering: black, white on a back face's dark bars */
   --title-font: $title_font;
   --body-font: $body_font;
   /* text position inside its bar, calibrated against Scryfall scans with
@@ -282,13 +283,57 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
   background: radial-gradient(circle at 40% 35%, #e8e8e8, #9a9a9a 60%, #6f6f6f); }
 .stamp-circle .textbox { clip-path: path('M.5 0 H212.3 L212.8 .5 V103.6 H115.85 A9.5 9.5 0 1 0 96.95 103.6 H0 V.5 Z'); }
 .stamp-circle .pl-text { clip-path: path('M0 0 H216.8 V107.2 H115.43 A7.5 7.5 0 1 0 101.37 107.2 H0 Z'); }
+/* the bite is cut for the normal text box, 212.8 x 103.6: the layouts whose box is elsewhere (a saga's column, a
+   class's, a split's halves, a battle's wide box) keep their own shape, their stamp sitting on the frame instead */
+.saga .textbox, .class .textbox, .split .textbox, .battle .textbox {
+  clip-path: polygon(.5px 0, calc(100% - .5px) 0, 100% .5px, 100% 100%, 0 100%, 0 .5px); }
 /* --- the other layouts. Everything above is the normal frame; each of these moves its parts. --- */
-/* double-faced: the face's icon before its name, and the other face named at the foot of the text box */
-.dfc { display: inline-block; font-size: .8em; margin-right: 3px; opacity: .8; }
-.other-face { position: absolute; left: 0; right: 0; bottom: 0; padding: 1px 5px; font-size: 6px; line-height: 1.3;
-  color: var(--ink); background: color-mix(in srgb, var(--bar) 70%, var(--frame)); border-top: 0.7px solid var(--bar-edge); }
-.other-face small { color: rgba(0,0,0,.6); margin-left: 3px; }
-.textbox .other-face { margin: 0 -5px -4px; position: static; }
+/* double-faced (frame.badge_html): the badge, a black tab 11-38.5 x 15-40.5 fused to the title bar's left end
+   (or its right, on a plain transform back) with a 19.5 disc centred on (25.2, 27) carrying the face's icon;
+   the name starts at 42.3 after it. A modal card's badge is a white teardrop off the bar's end, 21 x 15 with
+   its disc centred on (24, 27), in a shorter tab. The badge sits over the bar and the crown's tongues */
+.badge { position: absolute; top: 15px; width: 26.5px; height: 25.5px; background: #141414; border-radius: 12.75px 4px 4px 12.75px;
+  box-shadow: inset 0 0 0 .7px rgba(255,255,255,.14), 0 0 0 .6px rgba(0,0,0,.8); z-index: 3; }
+.badge.left { left: 11px; }
+.badge.right { right: 11px; border-radius: 4px 12.75px 12.75px 4px; }
+.badge svg { position: absolute; left: 4.45px; top: 3px; width: 19.5px; height: 19.5px; display: block; }
+.badge.right svg { left: auto; right: 4.45px; }
+.badge.modal { left: 13px; top: 17.5px; width: 23px; height: 19.5px; border-radius: 9px 3px 3px 9px; }
+.badge.modal svg { left: -1.5px; top: 2.25px; width: 21px; height: 15px; }
+/* the bar itself starts past the tab, its end cap drawn right against it, and the name after its own padding */
+.badge-left .titlebar { left: 36px; width: 199px; padding-left: 6.3px; }
+.badge-right .titlebar { width: 198.7px; }
+/* a back face's bars letter in white on their deep colour (frame.BACK) */
+.titlebar, .typebar { color: var(--bar-ink); }
+/* the colour indicator before a back face's type line: a 7 disc at 16.5-23.5 (frame.indicator_html), a dark
+   ring with a white one inside it, the type line starting at 26.5 after it */
+.ci { flex: none; width: 7px; height: 7px; border-radius: 50%; margin: 0 2.5px 0 -2.5px; position: relative; top: var(--type-dy);
+  box-shadow: inset 0 0 0 .5px rgba(255,255,255,.85), 0 0 0 .55px #000; }
+.ci + .type { margin-right: auto; }  /* the bar spaces its two ends apart; the type line keeps to the left with the disc */
+/* a transform front's ghost of its back's P/T: grey, in the rules face, its baseline at 303 and right edge at 228.5,
+   above the P/T plate (Delver of Secrets, INR 60); a saga's at the foot of its column (NEO 34) */
+.ghost-pt { position: absolute; right: 21.5px; top: 294.5px; font-family: var(--body-font); font-size: 11.3px; line-height: 1;
+  color: #8a8a8a; z-index: 3; }
+.saga .ghost-pt { right: auto; left: 29px; top: 281.5px; }
+.ghosted .textbox { padding-bottom: 20px; }  /* the lines keep above the ghost's own line, as the printed cards set them */
+/* a modal card's foot strip (frame.strip_html): the other face's type word and cost in a pointed bar at the text box's
+   foot, 10-114 x 310-322 with the point 5.5 long and a notch at its left end; a dark bar letters in white, a light one
+   in black with a black outline. The text box keeps its lines above it */
+.strip { position: absolute; left: 10px; top: 310px; width: 104px; height: 12px; z-index: 2; color: var(--strip-ink);
+  display: flex; align-items: center; padding: 0 8px 0 1.5px; font-family: var(--title-font); font-weight: 700; font-size: 8.6px;
+  clip-path: polygon(0 0, calc(100% - 5.5px) 0, 100% 50%, calc(100% - 5.5px) 100%, 0 100%); background: #000; }
+.strip.dark { background: rgba(255,255,255,.35); }
+.strip .fill { position: absolute; inset: .6px; background: var(--strip);
+  clip-path: polygon(0 0, calc(100% - 5.2px) 0, 100% 50%, calc(100% - 5.2px) 100%, 0 100%); }
+.strip .notch { position: relative; flex: none; width: 5.5px; height: 6px; margin-right: 2.5px; background: var(--strip-ink);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%); }
+.strip b { position: relative; flex: 1; white-space: nowrap; letter-spacing: .01em; top: .3px; }
+.strip .cost { position: relative; display: flex; gap: 1px; }
+.strip .cost .pip, .strip .cost .pip img { width: 7.5px; height: 7.5px; }
+.strip .cost .pip::before { transform: translate(-0.15px, 0.55px); }
+.strip .line { position: relative; font-family: var(--body-font); font-weight: 400; font-size: 9.2px; white-space: nowrap; }
+.strip .line img.sym { height: 7.5px; width: 7.5px; vertical-align: -1.3px; }
+.modal .textbox { padding-bottom: 13.5px; }
 /* planeswalker: the text box is a plain white sheet with a black outline in place of the bevel and pinline, inset on
    the left so the loyalty badges straddle its edge over a wide flat strip; a badge per ability, a row per
    paragraph shaded in turn, and the loyalty shield bottom right straddling the box's foot and the frame.
@@ -418,15 +463,27 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
 .loyalty .shield { position: absolute; left: 0; top: 0; width: 36px; height: 23px; display: block; }
 .loyalty span { position: absolute; left: 0; width: 36px; top: 13.6px; text-align: center; line-height: 1;
   transform: translateY(calc(-50% + var(--pt-dy))); font-family: var(--title-font); font-weight: 700; font-size: 13.7px; }
-/* saga: chapters down the left, the art the full height on the right, the type line under both */
-.saga .art { left: 125.6px; top: 38.7px; width: 109px; height: 262px; }
-.saga .textbox { left: 15.4px; top: 38.7px; width: 109px; height: 262px; padding: 5px 4px; font-size: 9.6px; justify-content: flex-start; }
-.saga .typebar { top: 302px; }
-.saga .textbox p.reminder { font-style: italic; font-size: .82em; color: rgba(0,0,0,.75); margin-bottom: 4px; }
-.saga .textbox p.chapter { display: flex; gap: 4px; align-items: flex-start; padding: 3px 0; border-top: 0.7px solid rgba(0,0,0,.25); margin: 0; }
-.saga .numeral { flex: none; display: flex; flex-direction: column; gap: 1px; }
-.saga .numeral b { display: block; width: 15px; height: 13px; line-height: 13px; text-align: center; font-family: var(--title-font); font-size: 8.5px;
-  color: #fff; background: #222; clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%); }
+/* saga: chapters down the left, the art the full height on the right, the type line under both. Measured off The
+   Restoration of Eiganjo (NEO 34): the column 15.4-124.4 x 38.7-293 with a 12-wide spine in the bar's colour down
+   its left edge, the text from 36; each chapter's numeral in a hexagon badge (frame.HEXAGON) centred on the spine
+   beside its text; the type bar at 295.5 and the frame's foot at 320 under it; the text at 11 */
+.saga .frame { bottom: 30px; }
+.saga .art { left: 125.6px; top: 38.7px; width: 109px; height: 254.3px; }
+.saga .textbox { left: 15.4px; top: 38.7px; width: 109px; height: 254.3px; padding: 4px 3px 4px 20.6px; font-size: 11px;
+  justify-content: flex-start; }
+.saga .textbox { background: linear-gradient(90deg, color-mix(in srgb, var(--bar) 80%, var(--frame)) 0, color-mix(in srgb, var(--bar) 80%, var(--frame)) 11.3px,
+  rgba(0,0,0,.45) 11.3px, rgba(0,0,0,.45) 12px, var(--box) 12px); }
+.saga .textbox p { flex: none; }  /* a column of rows: none gives way to the others, the fit shrinks the text instead */
+.saga.ghosted .textbox { padding-bottom: 16px; }
+.saga .typebar { top: 295.5px; }
+.saga .textbox p.reminder { font-style: italic; margin-bottom: 4px; }
+.saga .textbox p.chapter { position: relative; display: flex; align-items: center; padding: 4px 0; margin: 0;
+  border-top: 0.8px dotted rgba(0,0,0,.3); min-height: 19px; }
+.saga .numeral { position: absolute; left: -20.6px; top: 50%; transform: translateY(-50%); width: 14px; display: flex; flex-direction: column; gap: 1px; }
+.saga .numeral b { position: relative; display: block; width: 14px; height: 17px; }
+.saga .numeral b svg { position: absolute; inset: 0; width: 14px; height: 17px; }
+.saga .numeral b i { position: absolute; inset: 0; font-style: normal; text-align: center; line-height: 17px;
+  font-family: var(--title-font); font-weight: 700; font-size: 9.5px; color: #000; }
 /* class: the mirror of a saga -- art on the left, the levels on the right */
 .class .art { left: 15.4px; top: 38.7px; width: 109px; height: 262px; }
 .class .textbox { left: 125.6px; top: 38.7px; width: 109px; height: 262px; padding: 4px; font-size: 9.6px; justify-content: flex-start; }
@@ -445,28 +502,35 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
 .textbox.adventure .adv-type { padding: 0 3px; font-family: var(--title-font); font-weight: 700; font-size: .88em; border-bottom: 0.7px solid var(--bar-edge); white-space: nowrap; }
 .textbox.adventure .adv-text { padding: 2px 3px; flex: 1; display: flex; flex-direction: column; justify-content: safe center; }
 .textbox.adventure .main { flex: 1; display: flex; flex-direction: column; justify-content: safe center; padding: 1px 2px; }
-/* sideways cards: a 350x250 box turned a quarter turn inside the 250x350 card */
-.turn { position: absolute; left: 0; top: 0; width: 350px; height: 250px; transform-origin: 0 0; transform: rotate(90deg) translate(0, -250px); }
+/* sideways cards: a 350x250 box turned a quarter turn inside the 250x350 card, its top along the portrait's
+   left edge, as the printed cards are read (Fire // Ice, DMR 215; Invasion of Tolvada, MOM 241): the box's x runs
+   up the card, its y across. The stamp and the footer keep the portrait foot, outside the box */
+.turn { position: absolute; left: 0; top: 0; width: 350px; height: 250px; transform-origin: 0 0; transform: rotate(-90deg) translate(-350px, 0); }
 /* split: two half cards side by side in the turned box, each a normal frame at 0.64, leaving the portrait
-   bottom for the footer as on the real cards; a battle's footer rides in the turned box instead */
-.turn .footer { left: 14px; right: 14px; bottom: 3px; }
+   bottom for the footer as on the real cards */
 .split .turn .half { position: absolute; top: 6px; left: 8px; width: 250px; height: 350px; transform-origin: 0 0; transform: scale(0.64); }
 .split .turn .half + .half { left: 172px; }
 .split .footer { left: 12px; right: 12px; bottom: 6px; }
 .split .half .frame { bottom: 9.5px; }
 .split .half .textbox { height: 118px; }
 .split > .frame { display: none; }
-/* battle: the art on the left half, the text on the right, the defense shield bottom right */
-.battle .turn .frame { left: 9.5px; top: 9.5px; right: 9.5px; bottom: 9.5px; }
-.battle .turn .titlebar { left: 14px; width: 322px; top: 14px; }
-.battle .turn .art { left: 14px; top: 36px; width: 150px; height: 176px; }
-.battle .turn .typebar { left: 168px; width: 168px; top: 36px; }
-.battle .turn .textbox { left: 168px; top: 57px; width: 168px; height: 155px; font-size: 9.8px; }
-.battle .turn .other-face { left: 14px; right: auto; width: 150px; bottom: 36px; }
-.battle .turn .footer { left: 30px; right: 48px; }
-.defense { position: absolute; right: 13px; bottom: 16px; width: 26px; height: 22px; color: #fff; font-family: var(--title-font); font-weight: 700;
-  font-size: 12px; text-align: center; line-height: 22px; background: #1a1a1a; box-shadow: inset 0 0 0 0.9px #b9b9b9;
-  clip-path: polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%); }
+/* battle: measured off Invasion of Tolvada (MOM 241) -- the landscape frame 28-340 x 12.5-240 of the box (its foot
+   28 in from the portrait bottom, where the stamp and the footer go), the title bar, the art, the type bar and the
+   text box each the full width and stacked, the badge a smaller one at the bar's left end, the shield bottom right
+   over the frame's edge */
+.battle .turn .frame { left: 28px; top: 12.5px; right: 10px; bottom: 10px; border-radius: 22px 5px 5px 22px; }
+.battle .turn .titlebar { left: 36px; width: 291px; top: 14px; height: 18px; }
+.battle.badge-left .turn .titlebar { left: 49px; width: 278px; padding-left: 4px; }
+.battle .turn .badge { left: 31px; top: 13.5px; width: 20px; height: 19.5px; border-radius: 4px 2px 2px 4px; }
+.battle .turn .badge svg { left: 2.5px; top: 2.5px; width: 14.5px; height: 14.5px; }
+.battle .turn .art { left: 30px; top: 12.5px; width: 310px; height: 128.5px; }  /* the art under the floating title bar, out to the frame's edge */
+.battle .turn .typebar { left: 40px; width: 287px; top: 143.5px; height: 18px; }
+.battle .turn .textbox { left: 40px; top: 164px; width: 287px; height: 58px; font-size: 9.6px; padding: 2.5px 4px; }
+/* the defense starburst (frame.defense_html) over the frame's bottom right corner, centred on (332, 229) of the box */
+.defense { position: absolute; right: 6.5px; bottom: 9.5px; width: 23px; height: 23px; color: #fff; font-family: var(--title-font); font-weight: 700;
+  font-size: 11.5px; text-align: center; line-height: 23px; z-index: 3; }
+.defense svg { position: absolute; inset: 0; width: 23px; height: 23px; }
+.defense span { position: relative; display: block; top: .6px; }
 /* collector info: two rows on the left (number, then set/language/artist); the mint credit
    only on the bottom row, on the right, so it stays below the P/T box (which ends at 333) */
 .footer { position: absolute; left: 16.5px; right: 17.5px; bottom: 10px; color: #fff;

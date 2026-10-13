@@ -144,7 +144,7 @@ def test_render_text_escapes_markup():
 def test_build_html_substitutes_everything(card, art):
     html = frame.build_html(card, symbols=NoSymbols(), art_url="file://" + art, set_size=12, maker="me", year="2026")
     assert "${" not in html and "$name" not in html
-    assert "Test Subject" in html and "001/12 R" in html and "TST • EN" in html and "2/3" in html
+    assert "Test Subject" in html and "001/012 R" in html and "TST • EN" in html and "2/3" in html
     assert "2026 · me" in html
 
 
@@ -242,6 +242,20 @@ def test_faces():
             [("A", "a", 0, "A // B"), ("B", "b", 1, "A // B")]
     split = {"name": "A // B", "layout": "split", "image_uris": {}, "card_faces": [{"name": "A"}, {"name": "B"}]}
     assert len(faces(split)) == 1
+    # what only one face has stays on it, whether the record is raw or flattened by front_face; what each face
+    # makes and whether it is a legend is the face's own
+    dfc = {"name": "Grove // Prince", "layout": "transform", "produced_mana": ["C"], "frame_effects": ["legendary"],
+           "card_faces": [{"name": "Grove", "type_line": "Land", "illustration_id": "a", "image_uris": {},
+                           "oracle_text": "{T}: Add {C}.", "flavor_text": "Quiet."},
+                          {"name": "Prince", "type_line": "Legendary Creature — Demon", "illustration_id": "b",
+                           "image_uris": {}, "oracle_text": "Flying", "power": "9", "toughness": "7",
+                           "color_indicator": ["B"]}]}
+    for record in (dfc, front_face(dfc)):
+        front, back = faces(record)
+        assert "power" not in front and "flavor_text" not in back and "color_indicator" not in front
+        assert (back["power"], back["flavor_text"] if "flavor_text" in back else None) == ("9", None)
+        assert front["produced_mana"] == ["C"] and back["produced_mana"] == []
+        assert front["frame_effects"] == [] and back["frame_effects"] == ["legendary"]
 
 
 def test_frame_knobs_reach_the_page_as_custom_properties(card, art):
@@ -357,4 +371,4 @@ def test_stamp_follows_the_printing(card, art):
                                            card_faces=[dict(name="A", type_line="Instant", mana_cost="", oracle_text="x"),
                                                        dict(name="B", type_line="Instant", mana_cost="", oracle_text="y")]),
                             symbols=NoSymbols(), art_url="file://" + art)
-    assert '<div class="card split design-m15 rarity-rare kind-U">' in html  # sideways cards carry none
+    assert '<div class="card split stamped stamp-oval design-m15 rarity-rare kind-U">' in html  # in the portrait foot

@@ -80,6 +80,32 @@ CARDS = {
                   card_faces=[dict(name="Fix", type_line="Instant", mana_cost="{1}{R}",
                                    oracle_text="Fix deals 2 damage to any target."),
                               dict(name="Fixture", type_line="Sorcery", mana_cost="{2}{U}", oracle_text="Draw two cards.")]),
+    # the double-faced cards, each face with the other in hand (_other): a transform pair wears the plain badges, the
+    # front a ghost of the back's P/T and the back its colour indicator; a modal pair the teardrops and the foot strips
+    "transform": dict(name="Fixture Delver", type_line="Creature — Fixture", colors=["U"], mana_cost="{U}", rarity="common",
+                      power="1", toughness="1", layout="transform", face_index=0, flavor_text=None,
+                      oracle_text="At the beginning of your upkeep, look at the top card of your library.",
+                      _other=dict(name="Fixture Aberration", type_line="Creature — Fixture Insect", power="3", toughness="2")),
+    "transform-back": dict(name="Fixture Aberration", type_line="Creature — Fixture Insect", colors=["U"], mana_cost="",
+                           rarity="common", power="3", toughness="2", layout="transform", face_index=1,
+                           color_indicator=["U"], oracle_text="Flying", flavor_text="The fixture is out.",
+                           _other=dict(name="Fixture Delver", type_line="Creature — Fixture", mana_cost="{U}", power="1",
+                                       toughness="1")),
+    "modal": dict(name="Fixture's Awakening", type_line="Sorcery", colors=["G"], mana_cost="{2}{G}", rarity="rare",
+                  power=None, toughness=None, layout="modal_dfc", face_index=0, flavor_text="Wake up.",
+                  oracle_text="Return target creature card from your graveyard to your hand.",
+                  _other=dict(name="Fixture Grove", type_line="Land", colors=[], mana_cost="", face_index=1,
+                              oracle_text="As this land enters, you may pay 3 life.\n{T}: Add {G}.", produced_mana=["G"])),
+    "modal-back": dict(name="Fixture Grove", type_line="Land", colors=[], mana_cost="", rarity="rare", power=None,
+                       toughness=None, layout="modal_dfc", face_index=1, flavor_text=None, produced_mana=["G"],
+                       oracle_text="As this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {G}.",
+                       _other=dict(name="Fixture's Awakening", type_line="Sorcery", colors=["G"], mana_cost="{2}{G}",
+                                   face_index=0, oracle_text="Return target creature card.")),
+    "battle": dict(name="Invasion of the Fixture", type_line="Battle — Siege", colors=["W", "B"], mana_cost="{2}{W}{B}",
+                   rarity="rare", power=None, toughness=None, defense="5", layout="transform", face_index=0, flavor_text=None,
+                   oracle_text="(As a Siege enters, choose an opponent to protect it. You and others can attack it. When "
+                               "it's defeated, exile it, then cast it transformed.)\nWhen this Siege enters, draw a card.",
+                   _other=dict(name="The Fixed Sky", type_line="Enchantment", colors=["W", "B"], mana_cost="")),
 }
 
 
@@ -91,10 +117,12 @@ def browser():
 
 
 def render(name, art, tmp_path, browser):
-    card = synthetic_card(**CARDS[name])
+    spec = dict(CARDS[name])
+    other = spec.pop("_other", None)
+    card = synthetic_card(**spec)
     fonts_css = frame.local_fonts(tmp_path / "no-workspace-fonts")  # only the packaged faces, never the user's
     html = frame.build_html(card, symbols=DotSymbols(), art_url="file://" + art, theme="wizards", fonts_css=fonts_css,
-                            set_size=len(CARDS), maker="tester", year="2026")
+                            set_size=len(CARDS), maker="tester", year="2026", other_face=other)
     assert "fonts.googleapis.com" not in html  # the wizards theme is fully offline
     assert str(frame.FONTS) in html
     out = tmp_path / f"{name}.png"
@@ -119,7 +147,7 @@ def compare(got, want):
 def test_golden(name, art, tmp_path, browser):
     out, sizes = render(name, art, tmp_path, browser)
     assert Image.open(out).size == (408, 558)
-    base = {"planeswalker": 8.8, "saga": 9.6}.get(name, 12.6)  # these layouts set their text smaller to begin with
+    base = {"planeswalker": 8.8, "saga": 11, "battle": 9.6}.get(name, 12.6)  # these layouts set their text smaller to begin with
     if name == "land":
         assert frame.TEXT_FLOOR <= sizes["text"] < 12.6  # the long text was shrunk to fit
     else:
