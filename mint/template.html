@@ -246,8 +246,8 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
    a watermark behind the rules text; the holofoil oval under the text box on rares and mythics */
 .art::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: var(--art-bevel);
   box-shadow: 0 0 0 1px #000; }
-.bar, .textbox { isolation: isolate; }
-.bar::after, .textbox::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
+.bar, .textbox, .ghost-tab { isolation: isolate; }
+.bar::after, .textbox::after, .ghost-tab::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
   background: url("$noise"); mix-blend-mode: overlay; opacity: var(--box-grain); }
 .bar::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
   background: var(--rarity-hi); mix-blend-mode: soft-light; opacity: var(--rarity-tint); }
@@ -311,28 +311,41 @@ C221 19.6 224 15.6 225.6 14.1 L225.6 0 Z'); }
   box-shadow: inset 0 0 0 .5px rgba(255,255,255,.85), 0 0 0 .55px #000; }
 .ci + .type { margin-right: auto; }  /* the bar spaces its two ends apart; the type line keeps to the left with the disc */
 /* a transform front's ghost of its back's P/T: grey, in the rules face, its baseline at 303 and right edge at 228.5,
-   above the P/T plate (Delver of Secrets, INR 60); a saga's at the foot of its column (NEO 34) */
+   above the P/T plate (Delver of Secrets, INR 60); a saga's at the foot of its column (NEO 34). The box's right edge
+   steps out around it into a point: the face's apex at 238.2 x 300, the shoulders at 293.2 and 306.8 on the box's
+   edge (45-degree sides), the pinline round it 2 wide with its apex at 241, and the textured band is cut off along
+   the point's lower edge, the border black below it (measured off INR 60 and 287 and MID 204). The text keeps its
+   place -- centred in the box as ever -- and the lines beside the ghost shorten to clear it (the fit, below) */
 .ghost-pt { position: absolute; right: 21.5px; top: 294.5px; font-family: var(--body-font); font-size: 11.3px; line-height: 1;
   color: #8a8a8a; z-index: 3; }
+.ghost-tab { position: absolute; left: 229.4px; top: 293.2px; width: 8.8px; height: 13.6px; z-index: 2; background: var(--box);
+  clip-path: polygon(0 0, 2px 0, 100% 50%, 2px 100%, 0 100%); }
+.pair .ghost-tab { background: var(--box-b); }
+.pl-tab { left: 233.4px; top: 292.4px; width: 7.6px; height: 15.2px; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.ghosted .frame { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12.5px), calc(100% - 6.6px) calc(100% - 5.9px),
+  calc(100% - 6.6px) 100%, 0 100%); }
+.ghost-gap { float: right; }
 .saga .ghost-pt { right: auto; left: 29px; top: 281.5px; }
-.ghosted .textbox { padding-bottom: 20px; }  /* the lines keep above the ghost's own line, as the printed cards set them */
-/* a modal card's foot strip (frame.strip_html): the other face's type word and cost in a pointed bar at the text box's
-   foot, 10-114 x 310-322 with the point 5.5 long and a notch at its left end; a dark bar letters in white, a light one
-   in black with a black outline. The text box keeps its lines above it */
-.strip { position: absolute; left: 10px; top: 310px; width: 104px; height: 12px; z-index: 2; color: var(--strip-ink);
-  display: flex; align-items: center; padding: 0 8px 0 1.5px; font-family: var(--title-font); font-weight: 700; font-size: 8.6px;
-  clip-path: polygon(0 0, calc(100% - 5.5px) 0, 100% 50%, calc(100% - 5.5px) 100%, 0 100%); background: #000; }
+.saga .ghost-tab { display: none; }
+/* a modal card's foot strip (frame.strip_html): the other face's type word and cost in a bar pointed at both ends
+   at the text box's foot, 16.5-116.5 x 310-322.5, its left point reaching the box's pinline and its right one 12
+   long (both at 45 degrees), a solid triangle 6 wide inside the left point, the word from 31, the cost ending at
+   104.5 with 6.5-unit pips; a dark bar letters in white with a pale outline, a light one in black with a black
+   outline (ZNR 90). The text box keeps its lines above it */
+.strip { position: absolute; left: 16.5px; top: 310px; width: 100px; height: 12.5px; z-index: 2; color: var(--strip-ink);
+  display: flex; align-items: center; padding: 0 12px 0 4px; font-family: var(--title-font); font-weight: 700; font-size: 8.6px;
+  clip-path: polygon(0 50%, 12.5px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12.5px 100%); background: #000; }
 .strip.dark { background: rgba(255,255,255,.35); }
 .strip .fill { position: absolute; inset: .6px; background: var(--strip);
-  clip-path: polygon(0 0, calc(100% - 5.2px) 0, 100% 50%, calc(100% - 5.2px) 100%, 0 100%); }
-.strip .notch { position: relative; flex: none; width: 5.5px; height: 6px; margin-right: 2.5px; background: var(--strip-ink);
+  clip-path: polygon(.25px 50%, 12.2px 0, calc(100% - 11.7px) 0, calc(100% - .25px) 50%, calc(100% - 11.7px) 100%, 12.2px 100%); }
+.strip .notch { position: relative; flex: none; width: 6px; height: 6.5px; margin-right: 4.5px; background: var(--strip-ink);
   clip-path: polygon(100% 0, 0 50%, 100% 100%); }
 .strip b { position: relative; flex: 1; white-space: nowrap; letter-spacing: .01em; top: .3px; }
-.strip .cost { position: relative; display: flex; gap: 1px; }
-.strip .cost .pip, .strip .cost .pip img { width: 7.5px; height: 7.5px; }
+.strip .cost { position: relative; display: flex; gap: 1.8px; }
+.strip .cost .pip, .strip .cost .pip img { width: 6.6px; height: 6.6px; }
 .strip .cost .pip::before { transform: translate(-0.15px, 0.55px); }
 .strip .line { position: relative; font-family: var(--body-font); font-weight: 400; font-size: 9.2px; white-space: nowrap; }
-.strip .line img.sym { height: 7.5px; width: 7.5px; vertical-align: -1.3px; }
+.strip .line img.sym { height: 6.6px; width: 6.6px; vertical-align: -1.1px; }
 .modal .textbox { padding-bottom: 13.5px; }
 /* planeswalker: the text box is a plain white sheet with a black outline in place of the bevel and pinline, inset on
    the left so the loyalty badges straddle its edge over a wide flat strip; a badge per ability, a row per
@@ -571,7 +584,40 @@ window.fit = () => {
   for (const t of document.querySelectorAll('.textbox')) {
     t.style.fontSize = '';
     let f = parseFloat(getComputedStyle(t).fontSize);
-    while (t.scrollHeight > t.clientHeight && f > 6) { f -= 0.2; t.style.fontSize = f + 'px'; }
+    // a transform front's ghost of its back's P/T sits inside the rules face: the lines beside it stop short of
+    // it, as the print sets them, the block staying centred. Each paragraph it reaches into gets a float at its
+    // end, shaped (shape-outside) to begin where the ghost does, so only the lines level with the ghost shorten;
+    // a float moves the lines under it, so the floats are set again until nothing moves
+    const ghost = t.id === 'text' && !t.closest('.saga') ? document.querySelector('.ghost-pt') : null;
+    const clear = () => {
+      if (!ghost) return;
+      const g = ghost.getBoundingClientRect(), gap = 2.5, top = g.top - gap, bottom = g.bottom + gap;
+      for (let pass = 0; pass < 4; pass++) {
+        for (const p of t.querySelectorAll('p')) {
+          let sp = p.querySelector(':scope > .ghost-gap');
+          const r = p.getBoundingClientRect(), r0 = r.top + parseFloat(getComputedStyle(p).paddingTop);
+          if (r.bottom <= top || r0 >= bottom) { if (sp) sp.remove(); continue; }
+          if (!sp) { sp = document.createElement('span'); sp.className = 'ghost-gap'; p.prepend(sp); }
+          sp.style.width = (r.right - g.left + gap) + 'px';
+          sp.style.height = (Math.min(r.bottom, bottom) - r0) + 'px';
+          sp.style.shapeOutside = 'inset(' + Math.max(0, top - r0) + 'px 0 0 0)';
+        }
+      }
+    };
+    if (ghost) {
+      // a line the ghost would break in two shrinks the text a little first, as the typesetter would (Westvale
+      // Abbey's last line ends 3 short of the ghost at full size); past 1.2 the line breaks after all
+      const lines = () => [...t.querySelectorAll('p')].reduce((h, p) => h + p.getBoundingClientRect().height, 0);
+      const f0 = f;
+      for (;;) {
+        for (const sp of t.querySelectorAll('.ghost-gap')) sp.remove();
+        const h0 = lines(); clear();
+        if (lines() <= h0 + 1) break;
+        if (f <= f0 - 1.2) { f = f0; t.style.fontSize = f + 'px'; clear(); break; }
+        f -= 0.2; t.style.fontSize = f + 'px';
+      }
+    }
+    while (t.scrollHeight > t.clientHeight && f > 6) { f -= 0.2; t.style.fontSize = f + 'px'; clear(); }
     // the P/T plate (or a planeswalker's loyalty shield) overlaps the box's bottom right: the last line keeps
     // clear of it, as on the real cards
     const pt = document.querySelector('.pt, .loyalty');

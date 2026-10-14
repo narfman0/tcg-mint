@@ -1127,8 +1127,8 @@ def strip_colours(face):
 
 def strip_html(card, other, symbols):
     """The foot strip of a modal double-faced card: the other face's type word and its mana cost, or a land's
-    mana line, in a pointed bar at the text box's foot (template.html .strip). Measured off ZNR 90 and KHM 123:
-    10-114 x 310-322, a notch at its left end, the point 5.5 long."""
+    mana line, in a bar pointed at both ends at the text box's foot (template.html .strip). Measured off ZNR 90
+    and KHM 123: 16.5-116.5 x 310-322.5, a solid triangle inside its left point."""
     fill, ink = strip_colours(other)
     line = mana_line(other) if "Land" in (other.get("type_line") or "") else None
     if line:
@@ -1143,11 +1143,12 @@ def strip_html(card, other, symbols):
 
 def ghost_html(card, other):
     """A transform front's small grey note of its back's power and toughness, at the text box's foot beside
-    the P/T plate (Delver of Secrets, INR 60; a saga's at its column's foot): "" for any other face."""
+    the P/T plate, the box's edge pointing out around it (Delver of Secrets, INR 60; a saga's at its column's
+    foot, in the plain column): "" for any other face."""
     if (card.get("layout") != "transform" or card.get("face_index", 0) != 0 or not other
             or other.get("power") is None):
         return ""
-    return f'<div class="ghost-pt">{esc(other["power"])}/{esc(other["toughness"])}</div>'
+    return f'<div class="ghost-tab"></div><div class="ghost-pt">{esc(other["power"])}/{esc(other["toughness"])}</div>'
 
 
 # the pinline plate: the normal frame's four elements' pinlines, painted before them (template.html .pinlines),
@@ -1155,6 +1156,9 @@ def ghost_html(card, other):
 PINLINES = "".join(f'<div class="pinlines {layer}">'
                    + "".join(f'<div class="pinline pl-{e}"></div>' for e in ("crown", "title", "art", "type", "text"))
                    + "</div>" for layer in ("shade", "light"))
+# ... and with the point the text box's edge makes around a ghost P/T (template.html .pl-tab)
+PINLINES_TAB = PINLINES.replace('<div class="pinline pl-text"></div>', '<div class="pinline pl-text"></div>'
+                                '<div class="pinline pl-tab"></div>')
 
 
 def body_html(card, symbols, layout, flavor, pt_html, other_face=None, crown="", set_icon=None):
@@ -1207,7 +1211,7 @@ def body_html(card, symbols, layout, flavor, pt_html, other_face=None, crown="",
     # a basic's text box carries its symbol's glyph alone as a css variable (glyph_uri), for a design's use
     sym = basic_symbol(card)
     glyph = f' style="--glyph: url({glyph_uri(symbols.data_uri(sym))})"' if sym else ""
-    return (f'{PINLINES}{crown}{badge}{title(card)}<div class="art"></div>{typebar(card)}'
+    return (f'{PINLINES_TAB if ghost else PINLINES}{crown}{badge}{title(card)}<div class="art"></div>{typebar(card)}'
             f'<div class="textbox {cls}" id="text"{glyph}>{text}</div>{other}{ghost}{pt_html}')
 
 

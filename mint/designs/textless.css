@@ -134,5 +134,8 @@ C14.6 278.6 2 268.6 2 266.8 Z'); }
 /* no type line, no rules text: the type bar, the text box, their plates, and a planeswalker's box outline */
 .design-textless .typebar, .design-textless .pl-type, .design-textless .textbox, .design-textless .pl-text,
 .design-textless .pw-line { display: none; }
+/* ... nor the point the box's edge makes round a transform front's ghost P/T, and the band keeps its own foot */
+.design-textless .ghost-tab, .design-textless .pl-tab { display: none; }
+.design-textless.ghosted .frame { clip-path: none; }
 /* the title bar's smoked glass over the picture, white lettering */
 .design-textless .titlebar { --bar: rgba(84, 84, 84, .67); color: #fff; }

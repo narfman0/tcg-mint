@@ -25,7 +25,8 @@ draw them: the badge at the title bar's end with the printing's own icons
 (the plain triangles, sun and moon, Ixalan's compass, Origins' spark, Kamigawa's
 fan), a plain transform back's badge at the bar's right end, the colour
 indicator before a back face's type line, a transform front's grey note of
-its back's power and toughness, and a modal card's pointed foot strip naming
+its back's power and toughness in a point the text box makes for it, and a
+modal card's foot strip, pointed at both ends, naming
 the other face's type and cost (`--faces` renders the backs). Colour follows the
 real cards too: a land that makes one colour takes that colour's pinline,
 and a two-colour card — a dual land, a fetch land by the basic types it

@@ -52,6 +52,9 @@
    later in the document at the same z); its texture goes, and a hybrid's second texture with it */
 .design-fullart .frame { left: -11px; right: -11px; top: 323.6px; bottom: -11px; border-radius: 0; background: #000; z-index: 2; }
 .design-fullart .frame::before, .design-fullart .frame::after { display: none; }
+/* the glass box has no edge to point out round a transform front's ghost P/T, and the strip is not cut for it */
+.design-fullart .ghost-tab, .design-fullart .pl-tab { display: none; }
+.design-fullart.ghosted .frame { clip-path: none; }
 /* a stamped card's text box and its plate are bitten by arcs around the stamp (template.html .stamp): the oval's
    a 24.1 arc about (125, 339.1), the plate's the same arc 2 in, its rim lining the bite. The strip grows a black
    disc of the box's bite (24.1, 0.15 over so no hairline of art shows at the arc; the plate, painted under the
