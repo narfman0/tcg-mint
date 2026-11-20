@@ -1013,6 +1013,8 @@ def render_text(card, symbols, flavor=None, layout="normal"):
         p = re.sub(r"\(([^)]*)\)", r'<span class="reminder">(\1)</span>', p)
         # a run of symbols plus any trailing punctuation wraps as one unit
         p = re.sub(r'((?:<img class="sym"[^>]*>)+[.,;:]?)', r'<span class="nowrap">\1</span>', p)
+        # a number closing a clause stays with its word ("amass Orcs 1.", "surveil 2."), never a line to itself
+        p = re.sub(r" (\d+)(?=[.,;:)]|$)", " \\1", p)
         paras.append(f"<p>{p}</p>")
     flavor = card.get("flavor_text") if flavor is None else flavor
     if flavor:
